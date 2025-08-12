@@ -1,0 +1,5 @@
+model: "qwen2.5:7b"    # e.g., "llama3.1:8b-instruct"
+llm_kwargs:
+  temperature: 0.0
+  top_p: 1.0
+  repeat_penalty: 1.0

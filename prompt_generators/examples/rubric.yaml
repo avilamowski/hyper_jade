@@ -1,0 +1,22 @@
+title: "Rubric: average()"
+scale: 0-10
+criteria:
+  - id: correctness
+    title: Correctness
+    max_score: 4
+    descriptors:
+      full: "Computes average correctly for non-empty lists and handles empty lists."
+      partial: "Correct on common cases; fails on edge cases."
+      none: "Incorrect result or exceptions."
+  - id: robustness
+    title: Robustness & Errors
+    max_score: 2
+  - id: style
+    title: Style & Readability
+    max_score: 2
+  - id: complexity
+    title: Complexity
+    max_score: 1
+  - id: testability
+    title: Testability
+    max_score: 1
