@@ -8,8 +8,6 @@ STUDENT CODE:
 ASSIGNMENT DESCRIPTION:
 {{ assignment_description }}
 
-DIFFICULTY LEVEL: {{ difficulty_level.title() }}
-
 LANGUAGE: {{ language.title() }}
 
 FOCUS AREAS:
@@ -36,7 +34,7 @@ OUTPUT FORMAT:
 <LOGIC_ANALYSIS>
   <LOGIC_ERRORS>
     {% for error in logic_errors %}
-    <ERROR severity="{{ error.severity }}" type="{{ error.type }}">
+    <ERROR severity="{{ error.severity }}" type="{{ error.type }}" line="{{ error.line_number }}">
       <DESCRIPTION>{{ error.description }}</DESCRIPTION>
       <LOCATION>{{ error.location }}</LOCATION>
       <EXPLANATION>{{ error.explanation }}</EXPLANATION>
@@ -103,19 +101,3 @@ OUTPUT FORMAT:
     {% endfor %}
   </LEARNING_RESOURCES>
 </LOGIC_ANALYSIS>
-
-{% if difficulty_level == "beginner" %}
-ADDITIONAL GUIDANCE FOR BEGINNERS:
-- Focus on basic logic concepts like loops and conditionals
-- Provide simple examples to illustrate concepts
-- Break down complex problems into smaller steps
-- Emphasize the importance of testing with different inputs
-{% endif %}
-
-{% if difficulty_level == "advanced" %}
-ADDITIONAL GUIDANCE FOR ADVANCED STUDENTS:
-- Consider advanced algorithms and data structures
-- Analyze time and space complexity
-- Look for optimization opportunities
-- Consider concurrent programming issues
-{% endif %}

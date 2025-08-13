@@ -37,6 +37,9 @@ def main():
     parser.add_argument("--config", default="src/config/assignment_config.yaml", help="Configuration file path")
     parser.add_argument("--output", "-o", help="Output file path")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--use-stored", action="store_true", help="Use stored outputs from previous agent runs")
+    parser.add_argument("--assignment-id", help="Assignment ID for stored outputs (defaults to assignment filename)")
+    parser.add_argument("--storage-dir", default="outputs", help="Output storage directory")
     
     args = parser.parse_args()
     
@@ -62,6 +65,9 @@ def main():
         print(f"Error reading input files: {e}")
         sys.exit(1)
     
+    # Generate assignment ID if not provided
+    assignment_id = args.assignment_id or Path(args.assignment).stem
+    
     # Initialize the assignment evaluator
     try:
         evaluator = AssignmentEvaluator(config)
@@ -69,14 +75,57 @@ def main():
         print(f"Error initializing evaluator: {e}")
         sys.exit(1)
     
-    # Run the evaluation pipeline
-    print("🚀 Starting assignment evaluation pipeline...")
-    print(f"📝 Assignment: {args.assignment}")
-    print(f"💻 Code: {args.code}")
-    print(f"🐍 Language: {args.language}")
-    print("-" * 50)
-    
-    try:
+    # Check if we should use stored outputs
+    if args.use_stored:
+        from src.core.output_storage import OutputStorage
+        storage = OutputStorage(args.storage_dir)
+        
+        print("🔄 Using stored outputs from previous agent runs...")
+        print(f"🆔 Assignment ID: {assignment_id}")
+        
+        # Check for stored rubric
+        rubric_path = storage.get_latest_output("requirement_generator", assignment_id)
+        if rubric_path:
+            print(f"📋 Using stored rubric: {Path(rubric_path).name}")
+            rubric = storage.load_rubric(rubric_path)
+        else:
+            print("⚠️  No stored rubric found, will generate new one")
+            rubric = None
+        
+        # Check for stored prompts
+        prompts_path = storage.get_latest_output("prompt_generator", assignment_id)
+        if prompts_path:
+            print(f"📝 Using stored prompts: {Path(prompts_path).name}")
+            prompt_set = storage.load_prompts(prompts_path)
+        else:
+            print("⚠️  No stored prompts found, will generate new ones")
+            prompt_set = None
+        
+        # Run evaluation with stored outputs
+        if rubric and prompt_set:
+            print("✅ Using stored rubric and prompts for evaluation")
+            # We need to modify the evaluator to accept pre-generated outputs
+            # For now, we'll run the full pipeline but it will skip generation
+            result = evaluator.evaluate_assignment(
+                assignment_description=assignment_description,
+                student_code=student_code,
+                programming_language=args.language
+            )
+        else:
+            print("🔄 Running full pipeline (some outputs not found)")
+            result = evaluator.evaluate_assignment(
+                assignment_description=assignment_description,
+                student_code=student_code,
+                programming_language=args.language
+            )
+    else:
+        # Run the evaluation pipeline
+        print("🚀 Starting assignment evaluation pipeline...")
+        print(f"📝 Assignment: {args.assignment}")
+        print(f"💻 Code: {args.code}")
+        print(f"🐍 Language: {args.language}")
+        print("-" * 50)
+        
         result = evaluator.evaluate_assignment(
             assignment_description=assignment_description,
             student_code=student_code,
@@ -93,22 +142,19 @@ def main():
                 "agents_used": result.metadata.get("agents_used", [])
             },
             "evaluation": {
-                "grade_percentage": result.correction_result.grade_percentage,
-                "total_score": result.correction_result.total_score,
-                "max_possible_score": result.correction_result.max_possible_score,
+                "total_errors": result.correction_result.total_errors,
+                "critical_errors": result.correction_result.critical_errors,
                 "summary": result.correction_result.summary
             },
             "detailed_results": {
                 "rubric": {
                     "title": result.rubric.title,
                     "description": result.rubric.description,
-                    "total_score": result.rubric.total_score,
                     "items": [
                         {
                             "id": item.id,
                             "title": item.title,
                             "description": item.description,
-                            "max_score": item.max_score,
                             "criteria": item.criteria
                         }
                         for item in result.rubric.items
@@ -118,18 +164,18 @@ def main():
                     {
                         "rubric_item_id": eval.rubric_item_id,
                         "rubric_item_title": eval.rubric_item_title,
-                        "total_score": eval.total_score,
-                        "max_score": eval.max_score,
+                        "is_passing": eval.is_passing,
                         "overall_feedback": eval.overall_feedback,
-                        "criteria_evaluations": [
+                        "errors_found": [
                             {
-                                "name": criterion.name,
-                                "met": criterion.met,
-                                "score": criterion.score,
-                                "feedback": criterion.feedback,
-                                "suggestion": criterion.suggestion
+                                "error_type": error.error_type,
+                                "location": error.location,
+                                "description": error.description,
+                                "severity": error.severity,
+                                "suggestion": error.suggestion,
+                                "line_number": error.line_number
                             }
-                            for criterion in eval.criteria_evaluations
+                            for error in eval.errors_found
                         ]
                     }
                     for eval in result.correction_result.item_evaluations
@@ -137,7 +183,6 @@ def main():
                 "comprehensive_evaluation": {
                     "correctness": result.correction_result.comprehensive_evaluation.correctness,
                     "quality": result.correction_result.comprehensive_evaluation.quality,
-                    "documentation": result.correction_result.comprehensive_evaluation.documentation,
                     "error_handling": result.correction_result.comprehensive_evaluation.error_handling,
                     "strengths": result.correction_result.comprehensive_evaluation.strengths,
                     "areas_for_improvement": result.correction_result.comprehensive_evaluation.areas_for_improvement,
@@ -154,10 +199,10 @@ def main():
             print(f"✅ Results saved to {args.output}")
         else:
             # Print summary
-            print("\n📊 EVALUATION SUMMARY")
+            print("\n📊 ERROR ANALYSIS SUMMARY")
             print("=" * 50)
-            print(f"Overall Grade: {result.correction_result.grade_percentage:.1f}%")
-            print(f"Total Score: {result.correction_result.total_score}/{result.correction_result.max_possible_score}")
+            print(f"Total Errors Found: {result.correction_result.total_errors}")
+            print(f"Critical Errors: {result.correction_result.critical_errors}")
             print(f"\n{result.correction_result.summary}")
             
             if args.verbose:

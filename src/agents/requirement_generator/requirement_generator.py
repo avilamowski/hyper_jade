@@ -35,7 +35,6 @@ class Rubric:
     description: str
     items: List[RubricItem]
     programming_language: str
-    difficulty_level: str = "beginner"
 
 class RequirementGeneratorAgent:
     """Agent that generates rubrics from assignment descriptions"""
@@ -74,9 +73,7 @@ Generate a rubric with the following structure in JSON format:
 {{
     "title": "Rubric for [Assignment Name]",
     "description": "Brief description of what this rubric evaluates",
-    "total_score": 100,
     "programming_language": "{programming_language}",
-    "difficulty_level": "beginner",
     "items": [
         {{
             "id": "correctness",
@@ -99,16 +96,6 @@ Generate a rubric with the following structure in JSON format:
             ]
         }},
         {{
-            "id": "documentation",
-            "title": "Documentation",
-            "description": "Is the code properly documented?",
-            "criteria": [
-                "Functions have clear docstrings",
-                "Comments explain complex logic",
-                "Code is self-explanatory"
-            ]
-        }},
-        {{
             "id": "error_handling",
             "title": "Error Handling",
             "description": "Does the code handle errors gracefully?",
@@ -121,7 +108,7 @@ Generate a rubric with the following structure in JSON format:
     ]
 }}
 
-Focus on beginner-level expectations and ensure all criteria are specific and measurable.
+Focus on identifying potential errors and issues that students might encounter.
 Return only the JSON, no additional text.
 """
         
@@ -152,8 +139,7 @@ Return only the JSON, no additional text.
                 title=rubric_data["title"],
                 description=rubric_data["description"],
                 items=items,
-                programming_language=rubric_data["programming_language"],
-                difficulty_level=rubric_data.get("difficulty_level", "beginner")
+                programming_language=rubric_data["programming_language"]
             )
             
             logger.info(f"Generated rubric with {len(items)} items")
@@ -170,7 +156,6 @@ Return only the JSON, no additional text.
             title=f"Basic Rubric for {assignment_description[:50]}...",
             description="Basic rubric for evaluation",
             programming_language=programming_language,
-            difficulty_level="beginner",
             items=[
                 RubricItem(
                     id="basic_functionality",
@@ -185,10 +170,10 @@ Return only the JSON, no additional text.
                     criteria=["Clear variable names", "Proper formatting"]
                 ),
                 RubricItem(
-                    id="documentation",
-                    title="Documentation",
-                    description="Code has basic documentation",
-                    criteria=["Functions have docstrings", "Code is self-explanatory"]
+                    id="error_handling",
+                    title="Error Handling",
+                    description="Code handles errors appropriately",
+                    criteria=["Validates inputs", "Handles edge cases"]
                 )
             ]
         )

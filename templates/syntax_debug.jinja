@@ -1,14 +1,12 @@
 You are a specialized Syntax Error Detector for {{ language }} code.
 
-TASK: Analyze the following student code and identify syntax-related issues.
+TASK: Analyze the following student code and identify syntax-related issues and language rule violations.
 
 STUDENT CODE:
 {{ student_code }}
 
 ASSIGNMENT DESCRIPTION:
 {{ assignment_description }}
-
-DIFFICULTY LEVEL: {{ difficulty_level.title() }}
 
 LANGUAGE: {{ language.title() }}
 
@@ -22,49 +20,56 @@ COMMON SYNTAX ISSUES TO CHECK:
 - {{ issue }}
 {% endfor %}
 
-LANGUAGE-SPECIFIC PATTERNS:
-{% for pattern in language_patterns.syntax_errors %}
-- {{ pattern }}
-{% endfor %}
-
 INSTRUCTIONS:
-1. Scan the code line by line for syntax errors
-2. Identify missing punctuation, brackets, or keywords
-3. Check for proper indentation and formatting
-4. Verify variable and function declarations
+1. Check for basic syntax errors (missing colons, brackets, etc.)
+2. Verify proper indentation and formatting
+3. Check for undefined variables and imports
+4. Verify function and method definitions
 5. Look for language-specific syntax requirements
-6. Provide specific line numbers for each issue
-7. Suggest exact fixes with corrected code
+6. Check for proper use of operators and expressions
+7. Verify string and comment syntax
+8. Check for proper use of language keywords
 
 OUTPUT FORMAT:
 <SYNTAX_ANALYSIS>
-  <ERRORS>
-    {% for error in errors %}
-    <ERROR severity="{{ error.severity }}" line="{{ error.line }}">
-      <TYPE>{{ error.type }}</TYPE>
+  <SYNTAX_ERRORS>
+    {% for error in syntax_errors %}
+    <ERROR severity="{{ error.severity }}" type="{{ error.type }}" line="{{ error.line_number }}">
       <DESCRIPTION>{{ error.description }}</DESCRIPTION>
-      <LOCATION>Line {{ error.line }}: {{ error.code_snippet }}</LOCATION>
+      <LOCATION>{{ error.location }}</LOCATION>
       <EXPLANATION>{{ error.explanation }}</EXPLANATION>
       <FIX>{{ error.fix }}</FIX>
+      <EXAMPLE>{{ error.example }}</EXAMPLE>
     </ERROR>
     {% endfor %}
-  </ERRORS>
+  </SYNTAX_ERRORS>
   
-  <WARNINGS>
-    {% for warning in warnings %}
-    <WARNING severity="{{ warning.severity }}" line="{{ warning.line }}">
-      <TYPE>{{ warning.type }}</TYPE>
-      <DESCRIPTION>{{ warning.description }}</DESCRIPTION>
-      <SUGGESTION>{{ warning.suggestion }}</SUGGESTION>
-    </WARNING>
+  <FORMATTING_ISSUES>
+    {% for issue in formatting_issues %}
+    <ISSUE severity="{{ issue.severity }}" category="{{ issue.category }}">
+      <DESCRIPTION>{{ issue.description }}</DESCRIPTION>
+      <LOCATION>{{ issue.location }}</LOCATION>
+      <SUGGESTION>{{ issue.suggestion }}</SUGGESTION>
+    </ISSUE>
     {% endfor %}
-  </WARNINGS>
+  </FORMATTING_ISSUES>
+  
+  <LANGUAGE_VIOLATIONS>
+    {% for violation in language_violations %}
+    <VIOLATION type="{{ violation.type }}">
+      <DESCRIPTION>{{ violation.description }}</DESCRIPTION>
+      <LOCATION>{{ violation.location }}</LOCATION>
+      <RULE_VIOLATED>{{ violation.rule_violated }}</RULE_VIOLATED>
+      <CORRECT_USAGE>{{ violation.correct_usage }}</CORRECT_USAGE>
+    </VIOLATION>
+    {% endfor %}
+  </LANGUAGE_VIOLATIONS>
   
   <SUMMARY>
-    <TOTAL_ERRORS>{{ total_errors }}</TOTAL_ERRORS>
-    <TOTAL_WARNINGS>{{ total_warnings }}</TOTAL_WARNINGS>
-    <CRITICAL_ERRORS>{{ critical_errors }}</CRITICAL_ERRORS>
-    <OVERALL_ASSESSMENT>{{ overall_assessment }}</OVERALL_ASSESSMENT>
+    <TOTAL_SYNTAX_ERRORS>{{ total_syntax_errors }}</TOTAL_SYNTAX_ERRORS>
+    <TOTAL_FORMATTING_ISSUES>{{ total_formatting_issues }}</TOTAL_FORMATTING_ISSUES>
+    <TOTAL_LANGUAGE_VIOLATIONS>{{ total_language_violations }}</TOTAL_LANGUAGE_VIOLATIONS>
+    <OVERALL_SYNTAX_QUALITY>{{ overall_syntax_quality }}</OVERALL_SYNTAX_QUALITY>
   </SUMMARY>
   
   <LEARNING_RESOURCES>
@@ -77,11 +82,3 @@ OUTPUT FORMAT:
     {% endfor %}
   </LEARNING_RESOURCES>
 </SYNTAX_ANALYSIS>
-
-{% if difficulty_level == "beginner" %}
-ADDITIONAL GUIDANCE FOR BEGINNERS:
-- Provide extra explanations for basic concepts
-- Include step-by-step fix instructions
-- Suggest practice exercises for common syntax patterns
-- Emphasize the importance of proper formatting
-{% endif %}

@@ -1,6 +1,37 @@
-# AI Agent for Generating Debug Prompts
+# Hyper Jade - AI-Powered Assignment Evaluation System
 
-An intelligent system that creates specialized prompts for AI agents designed to debug and correct student code. This system builds on the foundation of the [JADE_Scripts](https://github.com/david-wis/JADE_Scripts) repository and provides a comprehensive framework for generating targeted debugging prompts.
+An intelligent system that creates specialized prompts for AI agents designed to debug and correct student code. This system builds on the foundation of the [JADE_Scripts](https://github.com/david-wis/JADE_Scripts) repository and provides a comprehensive framework for generating targeted debugging prompts and evaluating student assignments.
+
+## 🆕 New Features: Independent Agent Execution
+
+The system now supports running each agent independently and storing outputs for reuse:
+
+- **🔧 Individual Agent Scripts**: Run each agent separately with dedicated CLI tools
+- **💾 Output Storage**: Automatically save and load intermediate results
+- **🔄 Flexible Workflows**: Use stored outputs to avoid regenerating rubrics and prompts
+- **📊 Output Management**: List, view, and manage stored outputs
+- **⚡ Batch Processing**: Efficiently evaluate multiple student submissions
+
+### Quick Agent Usage
+
+```bash
+# Generate rubric from assignment
+python run_requirement_generator.py --assignment assignment.txt --assignment-id my_assignment
+
+# Generate prompts using stored rubric
+python run_prompt_generator.py --assignment assignment.txt --rubric my_assignment
+
+# Evaluate student code using stored prompts
+python run_code_corrector.py --code student.py --assignment assignment.txt --prompts my_assignment
+
+# Use stored outputs in main pipeline
+python main.py --code student.py --assignment assignment.txt --use-stored --assignment-id my_assignment
+
+# List stored outputs
+python list_outputs.py --latest my_assignment
+```
+
+See [docs/AGENT_USAGE.md](docs/AGENT_USAGE.md) for detailed usage instructions.
 
 ## Features
 
@@ -12,6 +43,13 @@ An intelligent system that creates specialized prompts for AI agents designed to
 - **Test Case Generator**: Creates comprehensive test scenarios and edge cases
 - **Security Vulnerability Scanner**: Identifies input validation and data protection issues
 - **Comprehensive Debug Agent**: Combines all specialized agents for complete analysis
+
+### 🤖 **Assignment Evaluation Pipeline**
+- **Requirement Generator Agent**: Creates comprehensive rubrics from assignment descriptions
+- **Prompt Generator Agent**: Generates specialized correction prompts for each rubric item
+- **Code Corrector Agent**: Evaluates student code using the generated prompts
+- **Independent Execution**: Run each agent separately or as a complete pipeline
+- **Output Persistence**: Store and reuse intermediate results for efficiency
 
 ### 🧠 **AI-Powered Prompt Generation**
 - Uses LangGraph for structured prompt generation workflows
@@ -32,6 +70,8 @@ An intelligent system that creates specialized prompts for AI agents designed to
 - Detailed explanations and fix suggestions
 - Learning resources and references
 - Confidence scoring for generated prompts
+- JSON-based output storage for easy integration
+- Metadata tracking for all agent runs
 
 ## Quick Start
 
@@ -65,6 +105,11 @@ cp debug_config.yaml debug_config_local.yaml
 python example_usage.py
 ```
 
+5. **Test the new agent functionality**:
+```bash
+python test_agents.py
+```
+
 ## Usage
 
 ### Basic Usage
@@ -88,6 +133,27 @@ print(result["prompt"])
 ```
 
 ### Command Line Interface
+
+#### Assignment Evaluation Pipeline
+
+```bash
+# Run complete pipeline
+python main.py --code student_code.py --assignment assignment.txt --language python
+
+# Use stored outputs from previous runs
+python main.py --code student_code.py --assignment assignment.txt --use-stored --assignment-id my_assignment
+
+# Individual agent execution
+python run_requirement_generator.py --assignment assignment.txt --assignment-id my_assignment
+python run_prompt_generator.py --assignment assignment.txt --rubric my_assignment
+python run_code_corrector.py --code student_code.py --assignment assignment.txt --prompts my_assignment
+
+# Output management
+python list_outputs.py --latest my_assignment
+python list_outputs.py --clean  # Clean old outputs
+```
+
+#### Debug Prompt Generation
 
 ```bash
 # Generate a single debug prompt
@@ -182,18 +248,44 @@ agent_types:
 3. **TemplateManager**: Jinja2-based template system
 4. **RAGEnhancer**: Optional RAG integration for enhanced prompts
 
-### Workflow
+### Assignment Evaluation Components
 
+1. **RequirementGeneratorAgent**: Generates rubrics from assignment descriptions
+2. **PromptGeneratorAgent**: Creates correction prompts for each rubric item
+3. **CodeCorrectorAgent**: Evaluates student code using the prompts
+4. **OutputStorage**: Manages storage and retrieval of agent outputs
+5. **AssignmentEvaluator**: Orchestrates the complete evaluation pipeline
+
+### Workflows
+
+#### Debug Prompt Generation
 ```
 Student Code + Assignment → Context Analysis → Prompt Generation → Validation → Final Prompt
 ```
 
+#### Assignment Evaluation Pipeline
+```
+Assignment Description → Rubric Generation → Prompt Creation → Code Evaluation → Final Report
+```
+
+#### Independent Agent Execution
+```
+Assignment → [Requirement Generator] → Stored Rubric → [Prompt Generator] → Stored Prompts → [Code Corrector] → Results
+```
+
 ### State Management
 
-The system uses a `DebugPromptState` that includes:
+The system uses multiple state types:
+
+**DebugPromptState** (for debug prompt generation):
 - Input: student code, assignment, language, agent type
 - Context: similar examples, common mistakes, best practices
 - Output: generated prompt, metadata, confidence score
+
+**AssignmentEvaluatorState** (for assignment evaluation):
+- Input: assignment description, student code, programming language
+- Intermediate: generated rubric, generated prompts, correction result
+- Output: final evaluation pipeline result with metadata
 
 ## Output Format
 
@@ -234,6 +326,14 @@ The generated prompts produce structured output in XML-like format:
 3. **Create template** in `templates/` directory
 4. **Update helper functions** for language-specific patterns
 
+### Adding New Assignment Evaluation Agents
+
+1. **Create agent class** in `src/agents/` directory
+2. **Implement required methods** (generate, evaluate, etc.)
+3. **Add to AssignmentEvaluator** workflow
+4. **Update OutputStorage** for new agent type
+5. **Create CLI script** for independent execution
+
 ### Adding RAG Support
 
 1. **Enable RAG** in configuration
@@ -249,6 +349,31 @@ The generated prompts produce structured output in XML-like format:
 4. **Test with sample code**
 
 ## Examples
+
+### Assignment Evaluation Workflow
+
+```bash
+# Step 1: Generate rubric for assignment
+python run_requirement_generator.py \
+  --assignment ejemplos/consigna.txt \
+  --assignment-id alu_example \
+  --verbose
+
+# Step 2: Generate prompts using the rubric
+python run_prompt_generator.py \
+  --assignment ejemplos/consigna.txt \
+  --rubric alu_example \
+  --assignment-id alu_example \
+  --verbose
+
+# Step 3: Evaluate student code
+python run_code_corrector.py \
+  --code ejemplos/alu1.py \
+  --assignment ejemplos/consigna.txt \
+  --prompts alu_example \
+  --assignment-id alu_example \
+  --verbose
+```
 
 ### Sample Student Code with Issues
 
@@ -316,9 +441,6 @@ OUTPUT FORMAT:
 4. **Run tests**: `python -m pytest tests/`
 5. **Submit a pull request**
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
@@ -329,9 +451,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Roadmap
 
-- [ ] **Vector Store Integration**: Full RAG implementation with Chroma/FAISS
-- [ ] **Multi-language Support**: Add support for C++, Rust, Go, and more
-- [ ] **Interactive Mode**: Web interface for prompt generation
+- [x] **Independent Agent Execution**: Run each agent separately with output storage
+- [x] **Output Management**: List, view, and manage stored outputs
+- [x] **Batch Processing**: Efficiently evaluate multiple student submissions
 - [ ] **Prompt Evaluation**: Metrics for prompt quality assessment
 - [ ] **Knowledge Base Management**: Tools for managing and curating knowledge
 - [ ] **Integration APIs**: REST API for external system integration
+- [ ] **Agent Performance Metrics**: Track and compare agent performance over time

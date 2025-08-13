@@ -8,7 +8,7 @@ knowledge and examples.
 """
 
 from __future__ import annotations
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TypedDict
 from dataclasses import dataclass
 import logging
 import json
@@ -30,9 +30,8 @@ class CorrectionPrompt:
     rubric_item_title: str
     prompt: str
     criteria: List[str]
-    max_score: int
-    examples: List[str] = None
-    resources: List[str] = None
+    examples: Optional[List[str]] = None
+    resources: Optional[List[str]] = None
 
 @dataclass
 class PromptSet:
@@ -42,16 +41,14 @@ class PromptSet:
     prompts: List[CorrectionPrompt]
     general_prompt: str
 
-class PromptGeneratorState:
+class PromptGeneratorState(TypedDict):
     """State for prompt generation process"""
-    def __init__(self):
-        self.assignment_description: str = ""
-        self.rubric: Optional[Rubric] = None
-        self.programming_language: str = "python"
-        self.generated_prompts: List[CorrectionPrompt] = []
-        self.general_prompt: str = ""
-        self.rag_knowledge: List[str] = []
-        self.evaluation_score: float = 0.0
+    assignment_description: str
+    rubric: Optional[Any]
+    programming_language: str
+    generated_prompts: List[CorrectionPrompt]
+    general_prompt: str
+    rag_knowledge: List[str]
 
 class PromptGeneratorAgent:
     """Agent that generates correction prompts for each rubric item"""
@@ -75,7 +72,7 @@ class PromptGeneratorAgent:
                 temperature=self.config.get("temperature", 0.1)
             )
     
-    def _create_graph(self) -> StateGraph:
+    def _create_graph(self) -> Any:
         """Create the LangGraph workflow for prompt generation"""
         graph = StateGraph(PromptGeneratorState)
         
@@ -83,8 +80,6 @@ class PromptGeneratorAgent:
         graph.add_node("retrieve_knowledge", self._retrieve_knowledge)
         graph.add_node("generate_prompts", self._generate_prompts)
         graph.add_node("generate_general_prompt", self._generate_general_prompt)
-        graph.add_node("evaluate_prompts", self._evaluate_prompts)
-        graph.add_node("refine_prompts", self._refine_prompts)
         
         # Set entry point
         graph.set_entry_point("retrieve_knowledge")
@@ -92,22 +87,16 @@ class PromptGeneratorAgent:
         # Add edges
         graph.add_edge("retrieve_knowledge", "generate_prompts")
         graph.add_edge("generate_prompts", "generate_general_prompt")
-        graph.add_edge("generate_general_prompt", "evaluate_prompts")
-        graph.add_conditional_edges(
-            "evaluate_prompts",
-            self._should_refine,
-            {True: "refine_prompts", False: END}
-        )
-        graph.add_edge("refine_prompts", "evaluate_prompts")
+        graph.add_edge("generate_general_prompt", END)
         
         return graph.compile()
     
-    def _retrieve_knowledge(self, state: PromptGeneratorState) -> PromptGeneratorState:
+    def _retrieve_knowledge(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Retrieve relevant knowledge for prompt generation"""
         logger.info("Retrieving knowledge for prompt generation")
         
         if not self.rag_enabled:
-            state.rag_knowledge = []
+            state["rag_knowledge"] = []
             return state
         
         # This would integrate with a knowledge base
@@ -127,71 +116,71 @@ class PromptGeneratorAgent:
             ]
         }
         
-        state.rag_knowledge = knowledge_base.get(state.programming_language, [])
+        state["rag_knowledge"] = knowledge_base.get(state["programming_language"], [])
         
         return state
     
-    def _generate_prompts(self, state: PromptGeneratorState) -> PromptGeneratorState:
+    def _generate_prompts(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Generate correction prompts for each rubric item"""
         logger.info("Generating correction prompts for rubric items")
         
-        if not state.rubric:
+        if not state["rubric"]:
             logger.error("No rubric provided for prompt generation")
             return state
         
         prompts = []
         
-        for item in state.rubric.items:
+        for item in state["rubric"].items:
             prompt = self._generate_item_prompt(item, state)
             prompts.append(prompt)
         
-        state.generated_prompts = prompts
+        state["generated_prompts"] = prompts
         
         return state
     
-    def _generate_item_prompt(self, item: RubricItem, state: PromptGeneratorState) -> CorrectionPrompt:
+    def _generate_item_prompt(self, item: RubricItem, state: Dict[str, Any]) -> CorrectionPrompt:
         """Generate a correction prompt for a specific rubric item"""
         
         knowledge_context = ""
-        if state.rag_knowledge:
-            knowledge_context = f"\n\nRELEVANT KNOWLEDGE:\n" + "\n".join(f"- {k}" for k in state.rag_knowledge)
+        if state["rag_knowledge"]:
+            knowledge_context = f"\n\nRELEVANT KNOWLEDGE:\n" + "\n".join(f"- {k}" for k in state["rag_knowledge"])
         
-        prompt_text = f"""You are a specialized code correction agent for {state.programming_language} programming.
+        prompt_text = f"""You are a specialized code correction agent for {state["programming_language"]} programming.
 
 ASSIGNMENT DESCRIPTION:
-{state.assignment_description}
+{state["assignment_description"]}
 
 RUBRIC ITEM: {item.title}
 DESCRIPTION: {item.description}
-MAX SCORE: {item.max_score}
 
 CRITERIA TO EVALUATE:
 {chr(10).join(f"- {criterion}" for criterion in item.criteria)}
 
 {knowledge_context}
 
-TASK: Analyze the student's code and evaluate it against the criteria above.
+TASK: Analyze the student's code and identify errors related to the criteria above.
 
 INSTRUCTIONS:
 1. Examine the code carefully for the specific criteria listed
-2. Check if the code meets each criterion
-3. Provide specific feedback for each criterion
-4. Award points based on how well each criterion is met
-5. Suggest specific improvements where criteria are not met
+2. Identify errors and issues related to each criterion
+3. Provide specific feedback for each error found
+4. Suggest specific improvements where issues are identified
+5. Focus on error identification rather than scoring
 
 OUTPUT FORMAT:
 <EVALUATION>
-  <CRITERION name="">
-    <MET>Yes/No</MET>
-    <SCORE>Points awarded (0-{item.max_score})</SCORE>
-    <FEEDBACK>Specific feedback about this criterion</FEEDBACK>
-    <SUGGESTION>How to improve this aspect</SUGGESTION>
-  </CRITERION>
+  <ERRORS>
+    <ERROR type="error_type" severity="Low/Medium/High/Critical" line="line_number">
+      <LOCATION>Where the error occurs</LOCATION>
+      <DESCRIPTION>Detailed description of the error</DESCRIPTION>
+      <SUGGESTION>How to fix this error</SUGGESTION>
+    </ERROR>
+  </ERRORS>
   
-  <SUMMARY>
-    <TOTAL_SCORE>Total points for this item</TOTAL_SCORE>
+  <ASSESSMENT>
+    <IS_PASSING>Yes/No</IS_PASSING>
     <OVERALL_FEEDBACK>Overall assessment of this aspect</OVERALL_FEEDBACK>
-  </SUMMARY>
+  </ASSESSMENT>
 </EVALUATION>
 
 When you receive the student's code, analyze it according to these instructions and provide the evaluation in the specified format.
@@ -202,44 +191,40 @@ When you receive the student's code, analyze it according to these instructions 
             rubric_item_title=item.title,
             prompt=prompt_text,
             criteria=item.criteria,
-            max_score=item.max_score,
             examples=self._get_examples_for_item(item),
             resources=self._get_resources_for_item(item)
         )
     
-    def _generate_general_prompt(self, state: PromptGeneratorState) -> PromptGeneratorState:
-        """Generate a general correction prompt for overall assessment"""
-        logger.info("Generating general correction prompt")
+    def _generate_general_prompt(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate a general prompt for overall evaluation"""
+        logger.info("Generating general evaluation prompt")
         
         knowledge_context = ""
-        if state.rag_knowledge:
-            knowledge_context = f"\n\nRELEVANT KNOWLEDGE:\n" + "\n".join(f"- {k}" for k in state.rag_knowledge)
+        if state["rag_knowledge"]:
+            knowledge_context = f"\n\nRELEVANT KNOWLEDGE:\n" + "\n".join(f"- {k}" for k in state["rag_knowledge"])
         
-        general_prompt = f"""You are a comprehensive code correction agent for {state.programming_language} programming.
+        general_prompt = f"""You are a comprehensive code evaluation agent for {state["programming_language"]} programming.
 
 ASSIGNMENT DESCRIPTION:
-{state.assignment_description}
-
-PROGRAMMING LANGUAGE: {state.programming_language}
+{state["assignment_description"]}
 
 {knowledge_context}
 
-TASK: Provide a comprehensive evaluation of the student's code.
+TASK: Provide an overall assessment of the student's code, focusing on error identification and improvement suggestions.
 
 INSTRUCTIONS:
 1. Analyze the code for overall correctness and functionality
-2. Check code quality, readability, and structure
-3. Evaluate documentation and comments
-4. Assess error handling and edge cases
+2. Identify any critical errors that prevent the code from working
+3. Assess code quality and structure
+4. Evaluate error handling and edge case management
 5. Provide constructive feedback for improvement
 
 OUTPUT FORMAT:
 <COMPREHENSIVE_EVALUATION>
   <OVERALL_ASSESSMENT>
-    <CORRECTNESS>Assessment of functional correctness</CORRECTNESS>
-    <QUALITY>Assessment of code quality</QUALITY>
-    <DOCUMENTATION>Assessment of documentation</DOCUMENTATION>
-    <ERROR_HANDLING>Assessment of error handling</ERROR_HANDLING>
+    <CORRECTNESS>Assessment of functional correctness and errors</CORRECTNESS>
+    <QUALITY>Assessment of code quality issues</QUALITY>
+    <ERROR_HANDLING>Assessment of error handling and edge cases</ERROR_HANDLING>
   </OVERALL_ASSESSMENT>
   
   <DETAILED_FEEDBACK>
@@ -253,70 +238,13 @@ OUTPUT FORMAT:
   </LEARNING_RESOURCES>
 </COMPREHENSIVE_EVALUATION>
 
-When you receive the student's code, provide a comprehensive evaluation following these instructions.
+Focus on identifying errors and providing constructive feedback for improvement.
 """
         
-        state.general_prompt = general_prompt
-        
+        state["general_prompt"] = general_prompt
         return state
     
-    def _evaluate_prompts(self, state: PromptGeneratorState) -> PromptGeneratorState:
-        """Evaluate the generated prompts"""
-        logger.info("Evaluating generated prompts")
-        
-        if not state.generated_prompts:
-            state.evaluation_score = 0.0
-            return state
-        
-        prompt = f"""Evaluate the following generated correction prompts for a programming assignment.
 
-ASSIGNMENT:
-{state.assignment_description}
-
-GENERATED PROMPTS:
-{json.dumps([self._prompt_to_dict(p) for p in state.generated_prompts], indent=2)}
-
-Please evaluate these prompts on a scale of 0-10 based on:
-1. Clarity: Are the instructions clear and specific?
-2. Completeness: Do they cover all necessary aspects?
-3. Appropriateness: Are they suitable for beginner students?
-4. Actionability: Do they provide actionable feedback?
-
-Provide a score and brief feedback.
-"""
-        
-        response = self.llm.invoke([HumanMessage(content=prompt)])
-        evaluation_text = str(response.content)
-        
-        # Extract score from response (simple parsing)
-        try:
-            score_text = evaluation_text.split("score")[1].split()[0]
-            state.evaluation_score = float(score_text)
-        except:
-            state.evaluation_score = 7.0  # Default score
-        
-        return state
-    
-    def _should_refine(self, state: PromptGeneratorState) -> bool:
-        """Determine if the prompts need refinement"""
-        return state.evaluation_score < 8.0
-    
-    def _refine_prompts(self, state: PromptGeneratorState) -> PromptGeneratorState:
-        """Refine the prompts based on evaluation"""
-        logger.info("Refining prompts based on evaluation")
-        
-        # Regenerate prompts with improved instructions
-        refined_prompts = []
-        
-        for item in state.rubric.items:
-            prompt = self._generate_item_prompt(item, state)
-            # Add refinement instructions
-            prompt.prompt += "\n\nREFINEMENT: Make sure to provide very specific, actionable feedback that a beginner student can understand and implement."
-            refined_prompts.append(prompt)
-        
-        state.generated_prompts = refined_prompts
-        
-        return state
     
     def _get_examples_for_item(self, item: RubricItem) -> List[str]:
         """Get examples relevant to the rubric item"""
@@ -330,11 +258,6 @@ Provide a score and brief feedback.
                 "Variable names are descriptive and meaningful",
                 "Code is properly indented and formatted",
                 "Functions are reasonably sized and focused"
-            ],
-            "documentation": [
-                "Functions have clear docstrings",
-                "Comments explain complex logic",
-                "Code is self-explanatory"
             ],
             "error_handling": [
                 "Validates input parameters",
@@ -356,10 +279,6 @@ Provide a score and brief feedback.
                 "PEP 8 style guide for Python",
                 "Clean code principles"
             ],
-            "documentation": [
-                "Python docstring conventions",
-                "Writing clear comments and documentation"
-            ],
             "error_handling": [
                 "Python exception handling",
                 "Input validation techniques"
@@ -375,7 +294,6 @@ Provide a score and brief feedback.
             "rubric_item_title": prompt.rubric_item_title,
             "prompt": prompt.prompt,
             "criteria": prompt.criteria,
-            "max_score": prompt.max_score,
             "examples": prompt.examples,
             "resources": prompt.resources
         }
@@ -388,15 +306,15 @@ Provide a score and brief feedback.
         """Generate correction prompts for the given assignment and rubric"""
         
         state = PromptGeneratorState()
-        state.assignment_description = assignment_description
-        state.rubric = rubric
-        state.programming_language = rubric.programming_language
+        state["assignment_description"] = assignment_description
+        state["rubric"] = rubric
+        state["programming_language"] = rubric.programming_language
         
         result = self.graph.invoke(state)
         
         return PromptSet(
             assignment_description=assignment_description,
             programming_language=rubric.programming_language,
-            prompts=result.generated_prompts,
-            general_prompt=result.general_prompt
+            prompts=result["generated_prompts"],
+            general_prompt=result["general_prompt"]
         )

@@ -3,15 +3,14 @@
 Code Correction Agent
 
 This agent evaluates student code against the generated correction prompts.
-It analyzes the code for each rubric item and provides detailed feedback
-with scores and suggestions for improvement.
+It analyzes the code for each rubric item and identifies errors and issues
+with detailed feedback for improvement.
 """
 
 from __future__ import annotations
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import logging
-import json
 import re
 from pathlib import Path
 
@@ -22,30 +21,29 @@ from langchain_openai import ChatOpenAI
 logger = logging.getLogger(__name__)
 
 @dataclass
-class CriterionEvaluation:
-    """Evaluation result for a single criterion"""
-    name: str
-    met: bool
-    score: float
-    feedback: str
+class ErrorIdentification:
+    """Identified error in the code"""
+    error_type: str
+    location: str
+    description: str
+    severity: str  # "Low", "Medium", "High", "Critical"
     suggestion: str
+    line_number: Optional[int] = None
 
 @dataclass
 class ItemEvaluation:
     """Evaluation result for a single rubric item"""
     rubric_item_id: str
     rubric_item_title: str
-    total_score: float
-    max_score: float
+    errors_found: List[ErrorIdentification]
     overall_feedback: str
-    criteria_evaluations: List[CriterionEvaluation]
+    is_passing: bool
 
 @dataclass
 class ComprehensiveEvaluation:
     """Comprehensive evaluation of the entire code"""
     correctness: str
     quality: str
-    documentation: str
     error_handling: str
     strengths: List[str]
     areas_for_improvement: List[str]
@@ -60,9 +58,8 @@ class CorrectionResult:
     programming_language: str
     item_evaluations: List[ItemEvaluation]
     comprehensive_evaluation: ComprehensiveEvaluation
-    total_score: float
-    max_possible_score: float
-    grade_percentage: float
+    total_errors: int
+    critical_errors: int
     summary: str
 
 class CodeCorrectorAgent:
@@ -94,25 +91,24 @@ class CodeCorrectorAgent:
         try:
             # Evaluate each rubric item
             item_evaluations = []
-            total_score = 0.0
-            max_possible_score = 0.0
+            all_errors = []
             
             for prompt in prompt_set.prompts:
                 evaluation = self._evaluate_item(student_code, prompt)
                 item_evaluations.append(evaluation)
-                total_score += evaluation.total_score
-                max_possible_score += evaluation.max_score
+                all_errors.extend(evaluation.errors_found)
             
             # Generate comprehensive evaluation
             comprehensive_eval = self._generate_comprehensive_evaluation(
                 student_code, prompt_set, item_evaluations
             )
             
-            # Calculate grade percentage
-            grade_percentage = (total_score / max_possible_score * 100) if max_possible_score > 0 else 0.0
+            # Count errors by severity
+            total_errors = len(all_errors)
+            critical_errors = len([e for e in all_errors if e.severity == "Critical"])
             
             # Generate summary
-            summary = self._generate_summary(item_evaluations, comprehensive_eval, grade_percentage)
+            summary = self._generate_summary(item_evaluations, comprehensive_eval, total_errors, critical_errors)
             
             result = CorrectionResult(
                 student_code=student_code,
@@ -120,13 +116,12 @@ class CodeCorrectorAgent:
                 programming_language=prompt_set.programming_language,
                 item_evaluations=item_evaluations,
                 comprehensive_evaluation=comprehensive_eval,
-                total_score=total_score,
-                max_possible_score=max_possible_score,
-                grade_percentage=grade_percentage,
+                total_errors=total_errors,
+                critical_errors=critical_errors,
                 summary=summary
             )
             
-            logger.info(f"Code evaluation completed. Score: {grade_percentage:.1f}%")
+            logger.info(f"Code evaluation completed. Found {total_errors} errors ({critical_errors} critical)")
             return result
             
         except Exception as e:
@@ -136,10 +131,10 @@ class CodeCorrectorAgent:
     def _evaluate_item(self, student_code: str, prompt: Any) -> ItemEvaluation:
         """Evaluate a single rubric item"""
         
-        evaluation_prompt = f"""Evaluate the following student code against the rubric item.
+        evaluation_prompt = f"""Analyze the following student code and identify errors related to the rubric item.
 
 STUDENT CODE:
-```python
+```{prompt_set.programming_language}
 {student_code}
 ```
 
@@ -149,25 +144,24 @@ EVALUATION PROMPT: {prompt.prompt}
 CRITERIA TO EVALUATE:
 {chr(10).join(f"- {criterion}" for criterion in prompt.criteria)}
 
-MAX SCORE: {prompt.max_score}
-
-Please evaluate the code and provide your response in the following XML format:
+Please analyze the code and identify errors in the following XML format:
 
 <EVALUATION>
-  <CRITERION name="criterion_name">
-    <MET>Yes/No</MET>
-    <SCORE>Points awarded (0-{prompt.max_score})</SCORE>
-    <FEEDBACK>Specific feedback about this criterion</FEEDBACK>
-    <SUGGESTION>How to improve this aspect</SUGGESTION>
-  </CRITERION>
+  <ERRORS>
+    <ERROR type="error_type" severity="Low/Medium/High/Critical" line="line_number">
+      <LOCATION>Where the error occurs</LOCATION>
+      <DESCRIPTION>Detailed description of the error</DESCRIPTION>
+      <SUGGESTION>How to fix this error</SUGGESTION>
+    </ERROR>
+  </ERRORS>
   
-  <SUMMARY>
-    <TOTAL_SCORE>Total points for this item</TOTAL_SCORE>
+  <ASSESSMENT>
+    <IS_PASSING>Yes/No</IS_PASSING>
     <OVERALL_FEEDBACK>Overall assessment of this aspect</OVERALL_FEEDBACK>
-  </SUMMARY>
+  </ASSESSMENT>
 </EVALUATION>
 
-Be specific and provide actionable feedback for a beginner student.
+Focus on identifying specific errors and providing actionable feedback for improvement.
 """
         
         try:
@@ -175,39 +169,39 @@ Be specific and provide actionable feedback for a beginner student.
             content = str(response).strip()
             
             # Parse XML response
-            criteria_evaluations = []
-            total_score = 0.0
+            errors_found = []
             
-            # Extract criterion evaluations
-            criterion_pattern = r'<CRITERION name="([^"]+)">\s*<MET>([^<]+)</MET>\s*<SCORE>([^<]+)</SCORE>\s*<FEEDBACK>([^<]+)</FEEDBACK>\s*<SUGGESTION>([^<]+)</SUGGESTION>\s*</CRITERION>'
-            matches = re.findall(criterion_pattern, content, re.DOTALL)
+            # Extract error information
+            error_pattern = r'<ERROR type="([^"]+)" severity="([^"]+)" line="([^"]*)">\s*<LOCATION>([^<]+)</LOCATION>\s*<DESCRIPTION>([^<]+)</DESCRIPTION>\s*<SUGGESTION>([^<]+)</SUGGESTION>\s*</ERROR>'
+            matches = re.findall(error_pattern, content, re.DOTALL)
             
             for match in matches:
-                criterion_name, met_str, score_str, feedback, suggestion = match
-                met = met_str.strip().lower() == "yes"
-                score = float(score_str.strip())
+                error_type, severity, line_str, location, description, suggestion = match
+                line_number = int(line_str) if line_str and line_str.isdigit() else None
                 
-                criterion_eval = CriterionEvaluation(
-                    name=criterion_name.strip(),
-                    met=met,
-                    score=score,
-                    feedback=feedback.strip(),
-                    suggestion=suggestion.strip()
+                error = ErrorIdentification(
+                    error_type=error_type.strip(),
+                    location=location.strip(),
+                    description=description.strip(),
+                    severity=severity.strip(),
+                    suggestion=suggestion.strip(),
+                    line_number=line_number
                 )
-                criteria_evaluations.append(criterion_eval)
-                total_score += score
+                errors_found.append(error)
             
-            # Extract overall feedback
+            # Extract assessment
+            is_passing_match = re.search(r'<IS_PASSING>([^<]+)</IS_PASSING>', content, re.DOTALL)
+            is_passing = is_passing_match.group(1).strip().lower() == "yes" if is_passing_match else False
+            
             overall_feedback_match = re.search(r'<OVERALL_FEEDBACK>([^<]+)</OVERALL_FEEDBACK>', content, re.DOTALL)
             overall_feedback = overall_feedback_match.group(1).strip() if overall_feedback_match else "Evaluation completed"
             
             return ItemEvaluation(
                 rubric_item_id=prompt.rubric_item_id,
                 rubric_item_title=prompt.rubric_item_title,
-                total_score=total_score,
-                max_score=prompt.max_score,
+                errors_found=errors_found,
                 overall_feedback=overall_feedback,
-                criteria_evaluations=criteria_evaluations
+                is_passing=is_passing
             )
             
         except Exception as e:
@@ -216,10 +210,9 @@ Be specific and provide actionable feedback for a beginner student.
             return ItemEvaluation(
                 rubric_item_id=prompt.rubric_item_id,
                 rubric_item_title=prompt.rubric_item_title,
-                total_score=0.0,
-                max_score=prompt.max_score,
+                errors_found=[],
                 overall_feedback="Evaluation failed - manual review required",
-                criteria_evaluations=[]
+                is_passing=False
             )
     
     def _generate_comprehensive_evaluation(
@@ -230,7 +223,7 @@ Be specific and provide actionable feedback for a beginner student.
     ) -> ComprehensiveEvaluation:
         """Generate comprehensive evaluation of the entire code"""
         
-        comprehensive_prompt = f"""Provide a comprehensive evaluation of the student's code.
+        comprehensive_prompt = f"""Provide a comprehensive evaluation of the student's code focusing on error identification.
 
 STUDENT CODE:
 ```{prompt_set.programming_language}
@@ -242,16 +235,15 @@ ASSIGNMENT: {prompt_set.assignment_description}
 GENERAL EVALUATION PROMPT: {prompt_set.general_prompt}
 
 ITEM EVALUATIONS:
-{chr(10).join(f"- {eval.rubric_item_title}: {eval.total_score}/{eval.max_score}" for eval in item_evaluations)}
+{chr(10).join(f"- {eval.rubric_item_title}: {'PASS' if eval.is_passing else 'FAIL'} ({len(eval.errors_found)} errors)" for eval in item_evaluations)}
 
 Please provide a comprehensive evaluation in the following XML format:
 
 <COMPREHENSIVE_EVALUATION>
   <OVERALL_ASSESSMENT>
-    <CORRECTNESS>Assessment of functional correctness</CORRECTNESS>
-    <QUALITY>Assessment of code quality</QUALITY>
-    <DOCUMENTATION>Assessment of documentation</DOCUMENTATION>
-    <ERROR_HANDLING>Assessment of error handling</ERROR_HANDLING>
+    <CORRECTNESS>Assessment of functional correctness and errors</CORRECTNESS>
+    <QUALITY>Assessment of code quality issues</QUALITY>
+    <ERROR_HANDLING>Assessment of error handling and edge cases</ERROR_HANDLING>
   </OVERALL_ASSESSMENT>
   
   <DETAILED_FEEDBACK>
@@ -265,7 +257,7 @@ Please provide a comprehensive evaluation in the following XML format:
   </LEARNING_RESOURCES>
 </COMPREHENSIVE_EVALUATION>
 
-Provide constructive feedback suitable for a beginner student.
+Focus on identifying errors and providing constructive feedback for improvement.
 """
         
         try:
@@ -275,7 +267,6 @@ Provide constructive feedback suitable for a beginner student.
             # Parse XML response
             correctness = self._extract_xml_tag(content, "CORRECTNESS", "Assessment pending")
             quality = self._extract_xml_tag(content, "QUALITY", "Assessment pending")
-            documentation = self._extract_xml_tag(content, "DOCUMENTATION", "Assessment pending")
             error_handling = self._extract_xml_tag(content, "ERROR_HANDLING", "Assessment pending")
             
             strengths = self._extract_list_from_xml(content, "STRENGTHS")
@@ -286,7 +277,6 @@ Provide constructive feedback suitable for a beginner student.
             return ComprehensiveEvaluation(
                 correctness=correctness,
                 quality=quality,
-                documentation=documentation,
                 error_handling=error_handling,
                 strengths=strengths,
                 areas_for_improvement=areas_for_improvement,
@@ -299,7 +289,6 @@ Provide constructive feedback suitable for a beginner student.
             return ComprehensiveEvaluation(
                 correctness="Evaluation failed",
                 quality="Evaluation failed",
-                documentation="Evaluation failed",
                 error_handling="Evaluation failed",
                 strengths=["Code submitted for evaluation"],
                 areas_for_improvement=["Manual review required"],
@@ -329,22 +318,14 @@ Provide constructive feedback suitable for a beginner student.
         self,
         item_evaluations: List[ItemEvaluation],
         comprehensive_eval: ComprehensiveEvaluation,
-        grade_percentage: float
+        total_errors: int,
+        critical_errors: int
     ) -> str:
         """Generate a summary of the evaluation"""
         
-        if grade_percentage >= 90:
-            grade_letter = "A"
-        elif grade_percentage >= 80:
-            grade_letter = "B"
-        elif grade_percentage >= 70:
-            grade_letter = "C"
-        elif grade_percentage >= 60:
-            grade_letter = "D"
-        else:
-            grade_letter = "F"
-        
-        summary = f"Grade: {grade_letter} ({grade_percentage:.1f}%)\n\n"
+        summary = f"Error Analysis Summary:\n"
+        summary += f"Total Errors Found: {total_errors}\n"
+        summary += f"Critical Errors: {critical_errors}\n\n"
         
         # Add strengths
         if comprehensive_eval.strengths:
@@ -378,15 +359,13 @@ Provide constructive feedback suitable for a beginner student.
             comprehensive_evaluation=ComprehensiveEvaluation(
                 correctness="Evaluation failed",
                 quality="Evaluation failed",
-                documentation="Evaluation failed",
                 error_handling="Evaluation failed",
                 strengths=["Code submitted for evaluation"],
                 areas_for_improvement=["Manual review required"],
                 suggestions=["Please review the code manually"],
                 learning_resources=["General programming resources"]
             ),
-            total_score=0.0,
-            max_possible_score=100.0,
-            grade_percentage=0.0,
+            total_errors=0,
+            critical_errors=0,
             summary="Evaluation failed - manual review required"
         )
