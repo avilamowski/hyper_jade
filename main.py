@@ -1,148 +1,173 @@
+#!/usr/bin/env python3
+"""
+Main entry point for the Assignment Evaluation System
+
+This script provides a command-line interface for evaluating student assignments
+using the three-agent pipeline: Requirement Generator → Prompt Generator → Code Corrector.
+"""
+
+import sys
 import os
-import mlflow.langchain
+import json
 import yaml
-import graphs
-import mlflow
-import datetime
-import logging
-import uuid
-import graphs
-import graphs.ej1_2025.sin_repetir_graph
-import graphs.fix.graph_fix
-import graphs.locate.graphIdentifier
-import graphs.group
-from langgraph.graph import StateGraph
+from pathlib import Path
 
-from graphs.group.group_graph import separate_in_groups
+# Add src to Python path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from src.core.assignment_evaluator import AssignmentEvaluator
 
-def load_langsmith_config():
-    with open("config.yaml", "r") as file:
-        config = yaml.safe_load(file)
-        if not config["langsmith"]["enable"]:
-            return
+def load_config(config_path: str) -> dict:
+    """Load configuration from YAML file"""
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading config: {e}")
+        return {}
 
-        os.environ["LANGSMITH_TRACING"] = config["langsmith"]["tracing"]
-        if config["langsmith"]["endpoint"]:
-            os.environ["LANGSMITH_ENDPOINT"] = config["langsmith"]["endpoint"]
-        if config["langsmith"]["apikey"]:
-            os.environ["LANGSMITH_API_KEY"] = config["langsmith"]["apikey"]
-        if config["langsmith"]["project"]:
-            os.environ["LANGSMITH_PROJECT"] = config["langsmith"]["project"]
-
-
-load_langsmith_config()
-with open("config.yaml", "r") as file:
-    CONFIG = yaml.safe_load(file)
-    MODEL = CONFIG["model"]
-    MODE = CONFIG["mode"]
-    INPUTS = CONFIG["inputs"]
-    INPUT_QUANTITY = CONFIG["input_quantity"]
-
-files = []
-if os.path.exists(INPUTS):
-    if os.path.isdir(INPUTS):
-        files = [
-            str(p)
-            for p in os.listdir(INPUTS)
-            if os.path.isfile(f"{str(os.path.dirname(INPUTS))}/{p}")
-        ][:INPUT_QUANTITY]
-    elif os.path.isfile(INPUTS):
-        files = [str(os.path.basename(INPUTS))]
-    else:
-        raise ValueError("INPUT NOT FOUND")
-else:
-    raise ValueError("INPUT NOT FOUND")
-
-mlflow.set_tracking_uri("http://localhost:8080")
-mlflow.langchain.autolog()
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-
-graph_dict = {
-    "group": graphs.group,
-    "fix": graphs.fix.graph_fix,
-    "locate": graphs.locate.graphIdentifier,
-    "ej1_2025": graphs.ej1_2025.sin_repetir_graph,
-}
-
-
-# mlflow.set_experiment(MODE)
-graph_strategy = graph_dict.get(MODE, graphs.fix.graph_fix)
-graph: StateGraph = graph_strategy.graph
-graph_name = graph_strategy.graph_name
-
-
-execution_id = uuid.uuid4()
-
-for file_name in files:
-    print(file_name)
-    if file_name.endswith(".txt") or file_name.endswith(".py"):
-        with open(f"{os.path.dirname(INPUTS)}/{file_name}", "r") as f:
-            initial_code = f.read()
-    dataset_name = file_name.split(".")[0]
-    output_folder = f"./outputs/{execution_id}-{dataset_name}"
-
-    if MODE == "locate":
-        initial_code = "\n".join(
-            f"{i + 1}: {line}"
-            for i, line in enumerate(initial_code.strip().splitlines())
+def main():
+    """Main entry point"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Assignment Evaluation System")
+    parser.add_argument("--code", "-c", required=True, help="Path to student code file")
+    parser.add_argument("--assignment", "-a", required=True, help="Path to assignment description file")
+    parser.add_argument("--language", "-l", default="python", help="Programming language")
+    parser.add_argument("--config", default="src/config/assignment_config.yaml", help="Configuration file path")
+    parser.add_argument("--output", "-o", help="Output file path")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    
+    args = parser.parse_args()
+    
+    # Load configuration
+    config = load_config(args.config)
+    if not config:
+        print("Error: Could not load configuration")
+        sys.exit(1)
+    
+    # Print model information
+    print(f"🤖 Using model: {config.get('model_name', 'Unknown')}")
+    print(f"🔧 Provider: {config.get('provider', 'Unknown')}")
+    print("-" * 50)
+    
+    # Read input files
+    try:
+        with open(args.code, "r", encoding="utf-8") as f:
+            student_code = f.read()
+        
+        with open(args.assignment, "r", encoding="utf-8") as f:
+            assignment_description = f.read()
+    except Exception as e:
+        print(f"Error reading input files: {e}")
+        sys.exit(1)
+    
+    # Initialize the assignment evaluator
+    try:
+        evaluator = AssignmentEvaluator(config)
+    except Exception as e:
+        print(f"Error initializing evaluator: {e}")
+        sys.exit(1)
+    
+    # Run the evaluation pipeline
+    print("🚀 Starting assignment evaluation pipeline...")
+    print(f"📝 Assignment: {args.assignment}")
+    print(f"💻 Code: {args.code}")
+    print(f"🐍 Language: {args.language}")
+    print("-" * 50)
+    
+    try:
+        result = evaluator.evaluate_assignment(
+            assignment_description=assignment_description,
+            student_code=student_code,
+            programming_language=args.language
         )
+        
+        # Prepare output
+        output = {
+            "metadata": {
+                "assignment_file": args.assignment,
+                "code_file": args.code,
+                "programming_language": args.language,
+                "pipeline_version": result.metadata.get("pipeline_version", "1.0"),
+                "agents_used": result.metadata.get("agents_used", [])
+            },
+            "evaluation": {
+                "grade_percentage": result.correction_result.grade_percentage,
+                "total_score": result.correction_result.total_score,
+                "max_possible_score": result.correction_result.max_possible_score,
+                "summary": result.correction_result.summary
+            },
+            "detailed_results": {
+                "rubric": {
+                    "title": result.rubric.title,
+                    "description": result.rubric.description,
+                    "total_score": result.rubric.total_score,
+                    "items": [
+                        {
+                            "id": item.id,
+                            "title": item.title,
+                            "description": item.description,
+                            "max_score": item.max_score,
+                            "criteria": item.criteria
+                        }
+                        for item in result.rubric.items
+                    ]
+                },
+                "item_evaluations": [
+                    {
+                        "rubric_item_id": eval.rubric_item_id,
+                        "rubric_item_title": eval.rubric_item_title,
+                        "total_score": eval.total_score,
+                        "max_score": eval.max_score,
+                        "overall_feedback": eval.overall_feedback,
+                        "criteria_evaluations": [
+                            {
+                                "name": criterion.name,
+                                "met": criterion.met,
+                                "score": criterion.score,
+                                "feedback": criterion.feedback,
+                                "suggestion": criterion.suggestion
+                            }
+                            for criterion in eval.criteria_evaluations
+                        ]
+                    }
+                    for eval in result.correction_result.item_evaluations
+                ],
+                "comprehensive_evaluation": {
+                    "correctness": result.correction_result.comprehensive_evaluation.correctness,
+                    "quality": result.correction_result.comprehensive_evaluation.quality,
+                    "documentation": result.correction_result.comprehensive_evaluation.documentation,
+                    "error_handling": result.correction_result.comprehensive_evaluation.error_handling,
+                    "strengths": result.correction_result.comprehensive_evaluation.strengths,
+                    "areas_for_improvement": result.correction_result.comprehensive_evaluation.areas_for_improvement,
+                    "suggestions": result.correction_result.comprehensive_evaluation.suggestions,
+                    "learning_resources": result.correction_result.comprehensive_evaluation.learning_resources
+                }
+            }
+        }
+        
+        # Output results
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                json.dump(output, f, indent=2)
+            print(f"✅ Results saved to {args.output}")
+        else:
+            # Print summary
+            print("\n📊 EVALUATION SUMMARY")
+            print("=" * 50)
+            print(f"Overall Grade: {result.correction_result.grade_percentage:.1f}%")
+            print(f"Total Score: {result.correction_result.total_score}/{result.correction_result.max_possible_score}")
+            print(f"\n{result.correction_result.summary}")
+            
+            if args.verbose:
+                print("\n📋 DETAILED RESULTS")
+                print("=" * 50)
+                print(json.dumps(output, indent=2))
+        
+    except Exception as e:
+        print(f"❌ Error during evaluation: {e}")
+        sys.exit(1)
 
-    app = graph.compile()
-
-    FUNCTION_NAMES = ["sin_repetir"]
-    FUNCTION_NAME = "sin_repetir"
-
-    with mlflow.start_run(run_name=f"{graph_name}-{execution_id}-{dataset_name}"):
-        start = datetime.datetime.now()
-
-        groups = separate_in_groups(initial_code, FUNCTION_NAMES)
-
-        for group_name, code in groups.items():
-            logger.info(f"Group: {group_name}")
-            logger.info(f"Code: {code[:20]}...")  # Log first 20 characters for brevity
-            mlflow.log_text(code, f"{output_folder}/{dataset_name}_{group_name}.py")
-
-        if FUNCTION_NAME not in groups:
-            raise ValueError(f"Function '{FUNCTION_NAME}' not found in groups.")
-
-        result = app.invoke(graph_strategy.get_initial_state(groups[FUNCTION_NAME]))
-
-        end = datetime.datetime.now()
-        elapsed_time = (end - start).total_seconds()
-
-        # Parameters
-        mlflow.log_param("nodes", list(graph.nodes.keys()))
-        mlflow.log_param("execution_id", execution_id)
-        mlflow.log_param("dataset_name", dataset_name)
-
-        # Metrics
-        mlflow.log_metric("execution_time", elapsed_time)
-        mlflow.log_metric("num_errors", len(result["errors"]))
-
-        # Artifacts
-        os.makedirs(output_folder, exist_ok=True)
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_file = f"{output_folder}/{timestamp}_result.txt"
-        errors_file = f"{output_folder}/{timestamp}_errors.txt"
-
-        with open(output_file, "w") as f:
-            f.write(result["code"])
-
-        with open(errors_file, "w") as f:
-            f.write("\n".join(result["errors"]))
-
-        mlflow.log_artifact(output_file)
-        mlflow.log_artifact(errors_file)
-
-        # Original code
-        with open(f"{output_folder}/original_code.txt", "w") as f:
-            f.write(initial_code)
-        mlflow.log_artifact(f"{output_folder}/original_code.txt")
-
-
-logger.info("Code fixing process completed.")
+if __name__ == "__main__":
+    main()

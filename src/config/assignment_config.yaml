@@ -1,0 +1,92 @@
+# Configuration for Assignment Evaluation System
+# This system coordinates three specialized agents for automated code evaluation
+
+# LLM Configuration
+model_name: "gpt-oss:latest"
+provider: "ollama"
+
+# RAG Configuration
+enable_rag: false
+rag_knowledge_base: null
+
+# Agent Configuration
+agents:
+  requirement_generator:
+    enabled: true
+    evaluation_threshold: 8.0  # Minimum score for rubric quality
+    
+  prompt_generator:
+    enabled: true
+    evaluation_threshold: 8.0  # Minimum score for prompt quality
+    include_examples: true
+    include_resources: true
+    
+  code_corrector:
+    enabled: true
+    detailed_feedback: true
+    include_suggestions: true
+    include_learning_resources: true
+
+# Programming Language Support
+languages:
+  python:
+    name: "Python"
+    file_extensions: [".py"]
+    syntax_highlighting: "python"
+    
+  javascript:
+    name: "JavaScript"
+    file_extensions: [".js", ".jsx"]
+    syntax_highlighting: "javascript"
+    
+  java:
+    name: "Java"
+    file_extensions: [".java"]
+    syntax_highlighting: "java"
+
+# Evaluation Criteria (Beginner Level)
+evaluation_criteria:
+  correctness:
+    weight: 0.4
+    description: "Code produces correct results"
+    subcriteria:
+      - "Produces expected output for given inputs"
+      - "Handles edge cases appropriately"
+      - "No logical errors in implementation"
+      
+  code_quality:
+    weight: 0.3
+    description: "Code is readable and well-structured"
+    subcriteria:
+      - "Clear variable and function names"
+      - "Proper indentation and formatting"
+      - "Logical code organization"
+      
+  documentation:
+    weight: 0.2
+    description: "Code is properly documented"
+    subcriteria:
+      - "Functions have clear docstrings"
+      - "Comments explain complex logic"
+      - "Code is self-explanatory"
+      
+  error_handling:
+    weight: 0.1
+    description: "Code handles errors gracefully"
+    subcriteria:
+      - "Validates input parameters"
+      - "Handles edge cases (empty lists, null values, etc.)"
+      - "Provides meaningful error messages"
+
+# Output Configuration
+output:
+  format: "json"  # Options: "json", "xml", "markdown"
+  include_metadata: true
+  include_timestamps: true
+  save_intermediate_results: false
+  
+# Logging Configuration
+logging:
+  level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "assignment_evaluator.log"

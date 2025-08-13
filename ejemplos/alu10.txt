@@ -1,0 +1,7 @@
+Nota 4.25/5
+
+REQUISITOS FUNCIONALES
+
+- #8: No guarda/actualiza/crea correctamente el archivo. [-0,75p]
+
+Cuando el archivo no está vacío, no se generan ventas ni cambia el archivo en nada.

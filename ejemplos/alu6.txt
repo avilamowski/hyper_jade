@@ -1,0 +1,9 @@
+Nota 2/5
+
+- Tiene un error de ejecucion cuando el inventario no se encuentra creado. No carga en listas correctamente los productos 1000-1009 con stock 100. (-0.75)
+
+- No resta correctamente la venta al stock, no actualiza el stock (-0.75)
+
+- No agrega a ventas pasadas el stock restado. (-0.75)
+
+- No guarda/actualiza/crea correctamente el archivo. Tiene un error de ejeución (w en lugar de 'w') y no escribe los datos de forma correcta (-0.75)

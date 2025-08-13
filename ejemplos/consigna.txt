@@ -1,0 +1,133 @@
+Crear una función que permita gestionar el inventario de una tienda pequeña. La función debe registrar ventas de productos, actualizar las cantidades disponibles y las ventas históricas.
+
+
+
+Definición de la función
+def vender_productos(ruta, cantidad):
+  ... 
+Donde:
+
+ruta: Es el nombre del archivo donde se almacena el inventario y el historial de ventas.
+cantidad: Es la cantidad de productos diferentes que se van a vender en la transacción.
+
+
+Tenga presente que cada llamada a la función 'vender_productos' representa una nueva venta.
+
+
+
+Los productos, sus cantidades y el historial de ventas se almacenan en un archivo de texto.
+
+
+
+Formato del archivo
+El archivo almacena tanto el inventario como el historial de ventas:
+
+codigo_producto: cantidad_disponible
+Para diferenciar entre inventario y ventas históricas:
+
+Códigos positivos: Representan productos del inventario
+Códigos negativos: Representan el historial de ventas acumuladas
+
+
+Por ejemplo:
+
+1000: 50
+1003: 23
+-1000: 15
+-1003: 7
+
+
+En este ejemplo:
+
+El producto de código 1000 tiene 50 unidades disponibles y ha vendido 15 unidades históricamente
+El producto  de código 1003 tiene 23 unidades disponibles y ha vendido 7 unidades históricamente
+
+
+Requerimientos
+Si la cantidad de productos a vender no es un número entero o es menor o igual a cero, se debe imprimir un mensaje por pantalla indicando que la cantidad debe ser positiva.
+Si el archivo indicado por la ruta no existe, debe crearse con 10 productos iniciales (representados por los códigos [1000-1009], cada uno con 100 unidades.
+Para cada venta, se debe elegir al azar un producto del inventario actual, y venderse entre 1 y 5 unidades, también al azar.
+Si un producto no tuviese suficiente stock, se vende lo que queda disponible. (En este caso, se actualiza el inventario solo con los que efectivamente se vendieron y no con los que se quisieron vender originalmente).
+Los productos con cantidad 0 deben permanecer en el archivo.
+
+
+Ejemplos de uso
+Ejemplo 1:
+
+Si se ingresa una cantidad negativa:
+
+
+
+vender_productos("inventario.txt", -2)
+
+
+O si se ingresa una cantidad que no es un número entero:
+
+
+
+vender_productos("inventario.txt", "hola")
+
+
+Se debe imprimir un mensaje por pantalla indicando que cantidad debe ser un número positivo y retornar automáticamente. (También es aceptable levantar una excepción tipo Exception con un mensaje similar).
+
+
+
+Ejemplo 2:
+Si no existe inventario.txt:
+
+
+
+vender_productos("inventario.txt", 3)
+a. Se generan las listas de Python con datos iniciales (códigos 1000-1009, 100 de stock c/u)
+
+
+
+b. Se venden 3 productos diferentes. Supongamos que se venden:
+
+Producto 1002: 3 unidades
+Producto 1005: 1 unidad
+Producto 1002: 2 unidades (se repitió)
+
+
+El archivo inventario.txt almacena:
+
+1000: 100
+1001: 100
+1002: 95
+1003: 100
+1004: 100
+1005: 99
+1006: 100
+1007: 100
+1008: 100
+1009: 100
+-1002: 5
+-1005: 1
+
+
+Ejemplo 3:
+vender_productos("inventario.txt", 2)
+Se venden otros 2 productos diferentes más. Supongamos que son:
+
+Producto 1002: 4 unidades
+Producto 1007: 2 unidades
+
+
+Y se actualiza el archivo inventario.txt:
+
+
+
+1000: 100
+1001: 100
+1002: 91
+1003: 100
+1004: 100
+1005: 99
+1006: 100
+1007: 98
+1008: 100
+1009: 100
+-1002: 9
+-1005: 1
+-1007: 2
+
