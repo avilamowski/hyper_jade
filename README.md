@@ -66,7 +66,6 @@ See [docs/AGENT_USAGE.md](docs/AGENT_USAGE.md) for detailed usage instructions.
 
 ### 📊 **Comprehensive Output**
 - Structured XML-like output format for consistent parsing
-- Severity ratings for issues (Low/Medium/High/Critical)
 - Detailed explanations and fix suggestions
 - Learning resources and references
 - Confidence scoring for generated prompts
@@ -229,7 +228,6 @@ languages:
 agent_types:
   syntax:
     focus_areas: ["grammar", "structure", "language rules"]
-    severity_levels: ["Low", "Medium", "High", "Critical"]
 ```
 
 ### Supported Programming Languages
@@ -294,7 +292,7 @@ The generated prompts produce structured output in XML-like format:
 ```xml
 <ANALYSIS>
   <ISSUES>
-    <ISSUE severity="High" type="logic">
+    <ISSUE type="logic">
       <DESCRIPTION>Off-by-one error in loop</DESCRIPTION>
       <LOCATION>Line 5: for i in range(len(numbers))</LOCATION>
       <EXPLANATION>Loop iterates one extra time</EXPLANATION>

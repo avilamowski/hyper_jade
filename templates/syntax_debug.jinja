@@ -34,7 +34,7 @@ OUTPUT FORMAT:
 <SYNTAX_ANALYSIS>
   <SYNTAX_ERRORS>
     {% for error in syntax_errors %}
-    <ERROR severity="{{ error.severity }}" type="{{ error.type }}" line="{{ error.line_number }}">
+    <ERROR type="{{ error.type }}" line="{{ error.line_number }}">
       <DESCRIPTION>{{ error.description }}</DESCRIPTION>
       <LOCATION>{{ error.location }}</LOCATION>
       <EXPLANATION>{{ error.explanation }}</EXPLANATION>
@@ -46,7 +46,7 @@ OUTPUT FORMAT:
   
   <FORMATTING_ISSUES>
     {% for issue in formatting_issues %}
-    <ISSUE severity="{{ issue.severity }}" category="{{ issue.category }}">
+    <ISSUE category="{{ issue.category }}">
       <DESCRIPTION>{{ issue.description }}</DESCRIPTION>
       <LOCATION>{{ issue.location }}</LOCATION>
       <SUGGESTION>{{ issue.suggestion }}</SUGGESTION>

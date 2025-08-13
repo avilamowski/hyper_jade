@@ -158,19 +158,19 @@ CRITERIA TO EVALUATE:
 
 {knowledge_context}
 
-TASK: Analyze the student's code and identify errors related to the criteria above.
+TASK: Create a detailed prompt for evaluating student code against the criteria above.
 
 INSTRUCTIONS:
-1. Examine the code carefully for the specific criteria listed
-2. Identify errors and issues related to each criterion
-3. Provide specific feedback for each error found
-4. Suggest specific improvements where issues are identified
+1. Create a prompt that will guide the evaluation of student code
+2. Focus on identifying errors and issues related to each criterion
+3. Request specific feedback for each error found
+4. Ask for specific improvements where issues are identified
 5. Focus on error identification rather than scoring
 
 OUTPUT FORMAT:
 <EVALUATION>
   <ERRORS>
-    <ERROR type="error_type" severity="Low/Medium/High/Critical" line="line_number">
+    <ERROR type="error_type" line="line_number">
       <LOCATION>Where the error occurs</LOCATION>
       <DESCRIPTION>Detailed description of the error</DESCRIPTION>
       <SUGGESTION>How to fix this error</SUGGESTION>
@@ -183,7 +183,7 @@ OUTPUT FORMAT:
   </ASSESSMENT>
 </EVALUATION>
 
-When you receive the student's code, analyze it according to these instructions and provide the evaluation in the specified format.
+This prompt will be used by the code correction agent to evaluate student code.
 """
         
         return CorrectionPrompt(
@@ -210,14 +210,14 @@ ASSIGNMENT DESCRIPTION:
 
 {knowledge_context}
 
-TASK: Provide an overall assessment of the student's code, focusing on error identification and improvement suggestions.
+TASK: Create a comprehensive prompt for overall evaluation of student code, focusing on error identification and improvement suggestions.
 
 INSTRUCTIONS:
-1. Analyze the code for overall correctness and functionality
-2. Identify any critical errors that prevent the code from working
-3. Assess code quality and structure
-4. Evaluate error handling and edge case management
-5. Provide constructive feedback for improvement
+1. Create a prompt that will guide the analysis of code for overall correctness and functionality
+2. Focus on identifying critical errors that prevent the code from working
+3. Request assessment of code quality and structure
+4. Ask for evaluation of error handling and edge case management
+5. Request constructive feedback for improvement
 
 OUTPUT FORMAT:
 <COMPREHENSIVE_EVALUATION>

@@ -75,62 +75,63 @@ def main():
         print(f"Error initializing evaluator: {e}")
         sys.exit(1)
     
-    # Check if we should use stored outputs
-    if args.use_stored:
-        from src.core.output_storage import OutputStorage
-        storage = OutputStorage(args.storage_dir)
-        
-        print("🔄 Using stored outputs from previous agent runs...")
-        print(f"🆔 Assignment ID: {assignment_id}")
-        
-        # Check for stored rubric
-        rubric_path = storage.get_latest_output("requirement_generator", assignment_id)
-        if rubric_path:
-            print(f"📋 Using stored rubric: {Path(rubric_path).name}")
-            rubric = storage.load_rubric(rubric_path)
+    try:
+        # Check if we should use stored outputs
+        if args.use_stored:
+            from src.core.output_storage import OutputStorage
+            storage = OutputStorage(args.storage_dir)
+            
+            print("🔄 Using stored outputs from previous agent runs...")
+            print(f"🆔 Assignment ID: {assignment_id}")
+            
+            # Check for stored rubric
+            rubric_path = storage.get_latest_output("requirement_generator", assignment_id)
+            if rubric_path:
+                print(f"📋 Using stored rubric: {Path(rubric_path).name}")
+                rubric = storage.load_rubric(rubric_path)
+            else:
+                print("⚠️  No stored rubric found, will generate new one")
+                rubric = None
+            
+            # Check for stored prompts
+            prompts_path = storage.get_latest_output("prompt_generator", assignment_id)
+            if prompts_path:
+                print(f"📝 Using stored prompts: {Path(prompts_path).name}")
+                prompt_set = storage.load_prompts(prompts_path)
+            else:
+                print("⚠️  No stored prompts found, will generate new ones")
+                prompt_set = None
+            
+            # Run evaluation with stored outputs
+            if rubric and prompt_set:
+                print("✅ Using stored rubric and prompts for evaluation")
+                # We need to modify the evaluator to accept pre-generated outputs
+                # For now, we'll run the full pipeline but it will skip generation
+                result = evaluator.evaluate_assignment(
+                    assignment_description=assignment_description,
+                    student_code=student_code,
+                    programming_language=args.language
+                )
+            else:
+                print("🔄 Running full pipeline (some outputs not found)")
+                result = evaluator.evaluate_assignment(
+                    assignment_description=assignment_description,
+                    student_code=student_code,
+                    programming_language=args.language
+                )
         else:
-            print("⚠️  No stored rubric found, will generate new one")
-            rubric = None
-        
-        # Check for stored prompts
-        prompts_path = storage.get_latest_output("prompt_generator", assignment_id)
-        if prompts_path:
-            print(f"📝 Using stored prompts: {Path(prompts_path).name}")
-            prompt_set = storage.load_prompts(prompts_path)
-        else:
-            print("⚠️  No stored prompts found, will generate new ones")
-            prompt_set = None
-        
-        # Run evaluation with stored outputs
-        if rubric and prompt_set:
-            print("✅ Using stored rubric and prompts for evaluation")
-            # We need to modify the evaluator to accept pre-generated outputs
-            # For now, we'll run the full pipeline but it will skip generation
+            # Run the evaluation pipeline
+            print("🚀 Starting assignment evaluation pipeline...")
+            print(f"📝 Assignment: {args.assignment}")
+            print(f"💻 Code: {args.code}")
+            print(f"🐍 Language: {args.language}")
+            print("-" * 50)
+            
             result = evaluator.evaluate_assignment(
                 assignment_description=assignment_description,
                 student_code=student_code,
                 programming_language=args.language
             )
-        else:
-            print("🔄 Running full pipeline (some outputs not found)")
-            result = evaluator.evaluate_assignment(
-                assignment_description=assignment_description,
-                student_code=student_code,
-                programming_language=args.language
-            )
-    else:
-        # Run the evaluation pipeline
-        print("🚀 Starting assignment evaluation pipeline...")
-        print(f"📝 Assignment: {args.assignment}")
-        print(f"💻 Code: {args.code}")
-        print(f"🐍 Language: {args.language}")
-        print("-" * 50)
-        
-        result = evaluator.evaluate_assignment(
-            assignment_description=assignment_description,
-            student_code=student_code,
-            programming_language=args.language
-        )
         
         # Prepare output
         output = {
@@ -143,7 +144,6 @@ def main():
             },
             "evaluation": {
                 "total_errors": result.correction_result.total_errors,
-                "critical_errors": result.correction_result.critical_errors,
                 "summary": result.correction_result.summary
             },
             "detailed_results": {
@@ -171,7 +171,6 @@ def main():
                                 "error_type": error.error_type,
                                 "location": error.location,
                                 "description": error.description,
-                                "severity": error.severity,
                                 "suggestion": error.suggestion,
                                 "line_number": error.line_number
                             }
@@ -202,7 +201,6 @@ def main():
             print("\n📊 ERROR ANALYSIS SUMMARY")
             print("=" * 50)
             print(f"Total Errors Found: {result.correction_result.total_errors}")
-            print(f"Critical Errors: {result.correction_result.critical_errors}")
             print(f"\n{result.correction_result.summary}")
             
             if args.verbose:

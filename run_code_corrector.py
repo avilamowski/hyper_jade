@@ -123,7 +123,6 @@ def main():
             # Log metrics
             mlflow.log_metric("code_evaluation_time", end_time - start_time)
             mlflow.log_metric("total_errors", correction_result.total_errors)
-            mlflow.log_metric("critical_errors", correction_result.critical_errors)
             
             # Save evaluation results as artifact
             evaluation_data = {
@@ -131,7 +130,6 @@ def main():
                 "assignment_description": correction_result.assignment_description,
                 "programming_language": correction_result.programming_language,
                 "total_errors": correction_result.total_errors,
-                "critical_errors": correction_result.critical_errors,
                 "summary": correction_result.summary,
                 "item_evaluations": [
                     {
@@ -144,7 +142,6 @@ def main():
                                 "error_type": error.error_type,
                                 "location": error.location,
                                 "description": error.description,
-                                "severity": error.severity,
                                 "suggestion": error.suggestion,
                                 "line_number": error.line_number
                             }
@@ -194,7 +191,6 @@ def main():
             },
             "evaluation": {
                 "total_errors": correction_result.total_errors,
-                "critical_errors": correction_result.critical_errors,
                 "summary": correction_result.summary
             },
             "detailed_results": {
@@ -209,7 +205,6 @@ def main():
                                 "error_type": error.error_type,
                                 "location": error.location,
                                 "description": error.description,
-                                "severity": error.severity,
                                 "suggestion": error.suggestion,
                                 "line_number": error.line_number
                             }
@@ -242,7 +237,6 @@ def main():
         print("\n📊 ERROR ANALYSIS SUMMARY")
         print("=" * 50)
         print(f"Total Errors Found: {correction_result.total_errors}")
-        print(f"Critical Errors: {correction_result.critical_errors}")
         print(f"MLflow Run ID: {run.info.run_id}")
         print(f"\n{correction_result.summary}")
         
@@ -253,7 +247,7 @@ def main():
             print(f"     Errors: {len(eval.errors_found)}")
             if eval.errors_found:
                 for error in eval.errors_found[:3]:  # Show first 3 errors
-                    print(f"       - {error.severity}: {error.description}")
+                    print(f"       - {error.error_type}: {error.description}")
                 if len(eval.errors_found) > 3:
                     print(f"       ... and {len(eval.errors_found) - 3} more errors")
         

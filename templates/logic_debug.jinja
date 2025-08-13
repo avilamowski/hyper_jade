@@ -34,7 +34,7 @@ OUTPUT FORMAT:
 <LOGIC_ANALYSIS>
   <LOGIC_ERRORS>
     {% for error in logic_errors %}
-    <ERROR severity="{{ error.severity }}" type="{{ error.type }}" line="{{ error.line_number }}">
+    <ERROR type="{{ error.type }}" line="{{ error.line_number }}">
       <DESCRIPTION>{{ error.description }}</DESCRIPTION>
       <LOCATION>{{ error.location }}</LOCATION>
       <EXPLANATION>{{ error.explanation }}</EXPLANATION>
@@ -51,7 +51,7 @@ OUTPUT FORMAT:
   
   <ALGORITHM_ISSUES>
     {% for issue in algorithm_issues %}
-    <ISSUE severity="{{ issue.severity }}" category="{{ issue.category }}">
+    <ISSUE category="{{ issue.category }}">
       <DESCRIPTION>{{ issue.description }}</DESCRIPTION>
       <LOCATION>{{ issue.location }}</LOCATION>
       <EXPLANATION>{{ issue.explanation }}</EXPLANATION>

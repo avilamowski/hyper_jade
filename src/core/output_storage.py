@@ -181,7 +181,6 @@ class OutputStorage:
                             "error_type": error.error_type,
                             "location": error.location,
                             "description": error.description,
-                            "severity": error.severity,
                             "suggestion": error.suggestion,
                             "line_number": error.line_number
                         }
@@ -235,7 +234,6 @@ class OutputStorage:
                         error_type=error["error_type"],
                         location=error["location"],
                         description=error["description"],
-                        severity=error["severity"],
                         suggestion=error["suggestion"],
                         line_number=error.get("line_number")
                     )
@@ -262,7 +260,6 @@ class OutputStorage:
             item_evaluations=item_evaluations,
             comprehensive_evaluation=comprehensive_eval,
             total_errors=data["total_errors"],
-            critical_errors=data["critical_errors"],
             summary=data["summary"]
         )
         

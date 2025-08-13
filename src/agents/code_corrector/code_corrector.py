@@ -26,7 +26,6 @@ class ErrorIdentification:
     error_type: str
     location: str
     description: str
-    severity: str  # "Low", "Medium", "High", "Critical"
     suggestion: str
     line_number: Optional[int] = None
 
@@ -59,7 +58,6 @@ class CorrectionResult:
     item_evaluations: List[ItemEvaluation]
     comprehensive_evaluation: ComprehensiveEvaluation
     total_errors: int
-    critical_errors: int
     summary: str
 
 class CodeCorrectorAgent:
@@ -103,12 +101,11 @@ class CodeCorrectorAgent:
                 student_code, prompt_set, item_evaluations
             )
             
-            # Count errors by severity
+            # Count errors
             total_errors = len(all_errors)
-            critical_errors = len([e for e in all_errors if e.severity == "Critical"])
             
             # Generate summary
-            summary = self._generate_summary(item_evaluations, comprehensive_eval, total_errors, critical_errors)
+            summary = self._generate_summary(item_evaluations, comprehensive_eval, total_errors)
             
             result = CorrectionResult(
                 student_code=student_code,
@@ -117,11 +114,10 @@ class CodeCorrectorAgent:
                 item_evaluations=item_evaluations,
                 comprehensive_evaluation=comprehensive_eval,
                 total_errors=total_errors,
-                critical_errors=critical_errors,
                 summary=summary
             )
             
-            logger.info(f"Code evaluation completed. Found {total_errors} errors ({critical_errors} critical)")
+            logger.info(f"Code evaluation completed. Found {total_errors} errors")
             return result
             
         except Exception as e:
@@ -148,7 +144,7 @@ Please analyze the code and identify errors in the following XML format:
 
 <EVALUATION>
   <ERRORS>
-    <ERROR type="error_type" severity="Low/Medium/High/Critical" line="line_number">
+    <ERROR type="error_type" line="line_number">
       <LOCATION>Where the error occurs</LOCATION>
       <DESCRIPTION>Detailed description of the error</DESCRIPTION>
       <SUGGESTION>How to fix this error</SUGGESTION>
@@ -172,18 +168,17 @@ Focus on identifying specific errors and providing actionable feedback for impro
             errors_found = []
             
             # Extract error information
-            error_pattern = r'<ERROR type="([^"]+)" severity="([^"]+)" line="([^"]*)">\s*<LOCATION>([^<]+)</LOCATION>\s*<DESCRIPTION>([^<]+)</DESCRIPTION>\s*<SUGGESTION>([^<]+)</SUGGESTION>\s*</ERROR>'
+            error_pattern = r'<ERROR type="([^"]+)" line="([^"]*)">\s*<LOCATION>([^<]+)</LOCATION>\s*<DESCRIPTION>([^<]+)</DESCRIPTION>\s*<SUGGESTION>([^<]+)</SUGGESTION>\s*</ERROR>'
             matches = re.findall(error_pattern, content, re.DOTALL)
             
             for match in matches:
-                error_type, severity, line_str, location, description, suggestion = match
+                error_type, line_str, location, description, suggestion = match
                 line_number = int(line_str) if line_str and line_str.isdigit() else None
                 
                 error = ErrorIdentification(
                     error_type=error_type.strip(),
                     location=location.strip(),
                     description=description.strip(),
-                    severity=severity.strip(),
                     suggestion=suggestion.strip(),
                     line_number=line_number
                 )
@@ -318,14 +313,12 @@ Focus on identifying errors and providing constructive feedback for improvement.
         self,
         item_evaluations: List[ItemEvaluation],
         comprehensive_eval: ComprehensiveEvaluation,
-        total_errors: int,
-        critical_errors: int
+        total_errors: int
     ) -> str:
         """Generate a summary of the evaluation"""
         
         summary = f"Error Analysis Summary:\n"
-        summary += f"Total Errors Found: {total_errors}\n"
-        summary += f"Critical Errors: {critical_errors}\n\n"
+        summary += f"Total Errors Found: {total_errors}\n\n"
         
         # Add strengths
         if comprehensive_eval.strengths:
@@ -366,6 +359,5 @@ Focus on identifying errors and providing constructive feedback for improvement.
                 learning_resources=["General programming resources"]
             ),
             total_errors=0,
-            critical_errors=0,
             summary="Evaluation failed - manual review required"
         )
