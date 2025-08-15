@@ -1,458 +1,274 @@
-# Hyper Jade - AI-Powered Assignment Evaluation System
+# Hyper Jade - Assignment Evaluation System
 
-An intelligent system that creates specialized prompts for AI agents designed to debug and correct student code. This system builds on the foundation of the [JADE_Scripts](https://github.com/david-wis/JADE_Scripts) repository and provides a comprehensive framework for generating targeted debugging prompts and evaluating student assignments.
+Un sistema de evaluación de tareas de programación que utiliza tres agentes especializados para analizar código de estudiantes de manera automática y detallada.
 
-## 🆕 New Features: Independent Agent Execution
+## Estructura del Sistema
 
-The system now supports running each agent independently and storing outputs for reuse:
+El sistema está compuesto por tres agentes que trabajan en secuencia:
 
-- **🔧 Individual Agent Scripts**: Run each agent separately with dedicated CLI tools
-- **💾 Output Storage**: Automatically save and load intermediate results
-- **🔄 Flexible Workflows**: Use stored outputs to avoid regenerating rubrics and prompts
-- **📊 Output Management**: List, view, and manage stored outputs
-- **⚡ Batch Processing**: Efficiently evaluate multiple student submissions
+### 1. RequirementGenerator
+**Input:** Una consigna (archivo .txt)
+**Output:** Múltiples requerimientos individuales (archivos .txt separados)
 
-### Quick Agent Usage
+- Analiza la consigna de programación
+- Identifica todos los aspectos que deben ser evaluados
+- Genera requerimientos específicos y medibles
+- Cada requerimiento se guarda como un archivo separado
 
-```bash
-# Generate rubric from assignment
-python run_requirement_generator.py --assignment assignment.txt --assignment-id my_assignment
+### 2. PromptGenerator
+**Input:** UN requerimiento (archivo .txt)
+**Output:** UN prompt Jinja2 (archivo .jinja)
 
-# Generate prompts using stored rubric
-python run_prompt_generator.py --assignment assignment.txt --rubric my_assignment
+- Toma un requerimiento específico
+- Genera una plantilla Jinja2 que servirá como prompt para el análisis
+- La plantilla permite inyectar código y contexto adicional
+- Específica para evaluar ese requerimiento en particular
 
-# Evaluate student code using stored prompts
-python run_code_corrector.py --code student.py --assignment assignment.txt --prompts my_assignment
+### 3. CodeCorrector
+**Input:** Un prompt Jinja2 (.jinja) y un archivo de código Python (.py o .txt)
+**Output:** Un análisis de qué tan bien satisface el requerimiento el código
 
-# Use stored outputs in main pipeline
-python main.py --code student.py --assignment assignment.txt --use-stored --assignment-id my_assignment
+- Renderiza la plantilla Jinja2 con el código del estudiante
+- Analiza el código contra el requerimiento específico
+- Genera un análisis detallado con errores, sugerencias y evaluación conceptual
 
-# List stored outputs
-python list_outputs.py --latest my_assignment
-```
+## Instalación
 
-See [docs/AGENT_USAGE.md](docs/AGENT_USAGE.md) for detailed usage instructions.
-
-## Features
-
-### 🎯 **Specialized Debug Agents**
-- **Syntax Error Detector**: Identifies grammar, structure, and language rule violations
-- **Logic Error Analyzer**: Finds algorithmic bugs, flow control issues, and data manipulation problems
-- **Performance Optimizer**: Analyzes complexity, efficiency, and resource usage
-- **Code Style Checker**: Evaluates readability, conventions, and documentation
-- **Test Case Generator**: Creates comprehensive test scenarios and edge cases
-- **Security Vulnerability Scanner**: Identifies input validation and data protection issues
-- **Comprehensive Debug Agent**: Combines all specialized agents for complete analysis
-
-### 🤖 **Assignment Evaluation Pipeline**
-- **Requirement Generator Agent**: Creates comprehensive rubrics from assignment descriptions
-- **Prompt Generator Agent**: Generates specialized correction prompts for each rubric item
-- **Code Corrector Agent**: Evaluates student code using the generated prompts
-- **Independent Execution**: Run each agent separately or as a complete pipeline
-- **Output Persistence**: Store and reuse intermediate results for efficiency
-
-### 🧠 **AI-Powered Prompt Generation**
-- Uses LangGraph for structured prompt generation workflows
-- Supports multiple LLM providers (Ollama, OpenAI)
-- Configurable difficulty levels (beginner, intermediate, advanced)
-- Language-specific patterns and best practices
-- Template-based prompt generation with Jinja2
-
-### 🔧 **Easy RAG Integration**
-- Modular RAG extension for future enhancement
-- Knowledge base management with relevance scoring
-- Support for vector stores (Chroma, FAISS) - ready for implementation
-- Mock implementation for development and testing
-
-### 📊 **Comprehensive Output**
-- Structured XML-like output format for consistent parsing
-- Detailed explanations and fix suggestions
-- Learning resources and references
-- Confidence scoring for generated prompts
-- JSON-based output storage for easy integration
-- Metadata tracking for all agent runs
-
-## Quick Start
-
-### Prerequisites
-- Python 3.8+
-- Ollama (for local LLM support) or OpenAI API key
-- Required Python packages (see `requirements.txt`)
-
-### Installation
-
-1. **Clone the repository**:
+1. Clona el repositorio:
 ```bash
 git clone <repository-url>
 cd hyper_jade
 ```
 
-2. **Install dependencies**:
+2. Instala las dependencias:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Configure the system**:
-```bash
-# Copy and edit the configuration file
-cp debug_config.yaml debug_config_local.yaml
-# Edit debug_config_local.yaml with your settings
-```
-
-4. **Run the example**:
-```bash
-python example_usage.py
-```
-
-5. **Test the new agent functionality**:
-```bash
-python test_agents.py
-```
-
-## Usage
-
-### Basic Usage
-
-```python
-from debug_prompt_generator import DebugPromptGenerator
-
-# Initialize the generator
-generator = DebugPromptGenerator("debug_config.yaml")
-
-# Generate a debug prompt
-result = generator.generate_prompt(
-    student_code="def calculate_average(numbers):\n    return sum(numbers) / len(numbers)",
-    assignment_description="Calculate the average of a list of numbers",
-    programming_language="python",
-    debug_agent_type="logic",
-    difficulty_level="intermediate"
-)
-
-print(result["prompt"])
-```
-
-### Command Line Interface
-
-#### Assignment Evaluation Pipeline
-
-```bash
-# Run complete pipeline
-python main.py --code student_code.py --assignment assignment.txt --language python
-
-# Use stored outputs from previous runs
-python main.py --code student_code.py --assignment assignment.txt --use-stored --assignment-id my_assignment
-
-# Individual agent execution
-python run_requirement_generator.py --assignment assignment.txt --assignment-id my_assignment
-python run_prompt_generator.py --assignment assignment.txt --rubric my_assignment
-python run_code_corrector.py --code student_code.py --assignment assignment.txt --prompts my_assignment
-
-# Output management
-python list_outputs.py --latest my_assignment
-python list_outputs.py --clean  # Clean old outputs
-```
-
-#### Debug Prompt Generation
-
-```bash
-# Generate a single debug prompt
-python debug_prompt_generator.py \
-    --code student_code.py \
-    --assignment assignment.md \
-    --language python \
-    --agent-type logic \
-    --difficulty intermediate \
-    --output result.json
-
-# Generate prompts for all agent types
-python debug_prompt_generator.py \
-    --code student_code.py \
-    --assignment assignment.md \
-    --all \
-    --output all_prompts.json
-```
-
-### Advanced Usage with RAG
-
-```python
-from rag_extension import RAGEnhancer, RAGConfig
-
-# Configure RAG
-rag_config = RAGConfig(
-    enable_rag=True,
-    max_results=5,
-    similarity_threshold=0.7
-)
-
-# Create RAG enhancer
-enhancer = RAGEnhancer(rag_config)
-
-# Enhance a prompt with relevant knowledge
-enhanced_prompt, knowledge_items = enhancer.enhance_prompt(
-    base_prompt=base_prompt,
-    student_code=student_code,
-    assignment_description=assignment_description,
-    debug_agent_type="logic",
-    programming_language="python",
-    difficulty_level="intermediate"
-)
-```
-
-## Configuration
-
-### Debug Agent Configuration (`debug_config.yaml`)
-
+3. Configura el modelo de lenguaje en `src/config/assignment_config.yaml`:
 ```yaml
-# LLM Configuration
-model_name: "qwen2.5:7b"
-provider: "ollama"  # or "openai"
+provider: "ollama"  # o "openai"
+model_name: "qwen2.5:7b"  # o "gpt-4" para OpenAI
 temperature: 0.1
-max_tokens: 2000
-
-# RAG Configuration
-enable_rag: false
-rag_knowledge_base: null
-
-# Language-specific settings
-languages:
-  python:
-    syntax_patterns:
-      - "IndentationError"
-      - "SyntaxError"
-    common_mistakes:
-      - "forgetting self in methods"
-    best_practices:
-      - "PEP 8 style guide"
-
-# Agent type configurations
-agent_types:
-  syntax:
-    focus_areas: ["grammar", "structure", "language rules"]
 ```
 
-### Supported Programming Languages
+## Uso
 
-- **Python**: Full support with PEP 8, type hints, and Python-specific patterns
-- **JavaScript**: ES6+ features, async/await, and JavaScript-specific issues
-- **Java**: SOLID principles, exception handling, and Java-specific patterns
-- **Extensible**: Easy to add support for additional languages
+### Pipeline Completo
 
-## Architecture
-
-### Core Components
-
-1. **DebugPromptGenerator**: Main class for generating debug prompts
-2. **StateGraph**: LangGraph-based workflow for prompt generation
-3. **TemplateManager**: Jinja2-based template system
-4. **RAGEnhancer**: Optional RAG integration for enhanced prompts
-
-### Assignment Evaluation Components
-
-1. **RequirementGeneratorAgent**: Generates rubrics from assignment descriptions
-2. **PromptGeneratorAgent**: Creates correction prompts for each rubric item
-3. **CodeCorrectorAgent**: Evaluates student code using the prompts
-4. **OutputStorage**: Manages storage and retrieval of agent outputs
-5. **AssignmentEvaluator**: Orchestrates the complete evaluation pipeline
-
-### Workflows
-
-#### Debug Prompt Generation
-```
-Student Code + Assignment → Context Analysis → Prompt Generation → Validation → Final Prompt
-```
-
-#### Assignment Evaluation Pipeline
-```
-Assignment Description → Rubric Generation → Prompt Creation → Code Evaluation → Final Report
-```
-
-#### Independent Agent Execution
-```
-Assignment → [Requirement Generator] → Stored Rubric → [Prompt Generator] → Stored Prompts → [Code Corrector] → Results
-```
-
-### State Management
-
-The system uses multiple state types:
-
-**DebugPromptState** (for debug prompt generation):
-- Input: student code, assignment, language, agent type
-- Context: similar examples, common mistakes, best practices
-- Output: generated prompt, metadata, confidence score
-
-**AssignmentEvaluatorState** (for assignment evaluation):
-- Input: assignment description, student code, programming language
-- Intermediate: generated rubric, generated prompts, correction result
-- Output: final evaluation pipeline result with metadata
-
-## Output Format
-
-The generated prompts produce structured output in XML-like format:
-
-```xml
-<ANALYSIS>
-  <ISSUES>
-    <ISSUE type="logic">
-      <DESCRIPTION>Off-by-one error in loop</DESCRIPTION>
-      <LOCATION>Line 5: for i in range(len(numbers))</LOCATION>
-      <EXPLANATION>Loop iterates one extra time</EXPLANATION>
-      <FIX>Use range(len(numbers)-1) or adjust logic</FIX>
-    </ISSUE>
-  </ISSUES>
-  
-  <SUMMARY>
-    <TOTAL_ISSUES>3</TOTAL_ISSUES>
-    <CRITICAL_ISSUES>1</CRITICAL_ISSUES>
-    <OVERALL_ASSESSMENT>Code has logic errors but good structure</OVERALL_ASSESSMENT>
-  </SUMMARY>
-  
-  <LEARNING_RESOURCES>
-    <RESOURCE type="documentation">
-      <TITLE>Python Loops Guide</TITLE>
-      <URL>https://docs.python.org/3/tutorial/controlflow.html</URL>
-    </RESOURCE>
-  </LEARNING_RESOURCES>
-</ANALYSIS>
-```
-
-## Extending the System
-
-### Adding New Debug Agent Types
-
-1. **Update `DEBUG_AGENT_TYPES`** in `debug_prompt_generator.py`
-2. **Add configuration** in `debug_config.yaml`
-3. **Create template** in `templates/` directory
-4. **Update helper functions** for language-specific patterns
-
-### Adding New Assignment Evaluation Agents
-
-1. **Create agent class** in `src/agents/` directory
-2. **Implement required methods** (generate, evaluate, etc.)
-3. **Add to AssignmentEvaluator** workflow
-4. **Update OutputStorage** for new agent type
-5. **Create CLI script** for independent execution
-
-### Adding RAG Support
-
-1. **Enable RAG** in configuration
-2. **Implement vector store** (Chroma, FAISS)
-3. **Add embedding models** (OpenAI, Ollama)
-4. **Create knowledge base** with relevant examples
-
-### Adding New Languages
-
-1. **Update language patterns** in `_get_language_patterns()`
-2. **Add language-specific templates**
-3. **Update configuration** with language-specific settings
-4. **Test with sample code**
-
-## Examples
-
-### Assignment Evaluation Workflow
+Para ejecutar todo el pipeline de evaluación:
 
 ```bash
-# Step 1: Generate rubric for assignment
+python main.py --assignment ejemplos/consigna.txt --code ejemplos/alu1.py --output-dir outputs
+```
+
+### Agentes Individuales
+
+#### 1. Generar Requerimientos
+```bash
+python run_requirement_generator.py --assignment ejemplos/consigna.txt --output-dir outputs/requirements
+```
+
+#### 2. Generar Prompts
+```bash
+python run_prompt_generator.py --requirement outputs/requirements/requirement_01.txt --output outputs/prompts/prompt_01.jinja
+```
+
+#### 3. Analizar Código
+```bash
+python run_code_corrector.py --prompt outputs/prompts/prompt_01.jinja --code ejemplos/alu1.py --output outputs/analyses/analysis_01.txt
+```
+
+### Modo Batch
+
+Para analizar múltiples archivos de código:
+
+```bash
+python run_code_corrector.py --prompt outputs/prompts/prompt_01.jinja --batch --code-dir ejemplos --output-dir outputs/analyses
+```
+
+## Estructura de Archivos
+
+```
+hyper_jade/
+├── src/
+│   ├── agents/
+│   │   ├── requirement_generator/
+│   │   ├── prompt_generator/
+│   │   └── code_corrector/
+│   └── config/
+├── ejemplos/
+│   ├── consigna.txt
+│   ├── alu1.py
+│   └── ...
+├── outputs/
+│   ├── requirements/
+│   │   ├── requirement_01.txt
+│   │   └── ...
+│   ├── prompts/
+│   │   ├── prompt_01.jinja
+│   │   └── ...
+│   └── analyses/
+│       ├── analysis_01.txt
+│       └── ...
+├── main.py
+├── run_requirement_generator.py
+├── run_prompt_generator.py
+├── run_code_corrector.py
+└── requirements.txt
+```
+
+## Configuración
+
+### Modelos Soportados
+
+- **Ollama:** Para uso local con modelos como qwen2.5:7b, llama3.2, etc.
+- **OpenAI:** Para uso con GPT-4, GPT-3.5-turbo, etc.
+
+### Configuración de Ollama
+
+1. Instala Ollama: https://ollama.ai/
+2. Descarga un modelo:
+```bash
+ollama pull qwen2.5:7b
+```
+3. Configura en `src/config/assignment_config.yaml`:
+```yaml
+provider: "ollama"
+model_name: "qwen2.5:7b"
+temperature: 0.1
+```
+
+### Configuración de OpenAI
+
+1. Configura tu API key:
+```bash
+export OPENAI_API_KEY="tu-api-key"
+```
+2. Configura en `src/config/assignment_config.yaml`:
+```yaml
+provider: "openai"
+model_name: "gpt-4"
+temperature: 0.1
+```
+
+## Ejemplos de Uso
+
+### Ejemplo 1: Evaluación Completa
+```bash
+# Evaluar un archivo de código contra una consigna
+python main.py \
+  --assignment ejemplos/consigna.txt \
+  --code ejemplos/alu1.py \
+  --output-dir outputs/evaluacion_alu1 \
+  --verbose
+```
+
+### Ejemplo 2: Solo Generar Requerimientos
+```bash
+# Generar requerimientos para reutilizar después
 python run_requirement_generator.py \
   --assignment ejemplos/consigna.txt \
-  --assignment-id alu_example \
+  --output-dir outputs/requirements \
   --verbose
+```
 
-# Step 2: Generate prompts using the rubric
-python run_prompt_generator.py \
-  --assignment ejemplos/consigna.txt \
-  --rubric alu_example \
-  --assignment-id alu_example \
-  --verbose
-
-# Step 3: Evaluate student code
+### Ejemplo 3: Analizar Múltiples Códigos
+```bash
+# Analizar todos los archivos en el directorio ejemplos
 python run_code_corrector.py \
-  --code ejemplos/alu1.py \
-  --assignment ejemplos/consigna.txt \
-  --prompts alu_example \
-  --assignment-id alu_example \
-  --verbose
+  --prompt outputs/prompts/prompt_01.jinja \
+  --batch \
+  --code-dir ejemplos \
+  --output-dir outputs/analyses_batch
 ```
 
-### Sample Student Code with Issues
+## Formato de Archivos
 
+### Consigna (.txt)
+```
+Implementa una función que calcule el factorial de un número.
+La función debe:
+- Manejar números enteros positivos
+- Retornar el resultado correcto
+- Incluir validación de entrada
+```
+
+### Requerimiento (.txt)
+```
+Requerimiento 1: La función debe calcular correctamente el factorial de números enteros positivos
+```
+
+### Prompt Jinja2 (.jinja)
+```jinja2
+# Análisis de Código - Evaluación de Requerimiento
+
+## Requerimiento a Evaluar:
+{{ requirement }}
+
+## Código del Estudiante:
 ```python
-def calculate_average(numbers):
-    total = 0
-    count = 0
-    
-    for i in range(len(numbers)):
-        total += numbers[i]
-        count += 1
-    
-    if count == 0:
-        return 0
-    else:
-        return total / count
-
-def find_maximum(values):
-    max_val = values[0]  # Will crash on empty list
-    
-    for val in values:
-        if val > max_val:
-            max_val = val
-    
-    return max_val
+{{ student_code }}
 ```
 
-### Generated Debug Prompt (Logic Agent)
-
-```
-You are a specialized Logic Error Analyzer for Python code.
-
-TASK: Analyze the following student code and identify logic-related issues...
-
-STUDENT CODE:
-[student code here]
-
-FOCUS AREAS:
-- algorithms
-- flow control
-- data manipulation
-
-COMMON LOGIC ISSUES TO CHECK:
-- off-by-one errors
-- wrong variable usage
-- missing edge cases
-
-INSTRUCTIONS:
-1. Analyze the algorithm and logic flow
-2. Identify off-by-one errors and boundary conditions
-3. Check for incorrect variable usage and scope issues
-...
-
-OUTPUT FORMAT:
-<LOGIC_ANALYSIS>
-  [structured output format]
-</LOGIC_ANALYSIS>
+## Instrucciones de Evaluación:
+Evalúa el código contra el requerimiento específico...
 ```
 
-## Contributing
+### Análisis (.txt)
+```
+# Análisis de Código - Evaluación de Requerimiento
 
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/new-agent-type`
-3. **Make your changes** and add tests
-4. **Run tests**: `python -m pytest tests/`
-5. **Submit a pull request**
+## Requerimiento a Evaluar:
+La función debe calcular correctamente el factorial de números enteros positivos
 
+## Código del Estudiante:
+```python
+def factorial(n):
+    if n == 0:
+        return 1
+    return n * factorial(n-1)
+```
 
-## Acknowledgments
+## Análisis:
 
-- Inspired by the [JADE_Scripts](https://github.com/david-wis/JADE_Scripts) repository
-- Built with [LangGraph](https://github.com/langchain-ai/langgraph) for workflow management
-- Uses [Jinja2](https://jinja.palletsprojects.com/) for template rendering
-- Supports [Ollama](https://ollama.ai/) for local LLM inference
+### EVALUACIÓN DEL REQUERIMIENTO:
+✅ El código satisface el requerimiento. La función factorial implementa correctamente el cálculo del factorial.
 
-## Roadmap
+### ERRORES ENCONTRADOS:
+❌ No hay validación de entrada para números negativos
+❌ No hay manejo de casos edge (números muy grandes)
 
-- [x] **Independent Agent Execution**: Run each agent separately with output storage
-- [x] **Output Management**: List, view, and manage stored outputs
-- [x] **Batch Processing**: Efficiently evaluate multiple student submissions
-- [ ] **Prompt Evaluation**: Metrics for prompt quality assessment
-- [ ] **Knowledge Base Management**: Tools for managing and curating knowledge
-- [ ] **Integration APIs**: REST API for external system integration
-- [ ] **Agent Performance Metrics**: Track and compare agent performance over time
+### UBICACIÓN DE PROBLEMAS:
+- Línea 1: Falta validación de entrada
+- No hay manejo de excepciones
+
+### SUGERENCIAS DE MEJORA:
+1. Agregar validación para números negativos
+2. Implementar manejo de excepciones
+3. Considerar límites de recursión para números grandes
+
+### JUICIO CONCEPTUAL:
+El estudiante demuestra comprensión del concepto de factorial y recursión, pero falta atención a la validación de entrada.
+```
+
+## Características
+
+- **Modular:** Cada agente puede ejecutarse independientemente
+- **Reutilizable:** Los requerimientos y prompts se pueden reutilizar
+- **Escalable:** Soporte para análisis batch de múltiples archivos
+- **Configurable:** Fácil cambio entre diferentes modelos de lenguaje
+- **Detallado:** Análisis específico por requerimiento
+- **Flexible:** Soporte para diferentes lenguajes de programación
+
+## Contribución
+
+1. Fork el repositorio
+2. Crea una rama para tu feature
+3. Commit tus cambios
+4. Push a la rama
+5. Abre un Pull Request
+
+## Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver el archivo LICENSE para más detalles.
