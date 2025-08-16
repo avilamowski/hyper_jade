@@ -15,6 +15,8 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+
+import sys
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
@@ -22,6 +24,13 @@ from langchain_openai import ChatOpenAI
 from src.config import get_agent_config
 
 load_dotenv(override=False)
+# Configure logging to output to stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
 
 # Import MLflow logger lazily to avoid circular imports
 def get_mlflow_logger():
@@ -31,6 +40,7 @@ def get_mlflow_logger():
         return mlflow_logger
     except ImportError:
         # Return a dummy logger if MLflow is not available
+        logging.warning("MLflow logger not available, using dummy logger")
         class DummyLogger:
             def start_run(self, *args, **kwargs): return None
             def end_run(self): pass
@@ -47,7 +57,6 @@ def get_mlflow_logger():
             def log_agent_input_output(self, *args, **kwargs): pass
         return DummyLogger()
 
-logger = logging.getLogger(__name__)
 
 class RequirementGeneratorAgent:
     """Agent that generates individual requirement files from an assignment description"""
@@ -123,6 +132,7 @@ class RequirementGeneratorAgent:
         
         try:
             # Read the assignment description
+            logger.info(f"Opening file")
             with open(assignment_file_path, 'r', encoding='utf-8') as f:
                 assignment_description = f.read().strip()
             
@@ -135,6 +145,7 @@ class RequirementGeneratorAgent:
                 "assignment_length": len(assignment_description)
             }, step_number=1)
             
+            logger.info("Generating requirements using LLM")
             # Generate requirements using LLM
             llm_start_time = time.time()
             requirements = self._generate_requirements_list(assignment_description)
@@ -212,6 +223,12 @@ class RequirementGeneratorAgent:
     def _generate_requirements_list(self, assignment_description: str) -> List[str]:
         """Generate a list of individual requirements from assignment description"""
         
+        from src.agents.utils.prompt_types import PromptType
+        prompt_types = [f"[{t.value}]" for t in PromptType]
+        type_instructions = "\n".join([
+            f"- Use {tag} for requirements that are of type '{tag[1:-1]}'" for tag in prompt_types
+        ])
+
         prompt = f"""Analyze the following programming assignment and generate a list of individual requirements.
 
 INSTRUCTIONS:
@@ -221,13 +238,15 @@ INSTRUCTIONS:
 4. Include requirements for functionality, code quality, error handling, etc.
 5. Each requirement should be clear and specific
 6. Only include up to 10 requirements
+7. For each requirement, infer its type and add a type tag as the first line. The available types are:
+{type_instructions}
 
 OUTPUT FORMAT:
 Generate a list with each requirement starting with a dash (-):
 
-- Requirement 1: Specific description of the first requirement
-- Requirement 2: Specific description of the second requirement
-- Requirement 3: Specific description of the third requirement
+- [presence]Requirement 1: Specific description of the first requirement
+- [presence]Requirement 2: Specific description of the second requirement
+- [conceptual]Requirement 3: Specific description of the third requirement
 ...
 
 Return only the list with dashes, no additional text.
@@ -246,6 +265,7 @@ ASSIGNMENT:
             "model_name": self.agent_config.get("model_name", "unknown")
         }, step_number=2)
         
+        logging.info(f"Invoking LLM with prompt of length {len(prompt)}")
         response = self.llm.invoke([HumanMessage(content=prompt)])
         # Minimal change: read actual message content
         raw_content = getattr(response, "content", str(response)).strip()

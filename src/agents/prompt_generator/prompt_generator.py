@@ -190,82 +190,61 @@ class PromptGeneratorAgent:
             mlflow_logger.end_run()
     
     def _generate_jinja_template(self, requirement: str, assignment_description: str) -> str:
-        """Generate a Jinja2 template prompt from a requirement and assignment description"""
-        
-        prompt = f"""You are creating a static code analyzer template. This template will be used to analyze student code.
+        """Generate a Jinja2 template prompt from a requirement and assignment description using a Jinja template file, selected by prompt type."""
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        from src.agents.utils.prompt_types import PromptType
 
-ASSIGNMENT DESCRIPTION:
-{assignment_description}
+        # Extract prompt type from requirement (first line)
+        lines = requirement.splitlines()
+        prompt_type = PromptType.PRESENCE
+        requirement_body = requirement
+        if lines:
+            first_line = lines[0].strip()
+            if first_line.startswith("[") and "]" in first_line:
+                type_tag = first_line[1:first_line.index("]")].strip().lower()
+                try:
+                    prompt_type = PromptType(type_tag)
+                except ValueError:
+                    prompt_type = PromptType.PRESENCE
+                # Remove type tag from requirement for template rendering
+                requirement_body = "\n".join(lines[1:]) if len(lines) > 1 else ""
 
-REQUIREMENT:
-{requirement}
+        # Select template file based on prompt type
+        template_map = {
+            PromptType.PRESENCE: "prompt_generator_presence.jinja",
+            PromptType.CONCEPTUAL: "prompt_generator_conceptual.jinja"
+        }
+        template_file = template_map.get(prompt_type, "prompt_generator_presence.jinja")
 
-Your task is to create a Jinja2 template that will analyze if student code meets this specific requirement.
+        env = Environment(
+            loader=FileSystemLoader("templates"),
+            autoescape=select_autoescape(["jinja"])
+        )
+        template = env.get_template(template_file)
+        prompt = template.render(requirement=requirement_body, assignment_description=assignment_description, code="{{ code }}")
 
-The template should follow this EXACT structure:
-
-```
-You are a static code analyzer.
-
-Task:
-- Determine if the code [describe what to check based on the requirement]
-
-Definition:
-- [Define what constitutes valid/invalid code for this requirement]
-
-Examples that should return <RESULT>YES</RESULT>:
-1. [Example of valid code that meets the requirement]
-2. [Another example of valid code]
-
-Examples that should return <RESULT>NO</RESULT>:
-1. [Example of invalid code that does not meet the requirement]
-2. [Another example of invalid code]
-
-Instructions:
-- Return YES if the code [meets the requirement].
-- Return NO otherwise.
-
-Output format (strict and exact):
-<RESULT>YES</RESULT>
-or
-<RESULT>NO</RESULT>
-
-Code to analyze:
-{{{{ code }}}}
-```
-
-IMPORTANT: 
-- This is a TEMPLATE for analysis, NOT code to implement
-- Use "{{{{ code }}}}" (with double braces) for the Jinja2 variable
-- The template will be filled with student code later
-- Focus on the specific requirement given
-- Provide clear examples of what passes and what fails
-
-Generate only the template, no explanations or additional text.
-"""
-        
         # Log the prompt being sent to LLM
         mlflow_logger = get_mlflow_logger()
         mlflow_logger.log_prompt(prompt, "prompt_generation", "llm_prompt")
-        
+
         response = self.llm.invoke([HumanMessage(content=prompt)])
-        template = str(response).strip()
-        
+        jinja_template = str(response).strip()
+
         # Clean up the response if it contains markdown formatting
-        if "```jinja" in template:
-            template = template.split("```jinja")[1].split("```")[0].strip()
-        elif "```" in template:
-            template = template.split("```")[1].strip()
-        
+        if "```jinja" in jinja_template:
+            jinja_template = jinja_template.split("```jinja")[1].split("```")[0].strip()
+        elif "```" in jinja_template:
+            jinja_template = jinja_template.split("```")[1].strip()
+
         # Ensure the template has the basic structure - be more flexible with validation
-        if "{{ code }}" not in template and "{{code}}" not in template:
+        if "{{ code }}" not in jinja_template and "{{code}}" not in jinja_template:
             # Try to fix common issues
-            template = template.replace("{{ student_code }}", "{{ code }}")
-            template = template.replace("{{code}}", "{{ code }}")
-            
+            jinja_template = jinja_template.replace("{{ student_code }}", "{{ code }}")
+            jinja_template = jinja_template.replace("{{code}}", "{{ code }}")
+
             # If still not found, add it at the end
-            if "{{ code }}" not in template:
-                template += "\n\nCode to analyze:\n{{ code }}"
-        
-        logger.info("Generated Jinja2 template successfully")
-        return template
+            if "{{ code }}" not in jinja_template:
+                jinja_template += "\n\nCode to analyze:\n{{ code }}"
+
+        logger.info(f"Generated Jinja2 template successfully for type: {prompt_type.value}")
+        return jinja_template

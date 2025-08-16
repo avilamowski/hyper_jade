@@ -2,7 +2,7 @@
 # This system coordinates three specialized agents for automated code evaluation
 
 # Global LLM Configuration (used as fallback if agent-specific config is not provided)
-model_name: "gpt-oss:latest"
+model_name: "deepseek-r1:14b"  # Default model for all agents
 provider: "ollama"
 temperature: 0.1
 
