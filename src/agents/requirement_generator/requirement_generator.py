@@ -12,12 +12,16 @@ import logging
 import json
 import time
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 
 from src.config import get_agent_config
+
+load_dotenv(override=False)
 
 # Import MLflow logger lazily to avoid circular imports
 def get_mlflow_logger():
@@ -56,15 +60,27 @@ class RequirementGeneratorAgent:
     
     def _setup_llm(self):
         """Setup LLM based on agent-specific configuration"""
-        if self.agent_config.get("provider") == "openai":
+        provider = self.agent_config.get("provider")
+        model_name = self.agent_config.get("model_name", "gpt-4o-mini")
+        temperature = self.agent_config.get("temperature", 0.1)
+
+        if provider == "openai":
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise RuntimeError(
+                    "OPENAI_API_KEY not found. Please add it to your .env file or environment variables."
+                )
+            base_url = os.getenv("OPENAI_BASE_URL")  # optional
             return ChatOpenAI(
-                model=self.agent_config.get("model_name", "gpt-4"),
-                temperature=self.agent_config.get("temperature", 0.1)
+                model=model_name,
+                temperature=temperature,
+                api_key=api_key,
+                base_url=base_url if base_url else None,
             )
         else:
             return OllamaLLM(
-                model=self.agent_config.get("model_name", "qwen2.5:7b"),
-                temperature=self.agent_config.get("temperature", 0.1)
+                model=model_name or "qwen2.5:7b",
+                temperature=temperature
             )
     
     def generate_requirements(
@@ -231,7 +247,8 @@ ASSIGNMENT:
         }, step_number=2)
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
-        raw_content = str(response).strip()
+        # Minimal change: read actual message content
+        raw_content = getattr(response, "content", str(response)).strip()
         
         # Log the raw response as artifact
         mlflow_logger = get_mlflow_logger()
