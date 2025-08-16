@@ -18,7 +18,7 @@ agents:
     enabled: true
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
-    # model_name: "deepseek-r1:14b"  # Different model for requirement generation
+    model_name: "deepseek-r1:14b"  # Different model for requirement generation
     # provider: "openai"   # Different provider for requirement generation
     # temperature: 0.2     # Different temperature for requirement generation
     

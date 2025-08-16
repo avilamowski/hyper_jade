@@ -231,10 +231,17 @@ ASSIGNMENT:
         }, step_number=2)
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
-        content = str(response).strip()
+        raw_content = str(response).strip()
+        
+        # Log the raw response as artifact
+        mlflow_logger = get_mlflow_logger()
+        mlflow_logger.log_text(raw_content, "raw_llm_response.txt")
         
         # Debug: Log the raw response
-        logger.info(f"Raw LLM response: {repr(content)}")
+        logger.info(f"Raw LLM response: {repr(raw_content)}")
+        
+        # Clean the content by removing think tags and explanations
+        content = self._clean_llm_response(raw_content)
         
         # Extract content from code blocks if present
         if "```" in content:
@@ -293,3 +300,52 @@ ASSIGNMENT:
         
         logger.info(f"Generated {len(requirements)} requirements")
         return requirements
+    
+    def _clean_llm_response(self, raw_content: str) -> str:
+        """
+        Clean LLM response by removing think tags, explanations, and other non-requirement content
+        
+        Args:
+            raw_content: The raw response from the LLM
+            
+        Returns:
+            Cleaned content containing only the requirements
+        """
+        content = raw_content
+        
+        # Remove think tags and their content
+        import re
+        
+        # Remove <think>...</think> tags and their content
+        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+        
+        # Remove <thinking>...</thinking> tags and their content
+        content = re.sub(r'<thinking>.*?</thinking>', '', content, flags=re.DOTALL)
+        
+        # Remove <reasoning>...</reasoning> tags and their content
+        content = re.sub(r'<reasoning>.*?</reasoning>', '', content, flags=re.DOTALL)
+        
+        # Remove <analysis>...</analysis> tags and their content
+        content = re.sub(r'<analysis>.*?</analysis>', '', content, flags=re.DOTALL)
+        
+        # Find the first occurrence of a dash (-) and cut everything before it
+        dash_index = content.find('-')
+        if dash_index != -1:
+            content = content[dash_index:]
+        
+        # If no dash found, try to find numbered requirements
+        if dash_index == -1:
+            # Look for "Requirement 1:" pattern
+            req_match = re.search(r'Requirement\s+\d+:', content)
+            if req_match:
+                content = content[req_match.start():]
+            else:
+                # Look for numbered list (1., 2., etc.)
+                num_match = re.search(r'\d+\.', content)
+                if num_match:
+                    content = content[num_match.start():]
+        
+        # Clean up any leading/trailing whitespace
+        content = content.strip()
+        
+        return content
