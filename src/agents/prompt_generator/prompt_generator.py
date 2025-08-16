@@ -17,6 +17,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 
+from src.config import get_agent_config
+
 # Import MLflow logger lazily to avoid circular imports
 def get_mlflow_logger():
     """Get MLflow logger instance, importing it only when needed"""
@@ -48,19 +50,21 @@ class PromptGeneratorAgent:
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        # Get agent-specific configuration
+        self.agent_config = get_agent_config(config, 'prompt_generator')
         self.llm = self._setup_llm()
     
     def _setup_llm(self):
-        """Setup LLM based on configuration"""
-        if self.config.get("provider") == "openai":
+        """Setup LLM based on agent-specific configuration"""
+        if self.agent_config.get("provider") == "openai":
             return ChatOpenAI(
-                model=self.config.get("model_name", "gpt-4"),
-                temperature=self.config.get("temperature", 0.1)
+                model=self.agent_config.get("model_name", "gpt-4"),
+                temperature=self.agent_config.get("temperature", 0.1)
             )
         else:
             return OllamaLLM(
-                model=self.config.get("model_name", "qwen2.5:7b"),
-                temperature=self.config.get("temperature", 0.1)
+                model=self.agent_config.get("model_name", "qwen2.5:7b"),
+                temperature=self.agent_config.get("temperature", 0.1)
             )
     
     def generate_prompt(
@@ -100,9 +104,9 @@ class PromptGeneratorAgent:
             "requirement_file_path": requirement_file_path,
             "assignment_file_path": assignment_file_path,
             "output_file_path": output_file_path,
-            "model_name": self.config.get("model_name", "unknown"),
-            "provider": self.config.get("provider", "unknown"),
-            "temperature": self.config.get("temperature", 0.1)
+            "model_name": self.agent_config.get("model_name", "unknown"),
+            "provider": self.agent_config.get("provider", "unknown"),
+            "temperature": self.agent_config.get("temperature", 0.1)
         })
         
         try:

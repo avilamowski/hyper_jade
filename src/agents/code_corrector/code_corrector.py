@@ -18,6 +18,8 @@ from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 from jinja2 import Template
 
+from src.config import get_agent_config
+
 # Import MLflow logger lazily to avoid circular imports
 def get_mlflow_logger():
     """Get MLflow logger instance, importing it only when needed"""
@@ -49,19 +51,21 @@ class CodeCorrectorAgent:
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        # Get agent-specific configuration
+        self.agent_config = get_agent_config(config, 'code_corrector')
         self.llm = self._setup_llm()
     
     def _setup_llm(self):
-        """Setup LLM based on configuration"""
-        if self.config.get("provider") == "openai":
+        """Setup LLM based on agent-specific configuration"""
+        if self.agent_config.get("provider") == "openai":
             return ChatOpenAI(
-                model=self.config.get("model_name", "gpt-4"),
-                temperature=self.config.get("temperature", 0.1)
+                model=self.agent_config.get("model_name", "gpt-4"),
+                temperature=self.agent_config.get("temperature", 0.1)
             )
         else:
             return OllamaLLM(
-                model=self.config.get("model_name", "qwen2.5:7b"),
-                temperature=self.config.get("temperature", 0.1)
+                model=self.agent_config.get("model_name", "qwen2.5:7b"),
+                temperature=self.agent_config.get("temperature", 0.1)
             )
     
     def analyze_code(
@@ -104,9 +108,9 @@ class CodeCorrectorAgent:
             "code_file_path": code_file_path,
             "output_file_path": output_file_path,
             "additional_context": additional_context is not None,
-            "model_name": self.config.get("model_name", "unknown"),
-            "provider": self.config.get("provider", "unknown"),
-            "temperature": self.config.get("temperature", 0.1)
+            "model_name": self.agent_config.get("model_name", "unknown"),
+            "provider": self.agent_config.get("provider", "unknown"),
+            "temperature": self.agent_config.get("temperature", 0.1)
         })
         
         try:
@@ -301,9 +305,9 @@ class CodeCorrectorAgent:
             "code_directory": code_directory,
             "output_directory": output_directory,
             "additional_context": additional_context is not None,
-            "model_name": self.config.get("model_name", "unknown"),
-            "provider": self.config.get("provider", "unknown"),
-            "temperature": self.config.get("temperature", 0.1)
+            "model_name": self.agent_config.get("model_name", "unknown"),
+            "provider": self.agent_config.get("provider", "unknown"),
+            "temperature": self.agent_config.get("temperature", 0.1)
         })
         
         try:

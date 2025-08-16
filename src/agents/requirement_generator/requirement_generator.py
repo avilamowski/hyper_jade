@@ -17,6 +17,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 
+from src.config import get_agent_config
+
 # Import MLflow logger lazily to avoid circular imports
 def get_mlflow_logger():
     """Get MLflow logger instance, importing it only when needed"""
@@ -48,19 +50,21 @@ class RequirementGeneratorAgent:
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        # Get agent-specific configuration
+        self.agent_config = get_agent_config(config, 'requirement_generator')
         self.llm = self._setup_llm()
     
     def _setup_llm(self):
-        """Setup LLM based on configuration"""
-        if self.config.get("provider") == "openai":
+        """Setup LLM based on agent-specific configuration"""
+        if self.agent_config.get("provider") == "openai":
             return ChatOpenAI(
-                model=self.config.get("model_name", "gpt-4"),
-                temperature=self.config.get("temperature", 0.1)
+                model=self.agent_config.get("model_name", "gpt-4"),
+                temperature=self.agent_config.get("temperature", 0.1)
             )
         else:
             return OllamaLLM(
-                model=self.config.get("model_name", "qwen2.5:7b"),
-                temperature=self.config.get("temperature", 0.1)
+                model=self.agent_config.get("model_name", "qwen2.5:7b"),
+                temperature=self.agent_config.get("temperature", 0.1)
             )
     
     def generate_requirements(
@@ -96,9 +100,9 @@ class RequirementGeneratorAgent:
         mlflow_logger.log_params({
             "assignment_file_path": assignment_file_path,
             "output_directory": output_directory,
-            "model_name": self.config.get("model_name", "unknown"),
-            "provider": self.config.get("provider", "unknown"),
-            "temperature": self.config.get("temperature", 0.1)
+            "model_name": self.agent_config.get("model_name", "unknown"),
+            "provider": self.agent_config.get("provider", "unknown"),
+            "temperature": self.agent_config.get("temperature", 0.1)
         })
         
         try:
@@ -129,7 +133,7 @@ class RequirementGeneratorAgent:
             # Log agent I/O
             mlflow_logger.log_agent_input_output("requirement_generator", {
                 "assignment_description": assignment_description,
-                "model_name": self.config.get("model_name", "unknown")
+                "model_name": self.agent_config.get("model_name", "unknown")
             }, {
                 "requirements": requirements,
                 "generation_time": llm_time
@@ -194,9 +198,6 @@ class RequirementGeneratorAgent:
         
         prompt = f"""Analyze the following programming assignment and generate a list of individual requirements.
 
-ASSIGNMENT:
-{assignment_description}
-
 INSTRUCTIONS:
 1. Identify all aspects that should be evaluated in the student's code
 2. Break down the assignment into specific and measurable requirements
@@ -208,9 +209,9 @@ OUTPUT FORMAT:
 Generate a JSON list with each requirement as a separate element:
 
 [
-    "Requirement 1: Specific description of the first requirement",
-    "Requirement 2: Specific description of the second requirement",
-    "Requirement 3: Specific description of the third requirement",
+    "Specific description of the first requirement",
+    "Specific description of the second requirement",
+    "Specific description of the third requirement",
     ...
 ]
 
@@ -221,6 +222,9 @@ Each requirement must be:
 - Objectively evaluable
 
 Return only the JSON, no additional text.
+
+ASSIGNMENT:
+{assignment_description}
 """
         
         # Log the prompt being sent to LLM
@@ -230,7 +234,7 @@ Return only the JSON, no additional text.
         # Log trace step: LLM generation
         mlflow_logger.log_trace_step("llm_generation", {
             "prompt_length": len(prompt),
-            "model_name": self.config.get("model_name", "unknown")
+            "model_name": self.agent_config.get("model_name", "unknown")
         }, step_number=2)
         
         response = self.llm.invoke([HumanMessage(content=prompt)])

@@ -1,29 +1,47 @@
 # Configuration for Assignment Evaluation System
 # This system coordinates three specialized agents for automated code evaluation
 
-# LLM Configuration
+# Global LLM Configuration (used as fallback if agent-specific config is not provided)
 model_name: "gpt-oss:latest"
 provider: "ollama"
+temperature: 0.1
 
 # RAG Configuration
 enable_rag: false
 rag_knowledge_base: null
 
 # Agent Configuration
+# Each agent can have its own model configuration
+# If not specified, the agent will use the global configuration above
 agents:
   requirement_generator:
     enabled: true
+    # Agent-specific model configuration (optional)
+    # Uncomment and modify these lines to use a different model for this agent
+    model_name: "deepseek-r1:14b"  # Different model for requirement generation
+    # provider: "openai"   # Different provider for requirement generation
+    # temperature: 0.2     # Different temperature for requirement generation
     
   prompt_generator:
     enabled: true
     include_examples: true
     include_resources: true
+    # Agent-specific model configuration (optional)
+    # Uncomment and modify these lines to use a different model for this agent
+    # model_name: "qwen2.5:7b"  # Different model for prompt generation
+    # provider: "ollama"        # Different provider for prompt generation
+    # temperature: 0.15         # Different temperature for prompt generation
     
   code_corrector:
     enabled: true
     detailed_feedback: true
     include_suggestions: true
     include_learning_resources: true
+    # Agent-specific model configuration (optional)
+    # Uncomment and modify these lines to use a different model for this agent
+    # model_name: "gpt-4-turbo"  # Different model for code correction
+    # provider: "openai"         # Different provider for code correction
+    # temperature: 0.05          # Different temperature for code correction
 
 # Programming Language Support
 languages:
@@ -41,29 +59,6 @@ languages:
     name: "Java"
     file_extensions: [".java"]
     syntax_highlighting: "java"
-
-# Evaluation Criteria
-evaluation_criteria:
-  correctness:
-    description: "Code produces correct results"
-    subcriteria:
-      - "Produces expected output for given inputs"
-      - "Handles edge cases appropriately"
-      - "No logical errors in implementation"
-      
-  code_quality:
-    description: "Code is readable and well-structured"
-    subcriteria:
-      - "Clear variable and function names"
-      - "Proper indentation and formatting"
-      - "Logical code organization"
-      
-  error_handling:
-    description: "Code handles errors gracefully"
-    subcriteria:
-      - "Validates input parameters"
-      - "Handles edge cases (empty lists, null values, etc.)"
-      - "Provides meaningful error messages"
 
 # Output Configuration
 output:

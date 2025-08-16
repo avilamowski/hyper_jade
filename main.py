@@ -21,6 +21,7 @@ from src.agents.requirement_generator.requirement_generator import RequirementGe
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.core.mlflow_utils import mlflow_logger
+from src.config import get_agent_config
 
 def load_config(config_path: str) -> dict:
     """Load configuration from YAML file"""
@@ -54,8 +55,17 @@ def main():
         sys.exit(1)
     
     # Print model information
-    print(f"🤖 Using model: {config.get('model_name', 'Unknown')}")
-    print(f"🔧 Provider: {config.get('provider', 'Unknown')}")
+    print("🤖 Model Configuration:")
+    print(f"   Global: {config.get('model_name', 'Unknown')} ({config.get('provider', 'Unknown')})")
+    
+    # Print agent-specific model information
+    agents_config = config.get('agents', {})
+    for agent_name, agent_config in agents_config.items():
+        if agent_config.get('enabled', True):
+            model_name = agent_config.get('model_name', config.get('model_name', 'Unknown'))
+            provider = agent_config.get('provider', config.get('provider', 'Unknown'))
+            print(f"   {agent_name.replace('_', ' ').title()}: {model_name} ({provider})")
+    
     print("-" * 50)
     
     # Check if input files exist

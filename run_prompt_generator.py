@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
+from src.config import get_agent_config
 
 def load_config(config_path: str) -> dict:
     """Load configuration from YAML file"""
@@ -46,8 +47,9 @@ def main():
         sys.exit(1)
     
     # Print model information
-    print(f"🤖 Using model: {config.get('model_name', 'Unknown')}")
-    print(f"🔧 Provider: {config.get('provider', 'Unknown')}")
+    agent_config = get_agent_config(config, 'prompt_generator')
+    print(f"🤖 Using model: {agent_config.get('model_name', 'Unknown')}")
+    print(f"🔧 Provider: {agent_config.get('provider', 'Unknown')}")
     print("-" * 50)
     
     # Check if files exist

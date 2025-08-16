@@ -46,11 +46,34 @@ pip install -r requirements.txt
 ```
 
 3. Configura el modelo de lenguaje en `src/config/assignment_config.yaml`:
+
+**Configuración Global (para todos los agentes):**
 ```yaml
 provider: "ollama"  # o "openai"
 model_name: "qwen2.5:7b"  # o "gpt-4" para OpenAI
 temperature: 0.1
 ```
+
+**Configuración Específica por Agente (opcional):**
+```yaml
+agents:
+  requirement_generator:
+    model_name: "gpt-4"      # Modelo específico para generación de requerimientos
+    provider: "openai"
+    temperature: 0.2
+    
+  prompt_generator:
+    model_name: "qwen2.5:7b" # Modelo específico para generación de prompts
+    provider: "ollama"
+    temperature: 0.15
+    
+  code_corrector:
+    model_name: "gpt-4-turbo" # Modelo específico para corrección de código
+    provider: "openai"
+    temperature: 0.05
+```
+
+Si no especificas configuración por agente, todos usarán la configuración global.
 
 ## Uso
 
@@ -138,6 +161,41 @@ provider: "ollama"
 model_name: "qwen2.5:7b"
 temperature: 0.1
 ```
+
+### Configuración de Modelos Múltiples
+
+Puedes usar diferentes modelos para cada agente según sus necesidades específicas:
+
+**Ejemplo con modelos mixtos:**
+```yaml
+# Configuración global (fallback)
+model_name: "gpt-oss:latest"
+provider: "ollama"
+temperature: 0.1
+
+agents:
+  requirement_generator:
+    model_name: "gpt-4"        # Mejor para entender consignas complejas
+    provider: "openai"
+    temperature: 0.2
+    
+  prompt_generator:
+    model_name: "qwen2.5:7b"   # Buen balance calidad/velocidad
+    provider: "ollama"
+    temperature: 0.15
+    
+  code_corrector:
+    model_name: "gpt-4-turbo"  # Mejor para análisis de código
+    provider: "openai"
+    temperature: 0.05
+```
+
+**Ventajas de usar modelos específicos:**
+- **Requirement Generator:** Modelos más potentes para entender consignas complejas
+- **Prompt Generator:** Modelos rápidos para generar plantillas
+- **Code Corrector:** Modelos especializados en análisis de código
+
+Ver `src/config/assignment_config_mixed_models.yaml` para un ejemplo completo.
 
 ### Configuración de OpenAI
 
