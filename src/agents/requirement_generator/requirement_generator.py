@@ -207,16 +207,14 @@ INSTRUCTIONS:
 6. Only include up to 10 requirements
 
 OUTPUT FORMAT:
-Generate a JSON list with each requirement as a separate element:
+Generate a list with each requirement starting with a dash (-):
 
-[
-    "Requirement 1: Specific description of the first requirement",
-    "Requirement 2: Specific description of the second requirement",
-    "Requirement 3: Specific description of the third requirement",
-    ...
-]
+- Requirement 1: Specific description of the first requirement
+- Requirement 2: Specific description of the second requirement
+- Requirement 3: Specific description of the third requirement
+...
 
-Return only the JSON, no additional text.
+Return only the list with dashes, no additional text.
 
 ASSIGNMENT:
 {assignment_description}
@@ -238,32 +236,60 @@ ASSIGNMENT:
         # Debug: Log the raw response
         logger.info(f"Raw LLM response: {repr(content)}")
         
-        # Extract JSON from response
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].strip()
+        # Extract content from code blocks if present
+        if "```" in content:
+            # Remove markdown code blocks
+            lines = content.split('\n')
+            content_lines = []
+            in_code_block = False
+            for line in lines:
+                if line.strip().startswith('```'):
+                    in_code_block = not in_code_block
+                    continue
+                if not in_code_block:
+                    content_lines.append(line)
+            content = '\n'.join(content_lines).strip()
         
         # Debug: Log the extracted content
-        logger.info(f"Extracted content for JSON parsing: {repr(content)}")
+        logger.info(f"Extracted content for parsing: {repr(content)}")
         
         # Check if content is empty
         if not content.strip():
             raise ValueError("LLM returned empty response")
         
-        try:
-            requirements = json.loads(content)
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
-            logger.error(f"Content that failed to parse: {repr(content)}")
-            raise
+        # Parse requirements from dash-separated list
+        requirements = []
+        lines = content.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line.startswith('-'):
+                # Remove the dash and any leading whitespace
+                requirement = line[1:].strip()
+                if requirement:  # Only add non-empty requirements
+                    requirements.append(requirement)
+            elif line and not line.startswith('#') and not line.startswith('*'):
+                # If line doesn't start with dash but contains content, 
+                # it might be a continuation or a requirement without dash
+                if line and not line.startswith('Requirement'):
+                    # Try to clean it up and add it
+                    clean_line = line.strip()
+                    if clean_line:
+                        requirements.append(clean_line)
         
-        # Validate that we got a list of strings
-        if not isinstance(requirements, list):
-            raise ValueError("Expected list of requirements")
+        # If no requirements found with dashes, try to extract from numbered list
+        if not requirements:
+            for line in lines:
+                line = line.strip()
+                if line and (line.startswith('Requirement') or 
+                           any(line.startswith(f"{i}.") for i in range(1, 11)) or
+                           any(line.startswith(f"{i})") for i in range(1, 11))):
+                    requirements.append(line)
         
-        # Ensure each requirement is a string
-        requirements = [str(req) for req in requirements if req]
+        # Validate that we got requirements
+        if not requirements:
+            raise ValueError("No requirements found in LLM response")
+        
+        logger.info(f"Parsed {len(requirements)} requirements from response")
         
         logger.info(f"Generated {len(requirements)} requirements")
         return requirements
