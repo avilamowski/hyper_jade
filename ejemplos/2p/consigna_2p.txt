@@ -1,0 +1,35 @@
+El archivo registro.csv contiene registros tomados por sensores portátiles que miden la frecuencia cardíaca (FC) de pacientes a lo largo del día.
+
+Cada línea del archivo representa una medición de FC y tiene el siguiente formato:
+
+ID_paciente,frecuencia,hora
+
+Ejemplo contenido del archivo registro.csv:
+
+P001,78,09:00
+P002,125,11:15
+P001,88,14:30
+P002,45,08:10
+P003,110,12:00
+
+
+Se pide:
+
+Crear una función llamada estadisticas_por_paciente que reciba como parámetro la ruta del archivo CSV y calcule, para cada paciente:
+
+Frecuencia mínima
+Frecuencia máxima
+Promedio de frecuencia
+
+Si hay un sólo registro para el paciente en registro.csv, la máxima, mínima y promedio será el valor de ese único registro.
+
+Los resultados deben mostrarse ordenados por ID de paciente y en formato tabular, como en el siguiente ejemplo:
+
+ID     Mínima  Máxima  Promedio
+P001   78      88      83.0     
+P002   45      125     85.0    
+P003   110     110     110.0
+
+Ejemplo del llamado de la función: estadisticas_por_paciente("registro.csv")
+
+Recuerde: que sus funciones pueden llamar a otras funciones  y garantizar una buena modularidad

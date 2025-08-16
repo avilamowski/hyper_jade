@@ -200,26 +200,21 @@ class RequirementGeneratorAgent:
 
 INSTRUCTIONS:
 1. Identify all aspects that should be evaluated in the student's code
-2. Break down the assignment into specific and measurable requirements
-3. Each requirement should be independent and evaluable separately
+2. Break down the assignment into specific requirements
+3. Each requirement should be independent
 4. Include requirements for functionality, code quality, error handling, etc.
 5. Each requirement should be clear and specific
+6. Only include up to 10 requirements
 
 OUTPUT FORMAT:
 Generate a JSON list with each requirement as a separate element:
 
 [
-    "Specific description of the first requirement",
-    "Specific description of the second requirement",
-    "Specific description of the third requirement",
+    "Requirement 1: Specific description of the first requirement",
+    "Requirement 2: Specific description of the second requirement",
+    "Requirement 3: Specific description of the third requirement",
     ...
 ]
-
-Each requirement must be:
-- Specific and measurable
-- Independent of other requirements
-- Clear about what the code should do
-- Objectively evaluable
 
 Return only the JSON, no additional text.
 
@@ -240,13 +235,28 @@ ASSIGNMENT:
         response = self.llm.invoke([HumanMessage(content=prompt)])
         content = str(response).strip()
         
+        # Debug: Log the raw response
+        logger.info(f"Raw LLM response: {repr(content)}")
+        
         # Extract JSON from response
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].strip()
         
-        requirements = json.loads(content)
+        # Debug: Log the extracted content
+        logger.info(f"Extracted content for JSON parsing: {repr(content)}")
+        
+        # Check if content is empty
+        if not content.strip():
+            raise ValueError("LLM returned empty response")
+        
+        try:
+            requirements = json.loads(content)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            logger.error(f"Content that failed to parse: {repr(content)}")
+            raise
         
         # Validate that we got a list of strings
         if not isinstance(requirements, list):
