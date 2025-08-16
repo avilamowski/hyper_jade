@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""
+MLflow utilities for logging metrics and artifacts across agents
+"""
+
+import mlflow
+import logging
+import time
+import yaml
+import json
+from pathlib import Path
+from typing import Dict, Any, Optional, List
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+class MLflowLogger:
+    """Centralized MLflow logging utility for all agents"""
+    
+    def __init__(self, experiment_name: str = "assignment_evaluation", config_path: Optional[str] = None):
+        self.experiment_name = experiment_name
+        self.config = self._load_config(config_path)
+        self._setup_experiment()
+    
+    def _load_config(self, config_path: Optional[str] = None) -> Dict[str, Any]:
+        """Load MLflow configuration from YAML file"""
+        if config_path is None:
+            config_path = Path(__file__).parent.parent / "config" / "mlflow_config.yaml"
+        
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded MLflow config from: {config_path}")
+            return config.get('mlflow', {})
+        except Exception as e:
+            logger.warning(f"Could not load MLflow config from {config_path}: {e}")
+            return {}
+    
+    def _setup_experiment(self):
+        """Setup MLflow experiment"""
+        try:
+            # Set tracking URI if configured
+            tracking_uri = self.config.get('tracking_uri')
+            if tracking_uri:
+                mlflow.set_tracking_uri(tracking_uri)
+                logger.info(f"Set MLflow tracking URI: {tracking_uri}")
+            
+            # Set experiment
+            experiment_name = self.config.get('experiment_name', self.experiment_name)
+            mlflow.set_experiment(experiment_name)
+            logger.info(f"MLflow experiment set to: {experiment_name}")
+        except Exception as e:
+            logger.warning(f"Could not set MLflow experiment: {e}")
+    
+    def start_run(self, run_name: str, tags: Optional[Dict[str, str]] = None) -> str:
+        """Start a new MLflow run and return the run ID"""
+        try:
+            mlflow.start_run(run_name=run_name)
+            if tags:
+                mlflow.set_tags(tags)
+            run_id = mlflow.active_run().info.run_id
+            logger.info(f"Started MLflow run: {run_name} (ID: {run_id})")
+            return run_id
+        except Exception as e:
+            logger.warning(f"Could not start MLflow run: {e}")
+            return None
+    
+    def end_run(self):
+        """End the current MLflow run"""
+        try:
+            mlflow.end_run()
+            logger.info("Ended MLflow run")
+        except Exception as e:
+            logger.warning(f"Could not end MLflow run: {e}")
+    
+    def log_metric(self, key: str, value: float, step: Optional[int] = None):
+        """Log a metric to MLflow"""
+        try:
+            mlflow.log_metric(key, value, step=step)
+            logger.debug(f"Logged metric: {key} = {value}")
+        except Exception as e:
+            logger.warning(f"Could not log metric {key}: {e}")
+    
+    def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
+        """Log multiple metrics to MLflow"""
+        try:
+            mlflow.log_metrics(metrics, step=step)
+            logger.debug(f"Logged metrics: {list(metrics.keys())}")
+        except Exception as e:
+            logger.warning(f"Could not log metrics: {e}")
+    
+    def log_artifact(self, local_path: str, artifact_path: Optional[str] = None):
+        """Log an artifact to MLflow"""
+        try:
+            mlflow.log_artifact(local_path, artifact_path)
+            logger.info(f"Logged artifact: {local_path}")
+        except Exception as e:
+            logger.warning(f"Could not log artifact {local_path}: {e}")
+    
+    def log_artifacts(self, local_dir: str, artifact_path: Optional[str] = None):
+        """Log all files in a directory as artifacts"""
+        try:
+            mlflow.log_artifacts(local_dir, artifact_path)
+            logger.info(f"Logged artifacts from directory: {local_dir}")
+        except Exception as e:
+            logger.warning(f"Could not log artifacts from {local_dir}: {e}")
+    
+    def log_param(self, key: str, value: Any):
+        """Log a parameter to MLflow"""
+        try:
+            mlflow.log_param(key, value)
+            logger.debug(f"Logged parameter: {key} = {value}")
+        except Exception as e:
+            logger.warning(f"Could not log parameter {key}: {e}")
+    
+    def log_params(self, params: Dict[str, Any]):
+        """Log multiple parameters to MLflow"""
+        try:
+            mlflow.log_params(params)
+            logger.debug(f"Logged parameters: {list(params.keys())}")
+        except Exception as e:
+            logger.warning(f"Could not log parameters: {e}")
+    
+    def log_text(self, text: str, artifact_file: str):
+        """Log text as an artifact"""
+        try:
+            mlflow.log_text(text, artifact_file)
+            logger.info(f"Logged text artifact: {artifact_file}")
+        except Exception as e:
+            logger.warning(f"Could not log text artifact {artifact_file}: {e}")
+    
+    def log_prompt(self, prompt: str, prompt_name: str, step: str):
+        """Log a prompt with metadata for tracing"""
+        try:
+            # Create prompt metadata
+            prompt_data = {
+                "prompt": prompt,
+                "step": step,
+                "timestamp": datetime.now().isoformat(),
+                "length_chars": len(prompt),
+                "length_lines": len(prompt.split('\n'))
+            }
+            
+            # Log as JSON artifact
+            prompt_json = json.dumps(prompt_data, indent=2, ensure_ascii=False)
+            mlflow.log_text(prompt_json, f"prompts/{prompt_name}_{step}.json")
+            
+            # Also log the raw prompt
+            mlflow.log_text(prompt, f"prompts/{prompt_name}_{step}.txt")
+            
+            logger.info(f"Logged prompt for {step}: {prompt_name}")
+            
+        except Exception as e:
+            logger.warning(f"Could not log prompt {prompt_name}: {e}")
+    
+    def log_trace_step(self, step_name: str, step_data: Dict[str, Any], step_number: int = None):
+        """Log a trace step for tracking agent progress"""
+        try:
+            trace_data = {
+                "step_name": step_name,
+                "step_number": step_number,
+                "timestamp": datetime.now().isoformat(),
+                "data": step_data
+            }
+            
+            # Log trace step
+            trace_json = json.dumps(trace_data, indent=2, ensure_ascii=False)
+            step_id = f"{step_number:02d}" if step_number else "00"
+            mlflow.log_text(trace_json, f"traces/step_{step_id}_{step_name}.json")
+            
+            # Log as metric for tracking
+            self.log_metric(f"trace_step_{step_name}_completed", 1.0, step=step_number)
+            
+            logger.info(f"Logged trace step: {step_name}")
+            
+        except Exception as e:
+            logger.warning(f"Could not log trace step {step_name}: {e}")
+    
+    def log_agent_input_output(self, agent_name: str, inputs: Dict[str, Any], outputs: Dict[str, Any]):
+        """Log agent inputs and outputs for tracing"""
+        try:
+            io_data = {
+                "agent_name": agent_name,
+                "timestamp": datetime.now().isoformat(),
+                "inputs": inputs,
+                "outputs": outputs
+            }
+            
+            # Log as JSON artifact
+            io_json = json.dumps(io_data, indent=2, ensure_ascii=False)
+            mlflow.log_text(io_json, f"agent_io/{agent_name}_input_output.json")
+            
+            logger.info(f"Logged agent I/O for {agent_name}")
+            
+        except Exception as e:
+            logger.warning(f"Could not log agent I/O for {agent_name}: {e}")
+    
+    def log_code_analysis_metrics(self, analysis_result: str, requirement_name: str):
+        """Log specific metrics for code analysis results"""
+        try:
+            # Extract YES/NO result from analysis
+            result = "UNKNOWN"
+            if "<RESULT>YES</RESULT>" in analysis_result:
+                result = "YES"
+            elif "<RESULT>NO</RESULT>" in analysis_result:
+                result = "NO"
+            
+            # Log the result as a metric
+            self.log_metric(f"{requirement_name}_result", 1.0 if result == "YES" else 0.0)
+            
+            # Log analysis length metrics
+            self.log_metrics({
+                f"{requirement_name}_analysis_length_chars": len(analysis_result),
+                f"{requirement_name}_analysis_length_lines": len(analysis_result.split('\n'))
+            })
+            
+            logger.info(f"Logged code analysis metrics for {requirement_name}: {result}")
+            
+        except Exception as e:
+            logger.warning(f"Could not log code analysis metrics: {e}")
+    
+    def log_requirement_metrics(self, requirement_text: str, requirement_number: int):
+        """Log metrics for individual requirements"""
+        try:
+            # Log requirement complexity metrics
+            self.log_metrics({
+                f"requirement_{requirement_number}_length_chars": len(requirement_text),
+                f"requirement_{requirement_number}_length_words": len(requirement_text.split()),
+                f"requirement_{requirement_number}_length_lines": len(requirement_text.split('\n'))
+            })
+            
+        except Exception as e:
+            logger.warning(f"Could not log requirement metrics: {e}")
+    
+    def log_prompt_metrics(self, prompt_template: str, prompt_name: str):
+        """Log metrics for generated prompts"""
+        try:
+            # Log prompt complexity metrics
+            self.log_metrics({
+                f"{prompt_name}_template_length_chars": len(prompt_template),
+                f"{prompt_name}_template_length_lines": len(prompt_template.split('\n')),
+                f"{prompt_name}_has_code_variable": "{{ code }}" in prompt_template
+            })
+            
+        except Exception as e:
+            logger.warning(f"Could not log prompt metrics: {e}")
+
+# Global MLflow logger instance
+mlflow_logger = MLflowLogger()

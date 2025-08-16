@@ -10,11 +10,36 @@ from __future__ import annotations
 from typing import Dict, List, Any, Optional
 import logging
 import json
+import time
 from pathlib import Path
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
+
+# Import MLflow logger lazily to avoid circular imports
+def get_mlflow_logger():
+    """Get MLflow logger instance, importing it only when needed"""
+    try:
+        from src.core.mlflow_utils import mlflow_logger
+        return mlflow_logger
+    except ImportError:
+        # Return a dummy logger if MLflow is not available
+        class DummyLogger:
+            def start_run(self, *args, **kwargs): return None
+            def end_run(self): pass
+            def log_metric(self, *args, **kwargs): pass
+            def log_metrics(self, *args, **kwargs): pass
+            def log_artifact(self, *args, **kwargs): pass
+            def log_artifacts(self, *args, **kwargs): pass
+            def log_param(self, *args, **kwargs): pass
+            def log_params(self, *args, **kwargs): pass
+            def log_text(self, *args, **kwargs): pass
+            def log_requirement_metrics(self, *args, **kwargs): pass
+            def log_prompt(self, *args, **kwargs): pass
+            def log_trace_step(self, *args, **kwargs): pass
+            def log_agent_input_output(self, *args, **kwargs): pass
+        return DummyLogger()
 
 logger = logging.getLogger(__name__)
 
@@ -53,32 +78,116 @@ class RequirementGeneratorAgent:
         Returns:
             List of paths to the generated requirement files
         """
+        # Start MLflow run for requirement generation
+        mlflow_logger = get_mlflow_logger()
+        run_id = mlflow_logger.start_run(
+            run_name="requirement_generation",
+            tags={
+                "agent": "requirement_generator",
+                "assignment_file": Path(assignment_file_path).name,
+                "output_directory": output_directory
+            }
+        )
+        
+        start_time = time.time()
         logger.info(f"Generating requirements from assignment: {assignment_file_path}")
         
-        # Read the assignment description
-        with open(assignment_file_path, 'r', encoding='utf-8') as f:
-            assignment_description = f.read().strip()
+        # Log parameters
+        mlflow_logger.log_params({
+            "assignment_file_path": assignment_file_path,
+            "output_directory": output_directory,
+            "model_name": self.config.get("model_name", "unknown"),
+            "provider": self.config.get("provider", "unknown"),
+            "temperature": self.config.get("temperature", 0.1)
+        })
         
-        # Generate requirements using LLM
-        requirements = self._generate_requirements_list(assignment_description)
-        
-        # Create output directory if it doesn't exist
-        output_path = Path(output_directory)
-        output_path.mkdir(parents=True, exist_ok=True)
-        
-        # Save each requirement as a separate file
-        requirement_files = []
-        for i, requirement in enumerate(requirements, 1):
-            filename = f"requirement_{i:02d}.txt"
-            file_path = output_path / filename
+        try:
+            # Read the assignment description
+            with open(assignment_file_path, 'r', encoding='utf-8') as f:
+                assignment_description = f.read().strip()
             
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(requirement)
-            requirement_files.append(str(file_path))
-            logger.info(f"Generated requirement file: {file_path}")
-        
-        logger.info(f"Generated {len(requirement_files)} requirement files")
-        return requirement_files
+            # Log assignment content as artifact
+            mlflow_logger.log_text(assignment_description, "assignment_description.txt")
+            
+            # Log trace step: Reading assignment
+            mlflow_logger.log_trace_step("read_assignment", {
+                "assignment_file": assignment_file_path,
+                "assignment_length": len(assignment_description)
+            }, step_number=1)
+            
+            # Generate requirements using LLM
+            llm_start_time = time.time()
+            requirements = self._generate_requirements_list(assignment_description)
+            llm_time = time.time() - llm_start_time
+            
+            # Log LLM performance metrics
+            mlflow_logger.log_metrics({
+                "llm_generation_time_seconds": llm_time,
+                "requirements_generated": len(requirements)
+            })
+            
+            # Log agent I/O
+            mlflow_logger.log_agent_input_output("requirement_generator", {
+                "assignment_description": assignment_description,
+                "model_name": self.config.get("model_name", "unknown")
+            }, {
+                "requirements": requirements,
+                "generation_time": llm_time
+            })
+            
+            # Log trace step: Requirements generated
+            mlflow_logger.log_trace_step("requirements_generated", {
+                "count": len(requirements),
+                "generation_time": llm_time
+            }, step_number=3)
+            
+            # Create output directory if it doesn't exist
+            output_path = Path(output_directory)
+            output_path.mkdir(parents=True, exist_ok=True)
+            
+            # Save each requirement as a separate file
+            requirement_files = []
+            for i, requirement in enumerate(requirements, 1):
+                filename = f"requirement_{i:02d}.txt"
+                file_path = output_path / filename
+                
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(requirement)
+                requirement_files.append(str(file_path))
+                logger.info(f"Generated requirement file: {file_path}")
+                
+                # Log each requirement as artifact and metrics
+                mlflow_logger.log_text(requirement, f"requirements/requirement_{i:02d}.txt")
+                mlflow_logger.log_requirement_metrics(requirement, i)
+            
+            total_time = time.time() - start_time
+            
+            # Log final metrics
+            mlflow_logger.log_metrics({
+                "total_generation_time_seconds": total_time,
+                "requirements_per_second": len(requirements) / total_time if total_time > 0 else 0
+            })
+            
+            # Log the entire requirements directory as artifacts
+            mlflow_logger.log_artifacts(output_directory, "requirements")
+            
+            # Log trace step: Final completion
+            mlflow_logger.log_trace_step("requirement_generation_complete", {
+                "files_generated": len(requirement_files),
+                "total_time": total_time
+            }, step_number=4)
+            
+            logger.info(f"Generated {len(requirement_files)} requirement files")
+            return requirement_files
+            
+        except Exception as e:
+            # Log error metrics
+            mlflow_logger.log_metric("error_occurred", 1.0)
+            mlflow_logger.log_text(str(e), "error_log.txt")
+            logger.error(f"Error generating requirements: {e}")
+            raise
+        finally:
+            mlflow_logger.end_run()
     
     def _generate_requirements_list(self, assignment_description: str) -> List[str]:
         """Generate a list of individual requirements from assignment description"""
@@ -113,6 +222,16 @@ Each requirement must be:
 
 Return only the JSON, no additional text.
 """
+        
+        # Log the prompt being sent to LLM
+        mlflow_logger = get_mlflow_logger()
+        mlflow_logger.log_prompt(prompt, "requirement_generation", "llm_prompt")
+        
+        # Log trace step: LLM generation
+        mlflow_logger.log_trace_step("llm_generation", {
+            "prompt_length": len(prompt),
+            "model_name": self.config.get("model_name", "unknown")
+        }, step_number=2)
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
         content = str(response).strip()

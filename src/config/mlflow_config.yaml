@@ -1,0 +1,32 @@
+# MLflow Configuration
+mlflow:
+  # Tracking server configuration
+  tracking_uri: "file:./mlruns"  # Local file system (default)
+  # tracking_uri: "http://localhost:5000"  # Remote MLflow server
+  
+  # Experiment configuration
+  experiment_name: "assignment_evaluation"
+  
+  # Artifact storage (optional, uses tracking_uri by default)
+  # artifact_location: "s3://my-bucket/mlflow-artifacts"
+  
+  # Logging configuration
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+    enable_console_logging: true
+    enable_file_logging: false
+    log_file_path: "./logs/mlflow.log"
+  
+  # Run configuration
+  run:
+    # Default tags for all runs
+    default_tags:
+      project: "hyper_jade"
+      version: "1.0.0"
+    
+    # Auto-logging configuration
+    auto_log:
+      enable_metrics: true
+      enable_params: true
+      enable_artifacts: true
+      enable_tags: true

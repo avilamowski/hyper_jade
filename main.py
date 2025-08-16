@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from src.agents.requirement_generator.requirement_generator import RequirementGeneratorAgent
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
+from src.core.mlflow_utils import mlflow_logger
 
 def load_config(config_path: str) -> dict:
     """Load configuration from YAML file"""
@@ -79,6 +80,31 @@ def main():
         print(f"Error initializing agents: {e}")
         sys.exit(1)
     
+    # Start MLflow run for the entire pipeline
+    pipeline_run_id = mlflow_logger.start_run(
+        run_name="assignment_evaluation_pipeline",
+        tags={
+            "pipeline": "assignment_evaluation",
+            "assignment_file": Path(args.assignment).name,
+            "code_file": Path(args.code).name,
+            "output_directory": str(output_dir),
+            "skip_requirements": args.skip_requirements,
+            "skip_prompts": args.skip_prompts
+        }
+    )
+    
+    # Log pipeline parameters
+    mlflow_logger.log_params({
+        "assignment_file": args.assignment,
+        "code_file": args.code,
+        "output_directory": str(output_dir),
+        "config_file": args.config,
+        "skip_requirements": args.skip_requirements,
+        "skip_prompts": args.skip_prompts,
+        "verbose": args.verbose,
+        "additional_context": args.context is not None
+    })
+    
     # Run the evaluation pipeline
     print("🚀 Starting assignment evaluation pipeline...")
     print(f"📝 Assignment: {args.assignment}")
@@ -97,6 +123,14 @@ def main():
         else:
             print("📋 Step 1: Generating requirements...")
             requirements_dir.mkdir(exist_ok=True)
+            
+            # Log pipeline trace step
+            mlflow_logger.log_trace_step("pipeline_step_1", {
+                "step": "requirement_generation",
+                "assignment_file": args.assignment,
+                "output_directory": str(requirements_dir)
+            }, step_number=1)
+            
             requirement_files = requirement_agent.generate_requirements(
                 assignment_file_path=args.assignment,
                 output_directory=str(requirements_dir)
@@ -111,6 +145,13 @@ def main():
         else:
             print("📝 Step 2: Generating prompts...")
             prompts_dir.mkdir(exist_ok=True)
+            
+            # Log pipeline trace step
+            mlflow_logger.log_trace_step("pipeline_step_2", {
+                "step": "prompt_generation",
+                "requirements_count": len(list(requirements_dir.glob("*.txt"))),
+                "output_directory": str(prompts_dir)
+            }, step_number=2)
             
             # Find requirement files
             requirement_files = list(requirements_dir.glob("*.txt"))
@@ -133,6 +174,14 @@ def main():
         analysis_dir = output_dir / "analyses"
         analysis_dir.mkdir(exist_ok=True)
         
+        # Log pipeline trace step
+        mlflow_logger.log_trace_step("pipeline_step_3", {
+            "step": "code_analysis",
+            "prompts_count": len(list(prompts_dir.glob("*.jinja"))),
+            "code_file": args.code,
+            "output_directory": str(analysis_dir)
+        }, step_number=3)
+        
         # Find prompt files
         prompt_files = list(prompts_dir.glob("*.jinja"))
         analysis_files = []
@@ -149,10 +198,30 @@ def main():
             print(f"  Analyzed with {prompt_file.name}")
         
         end_time = time.time()
+        total_pipeline_time = end_time - start_time
+        
+        # Log pipeline completion metrics
+        mlflow_logger.log_metrics({
+            "total_pipeline_time_seconds": total_pipeline_time,
+            "requirements_generated": len(list(requirements_dir.glob('*.txt'))),
+            "prompts_generated": len(list(prompts_dir.glob('*.jinja'))),
+            "analyses_completed": len(analysis_files),
+            "pipeline_success_rate": 1.0
+        })
+        
+        # Log the entire output directory as artifacts
+        mlflow_logger.log_artifacts(str(output_dir), "pipeline_outputs")
+        
+        # Log final pipeline trace step
+        mlflow_logger.log_trace_step("pipeline_complete", {
+            "total_time": total_pipeline_time,
+            "total_files_generated": len(analysis_files),
+            "success": True
+        }, step_number=4)
         
         # Output results
         print(f"✅ Completed analysis of {len(analysis_files)} requirements")
-        print(f"⏱️  Total pipeline time: {end_time - start_time:.2f} seconds")
+        print(f"⏱️  Total pipeline time: {total_pipeline_time:.2f} seconds")
         
         # Print summary
         print("\n📊 EVALUATION PIPELINE SUMMARY")
@@ -163,7 +232,7 @@ def main():
         print(f"Requirements generated: {len(list(requirements_dir.glob('*.txt')))}")
         print(f"Prompts generated: {len(list(prompts_dir.glob('*.jinja')))}")
         print(f"Analyses completed: {len(analysis_files)}")
-        print(f"Total pipeline time: {end_time - start_time:.2f} seconds")
+        print(f"Total pipeline time: {total_pipeline_time:.2f} seconds")
         
         print(f"\n📋 Generated files:")
         print(f"  Requirements: {requirements_dir}")
@@ -192,8 +261,14 @@ def main():
                     print(f"Error reading analysis: {e}")
         
     except Exception as e:
+        # Log error metrics
+        mlflow_logger.log_metric("pipeline_error_occurred", 1.0)
+        mlflow_logger.log_text(str(e), "pipeline_error_log.txt")
         print(f"❌ Error during evaluation pipeline: {e}")
         sys.exit(1)
+    finally:
+        # End the MLflow run
+        mlflow_logger.end_run()
 
 if __name__ == "__main__":
     main()
