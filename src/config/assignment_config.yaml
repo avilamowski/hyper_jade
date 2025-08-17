@@ -56,6 +56,13 @@ agents:
     model_name: "deepseek-r1:14b"  # Model for evaluation (should be high quality)
     provider: "ollama"         # Provider for evaluation
     temperature: 0.1           # Low temperature for consistent evaluation
+    enable_teacher_comparison: true  # Enable comparison with teacher examples
+    teacher_comparison_criteria:
+      coverage: 1.0           # Do generated requirements cover the same key aspects?
+      specificity: 1.0        # Are requirements as specific and actionable?
+      clarity: 1.0            # Are requirements as clear and unambiguous?
+      completeness: 1.0       # Do requirements address all important points?
+      format: 1.0             # Do requirements follow similar format/structure?
     evaluation_criteria:
       requirement_generator:
         completeness: 1.0
