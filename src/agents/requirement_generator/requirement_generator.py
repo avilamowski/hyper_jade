@@ -22,6 +22,8 @@ from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 
 from src.config import get_agent_config
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 
 load_dotenv(override=False)
 # Configure logging to output to stdout
@@ -229,31 +231,16 @@ class RequirementGeneratorAgent:
             f"- Use {tag} for requirements that are of type '{tag[1:-1]}'" for tag in prompt_types
         ])
 
-        prompt = f"""Analyze the following programming assignment and generate a list of individual requirements.
-
-INSTRUCTIONS:
-1. Identify all aspects that should be evaluated in the student's code
-2. Break down the assignment into specific requirements
-3. Each requirement should be independent
-4. Include requirements for functionality, code quality, error handling, etc.
-5. Each requirement should be clear and specific
-6. Only include up to 10 requirements
-7. For each requirement, infer its type and add a type tag as the first line. The available types are:
-{type_instructions}
-
-OUTPUT FORMAT:
-Generate a list with each requirement starting with a dash (-):
-
-- [presence]Requirement 1: Specific description of the first requirement
-- [presence]Requirement 2: Specific description of the second requirement
-- [conceptual]Requirement 3: Specific description of the third requirement
-...
-
-Return only the list with dashes, no additional text.
-
-ASSIGNMENT:
-{assignment_description}
-"""
+        template_name = self.agent_config.get("template")
+        env = Environment(
+            loader=FileSystemLoader("templates"),
+            autoescape=select_autoescape(["jinja"])
+        )
+        template = env.get_template(template_name)
+        prompt = template.render(
+            assignment_description=assignment_description,
+            type_instructions=type_instructions
+        )
         
         # Log the prompt being sent to LLM
         mlflow_logger = get_mlflow_logger()

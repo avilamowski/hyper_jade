@@ -209,12 +209,9 @@ class PromptGeneratorAgent:
                 # Remove type tag from requirement for template rendering
                 requirement_body = "\n".join(lines[1:]) if len(lines) > 1 else ""
 
-        # Select template file based on prompt type
-        template_map = {
-            PromptType.PRESENCE: "prompt_generator_presence.jinja",
-            PromptType.CONCEPTUAL: "prompt_generator_conceptual.jinja"
-        }
-        template_file = template_map.get(prompt_type, "prompt_generator_presence.jinja")
+        # Select template file based on prompt type from config
+        template_map = self.agent_config.get("templates", {})
+        template_file = template_map.get(prompt_type.value, template_map.get("default"))
 
         env = Environment(
             loader=FileSystemLoader("templates"),

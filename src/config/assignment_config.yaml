@@ -21,6 +21,7 @@ agents:
     model_name: "deepseek-r1:14b"  # Different model for requirement generation
     # provider: "openai"   # Different provider for requirement generation
     # temperature: 0.2     # Different temperature for requirement generation
+    template: "requirement_generator.jinja"  # Jinja template for requirement generation
     
   prompt_generator:
     enabled: true
@@ -31,6 +32,10 @@ agents:
     # model_name: "qwen2.5:7b"  # Different model for prompt generation
     # provider: "ollama"        # Different provider for prompt generation
     # temperature: 0.15         # Different temperature for prompt generation
+    templates:
+      default: "prompt_generator_presence.jinja"
+      presence: "prompt_generator_presence.jinja"
+      conceptual: "prompt_generator_conceptual.jinja"
     
   code_corrector:
     enabled: true
@@ -60,12 +65,6 @@ languages:
     file_extensions: [".java"]
     syntax_highlighting: "java"
 
-# Output Configuration
-output:
-  format: "xml"  # Options: "xml", "markdown"
-  include_metadata: true
-  include_timestamps: true
-  save_intermediate_results: false
   
 # Logging Configuration
 logging:

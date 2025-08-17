@@ -1,0 +1,24 @@
+Analyze the following programming assignment and generate a list of individual requirements.
+
+INSTRUCTIONS:
+1. Identify all aspects that should be evaluated in the student's code
+2. Break down the assignment into specific requirements
+3. Each requirement should be independent
+4. Include requirements for functionality, code quality, error handling, etc.
+5. Each requirement should be clear and specific
+6. Only include up to 10 requirements
+7. For each requirement, infer its type and add a type tag as the first line. The available types are:
+{{ type_instructions }}
+
+OUTPUT FORMAT:
+Generate a JSON list with each requirement as a separate element. Each element must be a string starting with the type tag in the first line, followed by the requirement description. Example:
+[
+    "[presence]\nRequirement 1: Specific description of the first requirement",
+    "[conceptual]\nRequirement 2: Specific description of the second requirement",
+    ...
+]
+
+Return only the JSON, no additional text.
+
+ASSIGNMENT:
+{{ assignment_description }}
