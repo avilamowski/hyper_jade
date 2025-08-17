@@ -31,6 +31,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph import StateGraph, END
 
 from src.config import get_agent_config
+from src.agents.utils.agent_evaluator import AgentEvaluator
 
 # --------------------------------------------------------------------------- #
 # Load .env ASAP and keep values in-memory
@@ -40,57 +41,25 @@ DOTENV = dotenv_values()
 
 
 # --------------------------------------------------------------------------- #
-# MLflow logger (lazy import + robust no-op fallback)
+# MLflow logger (optional)
 # --------------------------------------------------------------------------- #
 def get_mlflow_logger():
     """Get MLflow logger instance, importing it only when needed."""
     try:
         from src.core.mlflow_utils import mlflow_logger  # type: ignore
-
         return mlflow_logger
-    except Exception:
+    except ImportError:
+        logger.warning("MLflow not available - logging will be disabled")
+        return None
 
-        class DummyLogger:
-            def start_run(self, *a, **k):
-                return "dummy"
-
-            def end_run(self):
-                pass
-
-            def log_metric(self, *a, **k):
-                pass
-
-            def log_metrics(self, *a, **k):
-                pass
-
-            def log_param(self, *a, **k):
-                pass
-
-            def log_params(self, *a, **k):
-                pass
-
-            def log_text(self, *a, **k):
-                pass
-
-            def log_artifact(self, *a, **k):
-                pass
-
-            def log_artifacts(self, *a, **k):
-                pass
-
-            def log_code_analysis_metrics(self, *a, **k):
-                pass
-
-            def log_prompt(self, *a, **k):
-                pass
-
-            def log_trace_step(self, *a, **k):
-                pass
-
-            def log_agent_input_output(self, *a, **k):
-                pass
-
-        return DummyLogger()
+def safe_log_call(logger_instance, method_name, *args, **kwargs):
+    """Safely call a logging method, doing nothing if logger is None"""
+    if logger_instance is not None and hasattr(logger_instance, method_name):
+        try:
+            method = getattr(logger_instance, method_name)
+            method(*args, **kwargs)
+        except Exception as e:
+            logger.warning(f"Failed to call {method_name}: {e}")
 
 
 logger = logging.getLogger(__name__)
@@ -124,6 +93,11 @@ class CodeCorrectorAgent:
         self.agent_config = get_agent_config(self.config, "code_corrector")
         self.llm = self._setup_llm()
         self.ml = get_mlflow_logger()
+        
+        # Initialize agent evaluator if enabled
+        self.evaluator = None
+        if config.get('agents', {}).get('agent_evaluator', {}).get('enabled', False):
+            self.evaluator = AgentEvaluator(config)
 
     # -------------------------- LLM Setup ----------------------------------- #
     def _setup_llm(self):
@@ -135,7 +109,7 @@ class CodeCorrectorAgent:
             # Prefer explicit api_key from config, else pull from .env dict
             api_key = self.agent_config.get("api_key") or DOTENV.get("OPENAI_API_KEY")
             if not api_key:
-                logger.error(
+                raise RuntimeError(
                     "OPENAI_API_KEY missing from .env and no api_key provided in config."
                 )
             logger.info(
@@ -182,12 +156,9 @@ class CodeCorrectorAgent:
         tr1 = time.time()
 
         # Log prompt before sending
-        try:
-            ml.log_prompt(
-                rendered, prompt_name="code_corrector", step="rendered_prompt"
-            )
-        except Exception:
-            pass
+        safe_log_call(ml, "log_prompt",
+            rendered, prompt_name="code_corrector", step="rendered_prompt"
+        )
 
         # Call LLM
         tl0 = time.time()
@@ -202,40 +173,31 @@ class CodeCorrectorAgent:
         }
 
         # Trace steps
-        try:
-            ml.log_trace_step(
-                "template_rendering",
-                {
-                    "render_time": timings["template_render_sec"],
-                    "rendered_len": len(rendered),
-                },
-                step_number=1,
-            )
-            ml.log_trace_step(
-                "llm_analysis",
-                {
-                    "analysis_time": timings["llm_invoke_sec"],
-                    "analysis_len": len(analysis),
-                },
-                step_number=2,
-            )
-        except Exception:
-            pass
+        safe_log_call(ml, "log_trace_step",
+            "template_rendering",
+            {
+                "render_time": timings["template_render_sec"],
+                "rendered_len": len(rendered),
+            },
+            step_number=1,
+        )
+        safe_log_call(ml, "log_trace_step",
+            "llm_analysis",
+            {
+                "analysis_time": timings["llm_invoke_sec"],
+                "analysis_len": len(analysis),
+            },
+            step_number=2,
+        )
 
         # Artifacts
-        try:
-            ml.log_text(rendered, "rendered_prompt.txt")
-            ml.log_text(analysis, "generated_analysis.txt")
-        except Exception:
-            pass
+        safe_log_call(ml, "log_text", rendered, "rendered_prompt.txt")
+        safe_log_call(ml, "log_text", analysis, "generated_analysis.txt")
 
         # Code-analysis metrics (semantic parser is inside your mlflow utils)
-        try:
-            ml.log_code_analysis_metrics(
-                analysis, requirement_name="code_corrector_requirement"
-            )
-        except Exception:
-            pass
+        safe_log_call(ml, "log_code_analysis_metrics",
+            analysis, requirement_name="code_corrector_requirement"
+        )
 
         state["rendered_prompt"] = rendered
         state["analysis"] = analysis
@@ -266,7 +228,7 @@ class CodeCorrectorAgent:
         start = time.time()
 
         # Start run + params
-        ml.start_run(
+        safe_log_call(ml, "start_run",
             run_name="code_analysis",
             tags={
                 "agent": "code_corrector",
@@ -277,7 +239,7 @@ class CodeCorrectorAgent:
                 ),
             },
         )
-        ml.log_params(
+        safe_log_call(ml, "log_params",
             {
                 "prompt_template_path": prompt_template_path,
                 "code_file_path": code_file_path,
@@ -295,27 +257,21 @@ class CodeCorrectorAgent:
             student_code = Path(code_file_path).read_text(encoding="utf-8")
 
             # Log inputs as artifacts
-            try:
-                ml.log_text(template_content, "input_prompt_template.jinja")
-                ml.log_text(student_code, "input_student_code.py")
-                if additional_context:
-                    ml.log_text(str(additional_context), "input_additional_context.txt")
-            except Exception:
-                pass
+            safe_log_call(ml, "log_text", template_content, "input_prompt_template.jinja")
+            safe_log_call(ml, "log_text", student_code, "input_student_code.py")
+            if additional_context:
+                safe_log_call(ml, "log_text", str(additional_context), "input_additional_context.txt")
 
             # Trace step: inputs read
-            try:
-                ml.log_trace_step(
-                    "read_inputs",
-                    {
-                        "template_length": len(template_content),
-                        "code_length": len(student_code),
-                        "has_additional_context": bool(additional_context),
-                    },
-                    step_number=0,
-                )
-            except Exception:
-                pass
+            safe_log_call(ml, "log_trace_step",
+                "read_inputs",
+                {
+                    "template_length": len(template_content),
+                    "code_length": len(student_code),
+                    "has_additional_context": bool(additional_context),
+                },
+                step_number=0,
+            )
 
             # Build and run graph
             app = self._build_graph()
@@ -333,61 +289,69 @@ class CodeCorrectorAgent:
                 out = Path(output_file_path)
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_text(analysis, encoding="utf-8")
-                try:
-                    ml.log_artifact(str(out), "output_analysis")
-                except Exception:
-                    pass
+                safe_log_call(ml, "log_artifact", str(out), "output_analysis")
 
             # Log agent I/O
-            try:
-                ml.log_agent_input_output(
-                    "code_corrector",
-                    {
-                        "prompt_template": template_content,
-                        "student_code": student_code,
-                        "rendered_prompt": result_state.get("rendered_prompt", ""),
-                    },
-                    {
-                        "analysis": analysis,
-                        "timings": result_state.get("timings", {}),
-                    },
-                )
-            except Exception:
-                pass
+            safe_log_call(ml, "log_agent_input_output",
+                "code_corrector",
+                {
+                    "prompt_template": template_content,
+                    "student_code": student_code,
+                    "rendered_prompt": result_state.get("rendered_prompt", ""),
+                },
+                {
+                    "analysis": analysis,
+                    "timings": result_state.get("timings", {}),
+                },
+            )
+
+            # Evaluate agent output if evaluator is enabled
+            if self.evaluator:
+                try:
+                    logger.info("Evaluating code corrector output...")
+                    # Get requirement text from prompt template (simplified approach)
+                    requirement_text = "Code analysis requirement"  # This could be enhanced
+                    
+                    evaluation_result = self.evaluator.evaluate_code_corrector(
+                        requirement_text,
+                        template_content,
+                        student_code,
+                        analysis,
+                        output_file_path or "no_output_file"
+                    )
+                    
+                    # Log evaluation metrics
+                    safe_log_call(ml, "log_agent_evaluation_metrics", "code_corrector", evaluation_result)
+                    
+                    logger.info(f"Code corrector evaluation completed. Overall score: {evaluation_result.get('overall_score', 'N/A')}")
+                    
+                except Exception as eval_error:
+                    logger.warning(f"Error during code corrector evaluation: {eval_error}")
 
             total_time = time.time() - start
-            try:
-                ml.log_metrics(
-                    {
-                        "total_analysis_time_seconds": total_time,
-                        "analysis_length_chars": len(analysis),
-                        "analysis_length_lines": len(analysis.splitlines()),
-                    }
-                )
-                ml.log_trace_step(
-                    "analysis_complete",
-                    {"total_time": total_time, "output_file": output_file_path},
-                    step_number=3,
-                )
-            except Exception:
-                pass
+            safe_log_call(ml, "log_metrics",
+                {
+                    "total_analysis_time_seconds": total_time,
+                    "analysis_length_chars": len(analysis),
+                    "analysis_length_lines": len(analysis.splitlines()),
+                }
+            )
+            safe_log_call(ml, "log_trace_step",
+                "analysis_complete",
+                {"total_time": total_time, "output_file": output_file_path, "evaluation_performed": self.evaluator is not None},
+                step_number=3,
+            )
 
             logger.info(f"[CodeCorrector] Analysis complete in {total_time:.3f}s")
             return analysis
 
         except Exception as e:
-            try:
-                ml.log_metric("error_occurred", 1.0)
-                ml.log_text(str(e), "error_log.txt")
-            except Exception:
-                pass
+            safe_log_call(ml, "log_metric", "error_occurred", 1.0)
+            safe_log_call(ml, "log_text", str(e), "error_log.txt")
             logger.exception("[CodeCorrector] Error during analyze_code")
             raise
         finally:
-            try:
-                ml.end_run()
-            except Exception:
-                pass
+            safe_log_call(ml, "end_run")
 
     def batch_analyze(
         self,
@@ -403,7 +367,7 @@ class CodeCorrectorAgent:
         ml = self.ml
         start = time.time()
 
-        ml.start_run(
+        safe_log_call(ml, "start_run",
             run_name="batch_code_analysis",
             tags={
                 "agent": "code_corrector",
@@ -413,7 +377,7 @@ class CodeCorrectorAgent:
                 "output_directory": Path(output_directory).name,
             },
         )
-        ml.log_params(
+        safe_log_call(ml, "log_params",
             {
                 "prompt_template_path": prompt_template_path,
                 "code_directory": code_directory,
@@ -434,16 +398,13 @@ class CodeCorrectorAgent:
             txt_files = list(code_path.glob("*.txt"))
             files: List[Path] = sorted(py_files + txt_files)
 
-            try:
-                ml.log_metrics(
-                    {
-                        "total_files_to_analyze": len(files),
-                        "python_files": len(py_files),
-                        "text_files": len(txt_files),
-                    }
-                )
-            except Exception:
-                pass
+            safe_log_call(ml, "log_metrics",
+                {
+                    "total_files_to_analyze": len(files),
+                    "python_files": len(py_files),
+                    "text_files": len(txt_files),
+                }
+            )
 
             outputs: List[str] = []
             success = 0
@@ -463,33 +424,27 @@ class CodeCorrectorAgent:
                 except Exception:
                     fail += 1
                 finally:
-                    try:
-                        ml.log_metric("successful_analyses", success, step=i)
-                        ml.log_metric("failed_analyses", fail, step=i)
-                        ml.log_metric(
-                            "completion_percentage",
-                            (i / max(1, len(files))) * 100.0,
-                            step=i,
-                        )
-                    except Exception:
-                        pass
+                    safe_log_call(ml, "log_metric", "successful_analyses", success, step=i)
+                    safe_log_call(ml, "log_metric", "failed_analyses", fail, step=i)
+                    safe_log_call(ml, "log_metric",
+                        "completion_percentage",
+                        (i / max(1, len(files))) * 100.0,
+                        step=i,
+                    )
 
             total_time = time.time() - start
-            try:
-                ml.log_metrics(
-                    {
-                        "total_batch_time_seconds": total_time,
-                        "successful_analyses": success,
-                        "failed_analyses": fail,
-                        "success_rate": (success / len(files)) if files else 0.0,
-                        "average_time_per_file": (
-                            (total_time / len(files)) if files else 0.0
-                        ),
-                    }
-                )
-                ml.log_artifacts(output_directory, "batch_analysis_results")
-            except Exception:
-                pass
+            safe_log_call(ml, "log_metrics",
+                {
+                    "total_batch_time_seconds": total_time,
+                    "successful_analyses": success,
+                    "failed_analyses": fail,
+                    "success_rate": (success / len(files)) if files else 0.0,
+                    "average_time_per_file": (
+                        (total_time / len(files)) if files else 0.0
+                    ),
+                }
+            )
+            safe_log_call(ml, "log_artifacts", output_directory, "batch_analysis_results")
 
             logger.info(
                 f"[CodeCorrector] Batch complete: {success}/{len(files)} succeeded "
@@ -498,15 +453,9 @@ class CodeCorrectorAgent:
             return outputs
 
         except Exception as e:
-            try:
-                ml.log_metric("error_occurred", 1.0)
-                ml.log_text(str(e), "batch_error_log.txt")
-            except Exception:
-                pass
+            safe_log_call(ml, "log_metric", "error_occurred", 1.0)
+            safe_log_call(ml, "log_text", str(e), "batch_error_log.txt")
             logger.exception("[CodeCorrector] Error during batch_analyze")
             raise
         finally:
-            try:
-                ml.end_run()
-            except Exception:
-                pass
+            safe_log_call(ml, "end_run")

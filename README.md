@@ -4,7 +4,21 @@ Un sistema de evaluación de tareas de programación que utiliza tres agentes es
 
 ## Estructura del Sistema
 
-El sistema está compuesto por tres agentes que trabajan en secuencia:
+El sistema está compuesto por tres agentes que trabajan en secuencia, más un sistema de evaluación automática:
+
+### Sistema de Evaluación de Agentes
+
+El sistema incluye un **LLM as a Judge** que evalúa automáticamente la calidad de las salidas de cada agente:
+
+- **Evaluación automática** de la coherencia y calidad de las salidas
+- **Métricas cuantitativas** para cada criterio de evaluación
+- **Feedback detallado** con justificaciones y sugerencias de mejora
+- **Trazabilidad completa** a través de MLflow
+- **Procesos independientes** - generación y evaluación son separados
+
+Para más detalles sobre el sistema de evaluación, consulta [README_AGENT_EVALUATION.md](README_AGENT_EVALUATION.md).
+
+### Agentes del Pipeline
 
 ### 1. RequirementGenerator
 **Input:** Una consigna (archivo .txt)
@@ -71,6 +85,13 @@ agents:
     model_name: "gpt-4-turbo" # Modelo específico para corrección de código
     provider: "openai"
     temperature: 0.05
+
+  # Configuración del Evaluador de Agentes
+  agent_evaluator:
+    enabled: true
+    model_name: "gpt-4o-mini"  # Modelo para evaluación (debe ser de alta calidad)
+    provider: "openai"         # Proveedor para evaluación
+    temperature: 0.1           # Temperatura baja para evaluación consistente
 ```
 
 Si no especificas configuración por agente, todos usarán la configuración global.
@@ -98,6 +119,35 @@ python run_prompt_generator.py --requirement outputs/requirements/requirement_01
 ```
 
 #### 3. Analizar Código
+
+### Scripts Independientes
+
+#### Generación de Requerimientos (Independiente)
+```bash
+python run_requirement_generator.py --assignment ejemplos/2p/consigna_2p.txt --output-dir outputs/2p --verbose
+```
+
+#### Evaluación de Agentes (Independiente)
+```bash
+python run_agent_evaluation.py --assignment ejemplos/2p/consigna_2p.txt --requirements-dir outputs/2p --output-dir outputs/2p --verbose
+```
+
+#### Ejemplo de Workflow Completo
+```bash
+python example_workflow.py
+```
+
+Este script demuestra el flujo completo de generación y evaluación independientes.
+
+### Sistema de Evaluación
+
+Para ejecutar el sistema de evaluación de agentes:
+
+```bash
+python run_agent_evaluation.py
+```
+
+Este script ejecuta una evaluación completa de todos los agentes y muestra los resultados de calidad.
 ```bash
 python run_code_corrector.py --prompt outputs/prompts/prompt_01.jinja --code ejemplos/alu1.py --output outputs/analyses/analysis_01.txt
 ```

@@ -48,6 +48,33 @@ agents:
     # provider: "openai"         # Different provider for code correction
     # temperature: 0.05          # Different temperature for code correction
 
+  # Agent Evaluator Configuration
+  agent_evaluator:
+    enabled: true
+    # Agent-specific model configuration for the evaluator
+    model_name: "deepseek-r1:14b"  # Model for evaluation (should be high quality)
+    provider: "ollama"         # Provider for evaluation
+    temperature: 0.1           # Low temperature for consistent evaluation
+    evaluation_criteria:
+      requirement_generator:
+        - completeness
+        - clarity
+        - specificity
+        - coherence
+        - independence
+      prompt_generator:
+        - template_completeness
+        - clarity
+        - specificity
+        - code_analysis_focus
+        - jinja2_syntax
+      code_corrector:
+        - requirement_coverage
+        - analysis_depth
+        - clarity
+        - accuracy
+        - actionability
+
 # Programming Language Support
 languages:
   python:

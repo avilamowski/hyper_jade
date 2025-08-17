@@ -245,5 +245,74 @@ class MLflowLogger:
         except Exception as e:
             logger.warning(f"Could not log prompt metrics: {e}")
 
+    def log_agent_evaluation_metrics(self, agent_name: str, evaluation_result: Dict[str, Any]):
+        """Log evaluation metrics for agent outputs"""
+        try:
+            # Extract scores from evaluation result
+            metrics = {}
+            
+            # Log overall score
+            if "overall_score" in evaluation_result:
+                metrics[f"{agent_name}_overall_score"] = evaluation_result["overall_score"]
+            
+            # Log average criteria score
+            if "average_criteria_score" in evaluation_result:
+                metrics[f"{agent_name}_average_criteria_score"] = evaluation_result["average_criteria_score"]
+            
+            # Log individual criteria scores
+            for criterion, data in evaluation_result.items():
+                if isinstance(data, dict) and "score" in data:
+                    metrics[f"{agent_name}_{criterion}_score"] = data["score"]
+            
+            # Log metrics
+            if metrics:
+                self.log_metrics(metrics)
+                logger.info(f"Logged evaluation metrics for {agent_name}: {list(metrics.keys())}")
+            
+            # Log detailed evaluation as artifact
+            evaluation_json = json.dumps(evaluation_result, indent=2, ensure_ascii=False)
+            self.log_text(evaluation_json, f"evaluations/{agent_name}_evaluation.json")
+            
+        except Exception as e:
+            logger.warning(f"Could not log agent evaluation metrics: {e}")
+
+    def log_agent_evaluation_summary(self, evaluations: Dict[str, Dict[str, Any]]):
+        """Log summary metrics for all agent evaluations"""
+        try:
+            summary_metrics = {}
+            
+            for agent_name, evaluation in evaluations.items():
+                if "overall_score" in evaluation:
+                    summary_metrics[f"{agent_name}_overall_score"] = evaluation["overall_score"]
+                if "average_criteria_score" in evaluation:
+                    summary_metrics[f"{agent_name}_average_criteria_score"] = evaluation["average_criteria_score"]
+            
+            # Calculate overall system score
+            if summary_metrics:
+                overall_scores = [score for key, score in summary_metrics.items() if key.endswith("_overall_score")]
+                if overall_scores:
+                    summary_metrics["system_overall_score"] = sum(overall_scores) / len(overall_scores)
+                
+                average_scores = [score for key, score in summary_metrics.items() if key.endswith("_average_criteria_score")]
+                if average_scores:
+                    summary_metrics["system_average_criteria_score"] = sum(average_scores) / len(average_scores)
+            
+            # Log summary metrics
+            if summary_metrics:
+                self.log_metrics(summary_metrics)
+                logger.info(f"Logged evaluation summary: {list(summary_metrics.keys())}")
+            
+            # Log complete evaluation summary as artifact
+            summary_data = {
+                "timestamp": datetime.now().isoformat(),
+                "evaluations": evaluations,
+                "summary_metrics": summary_metrics
+            }
+            summary_json = json.dumps(summary_data, indent=2, ensure_ascii=False)
+            self.log_text(summary_json, "evaluations/system_evaluation_summary.json")
+            
+        except Exception as e:
+            logger.warning(f"Could not log evaluation summary: {e}")
+
 # Global MLflow logger instance
 mlflow_logger = MLflowLogger()

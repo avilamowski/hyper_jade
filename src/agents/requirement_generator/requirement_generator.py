@@ -23,6 +23,7 @@ from langchain_openai import ChatOpenAI
 
 from src.config import get_agent_config
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from src.agents.utils.agent_evaluator import AgentEvaluator
 
 
 load_dotenv(override=False)
@@ -41,23 +42,17 @@ def get_mlflow_logger():
         from src.core.mlflow_utils import mlflow_logger
         return mlflow_logger
     except ImportError:
-        # Return a dummy logger if MLflow is not available
-        logging.warning("MLflow logger not available, using dummy logger")
-        class DummyLogger:
-            def start_run(self, *args, **kwargs): return None
-            def end_run(self): pass
-            def log_metric(self, *args, **kwargs): pass
-            def log_metrics(self, *args, **kwargs): pass
-            def log_artifact(self, *args, **kwargs): pass
-            def log_artifacts(self, *args, **kwargs): pass
-            def log_param(self, *args, **kwargs): pass
-            def log_params(self, *args, **kwargs): pass
-            def log_text(self, *args, **kwargs): pass
-            def log_requirement_metrics(self, *args, **kwargs): pass
-            def log_prompt(self, *args, **kwargs): pass
-            def log_trace_step(self, *args, **kwargs): pass
-            def log_agent_input_output(self, *args, **kwargs): pass
-        return DummyLogger()
+        logger.warning("MLflow not available - logging will be disabled")
+        return None
+
+def safe_log_call(logger_instance, method_name, *args, **kwargs):
+    """Safely call a logging method, doing nothing if logger is None"""
+    if logger_instance is not None and hasattr(logger_instance, method_name):
+        try:
+            method = getattr(logger_instance, method_name)
+            method(*args, **kwargs)
+        except Exception as e:
+            logger.warning(f"Failed to call {method_name}: {e}")
 
 
 class RequirementGeneratorAgent:
@@ -68,6 +63,12 @@ class RequirementGeneratorAgent:
         # Get agent-specific configuration
         self.agent_config = get_agent_config(config, 'requirement_generator')
         self.llm = self._setup_llm()
+        
+        # Initialize agent evaluator if enabled
+        self.evaluator = None
+        # Disable automatic evaluation by default - use standalone evaluator instead
+        # if config.get('agents', {}).get('agent_evaluator', {}).get('enabled', False):
+        #     self.evaluator = AgentEvaluator(config)
     
     def _setup_llm(self):
         """Setup LLM based on agent-specific configuration"""
@@ -111,7 +112,7 @@ class RequirementGeneratorAgent:
         """
         # Start MLflow run for requirement generation
         mlflow_logger = get_mlflow_logger()
-        run_id = mlflow_logger.start_run(
+        safe_log_call(mlflow_logger, "start_run",
             run_name="requirement_generation",
             tags={
                 "agent": "requirement_generator",
@@ -124,7 +125,7 @@ class RequirementGeneratorAgent:
         logger.info(f"Generating requirements from assignment: {assignment_file_path}")
         
         # Log parameters
-        mlflow_logger.log_params({
+        safe_log_call(mlflow_logger, "log_params", {
             "assignment_file_path": assignment_file_path,
             "output_directory": output_directory,
             "model_name": self.agent_config.get("model_name", "unknown"),
@@ -139,10 +140,10 @@ class RequirementGeneratorAgent:
                 assignment_description = f.read().strip()
             
             # Log assignment content as artifact
-            mlflow_logger.log_text(assignment_description, "assignment_description.txt")
+            safe_log_call(mlflow_logger, "log_text", assignment_description, "assignment_description.txt")
             
             # Log trace step: Reading assignment
-            mlflow_logger.log_trace_step("read_assignment", {
+            safe_log_call(mlflow_logger, "log_trace_step", "read_assignment", {
                 "assignment_file": assignment_file_path,
                 "assignment_length": len(assignment_description)
             }, step_number=1)
@@ -154,13 +155,13 @@ class RequirementGeneratorAgent:
             llm_time = time.time() - llm_start_time
             
             # Log LLM performance metrics
-            mlflow_logger.log_metrics({
+            safe_log_call(mlflow_logger, "log_metrics", {
                 "llm_generation_time_seconds": llm_time,
                 "requirements_generated": len(requirements)
             })
             
             # Log agent I/O
-            mlflow_logger.log_agent_input_output("requirement_generator", {
+            safe_log_call(mlflow_logger, "log_agent_input_output", "requirement_generator", {
                 "assignment_description": assignment_description,
                 "model_name": self.agent_config.get("model_name", "unknown")
             }, {
@@ -169,7 +170,7 @@ class RequirementGeneratorAgent:
             })
             
             # Log trace step: Requirements generated
-            mlflow_logger.log_trace_step("requirements_generated", {
+            safe_log_call(mlflow_logger, "log_trace_step", "requirements_generated", {
                 "count": len(requirements),
                 "generation_time": llm_time
             }, step_number=3)
@@ -190,24 +191,44 @@ class RequirementGeneratorAgent:
                 logger.info(f"Generated requirement file: {file_path}")
                 
                 # Log each requirement as artifact and metrics
-                mlflow_logger.log_text(requirement, f"requirements/requirement_{i:02d}.txt")
-                mlflow_logger.log_requirement_metrics(requirement, i)
+                safe_log_call(mlflow_logger, "log_text", requirement, f"requirements/requirement_{i:02d}.txt")
+                safe_log_call(mlflow_logger, "log_requirement_metrics", requirement, i)
             
             total_time = time.time() - start_time
             
             # Log final metrics
-            mlflow_logger.log_metrics({
+            safe_log_call(mlflow_logger, "log_metrics", {
                 "total_generation_time_seconds": total_time,
                 "requirements_per_second": len(requirements) / total_time if total_time > 0 else 0
             })
             
             # Log the entire requirements directory as artifacts
-            mlflow_logger.log_artifacts(output_directory, "requirements")
+            safe_log_call(mlflow_logger, "log_artifacts", output_directory, "requirements")
+            
+            # Evaluate agent output if evaluator is enabled
+            # Note: Evaluation is now handled by the standalone evaluator
+            # if self.evaluator:
+            #     try:
+            #         logger.info("Evaluating requirement generator output...")
+            #         evaluation_result = self.evaluator.evaluate_requirement_generator(
+            #             assignment_description,
+            #             requirements,
+            #             output_directory
+            #         )
+            #         
+            #         # Log evaluation metrics
+            #         safe_log_call(mlflow_logger, "log_agent_evaluation_metrics", "requirement_generator", evaluation_result)
+            #         
+            #         logger.info(f"Requirement generator evaluation completed. Overall score: {evaluation_result.get('overall_score', 'N/A')}")
+            #         
+            #     except Exception as eval_error:
+            #         logger.warning(f"Error during requirement generator evaluation: {eval_error}")
             
             # Log trace step: Final completion
-            mlflow_logger.log_trace_step("requirement_generation_complete", {
+            safe_log_call(mlflow_logger, "log_trace_step", "requirement_generation_complete", {
                 "files_generated": len(requirement_files),
-                "total_time": total_time
+                "total_time": total_time,
+                "evaluation_performed": False  # Evaluation now handled by standalone evaluator
             }, step_number=4)
             
             logger.info(f"Generated {len(requirement_files)} requirement files")
@@ -215,12 +236,12 @@ class RequirementGeneratorAgent:
             
         except Exception as e:
             # Log error metrics
-            mlflow_logger.log_metric("error_occurred", 1.0)
-            mlflow_logger.log_text(str(e), "error_log.txt")
+            safe_log_call(mlflow_logger, "log_metric", "error_occurred", 1.0)
+            safe_log_call(mlflow_logger, "log_text", str(e), "error_log.txt")
             logger.error(f"Error generating requirements: {e}")
             raise
         finally:
-            mlflow_logger.end_run()
+            safe_log_call(mlflow_logger, "end_run")
     
     def _generate_requirements_list(self, assignment_description: str) -> List[str]:
         """Generate a list of individual requirements from assignment description"""
@@ -244,10 +265,10 @@ class RequirementGeneratorAgent:
         
         # Log the prompt being sent to LLM
         mlflow_logger = get_mlflow_logger()
-        mlflow_logger.log_prompt(prompt, "requirement_generation", "llm_prompt")
+        safe_log_call(mlflow_logger, "log_prompt", prompt, "requirement_generation", "llm_prompt")
         
         # Log trace step: LLM generation
-        mlflow_logger.log_trace_step("llm_generation", {
+        safe_log_call(mlflow_logger, "log_trace_step", "llm_generation", {
             "prompt_length": len(prompt),
             "model_name": self.agent_config.get("model_name", "unknown")
         }, step_number=2)
@@ -259,7 +280,7 @@ class RequirementGeneratorAgent:
         
         # Log the raw response as artifact
         mlflow_logger = get_mlflow_logger()
-        mlflow_logger.log_text(raw_content, "raw_llm_response.txt")
+        safe_log_call(mlflow_logger, "log_text", raw_content, "raw_llm_response.txt")
         
         # Debug: Log the raw response
         logger.info(f"Raw LLM response: {repr(raw_content)}")

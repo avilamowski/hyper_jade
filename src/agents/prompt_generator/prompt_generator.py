@@ -18,6 +18,7 @@ from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 
 from src.config import get_agent_config
+from src.agents.utils.agent_evaluator import AgentEvaluator
 
 # Import MLflow logger lazily to avoid circular imports
 def get_mlflow_logger():
@@ -26,22 +27,17 @@ def get_mlflow_logger():
         from src.core.mlflow_utils import mlflow_logger
         return mlflow_logger
     except ImportError:
-        # Return a dummy logger if MLflow is not available
-        class DummyLogger:
-            def start_run(self, *args, **kwargs): return None
-            def end_run(self): pass
-            def log_metric(self, *args, **kwargs): pass
-            def log_metrics(self, *args, **kwargs): pass
-            def log_artifact(self, *args, **kwargs): pass
-            def log_artifacts(self, *args, **kwargs): pass
-            def log_param(self, *args, **kwargs): pass
-            def log_params(self, *args, **kwargs): pass
-            def log_text(self, *args, **kwargs): pass
-            def log_prompt_metrics(self, *args, **kwargs): pass
-            def log_prompt(self, *args, **kwargs): pass
-            def log_trace_step(self, *args, **kwargs): pass
-            def log_agent_input_output(self, *args, **kwargs): pass
-        return DummyLogger()
+        logger.warning("MLflow not available - logging will be disabled")
+        return None
+
+def safe_log_call(logger_instance, method_name, *args, **kwargs):
+    """Safely call a logging method, doing nothing if logger is None"""
+    if logger_instance is not None and hasattr(logger_instance, method_name):
+        try:
+            method = getattr(logger_instance, method_name)
+            method(*args, **kwargs)
+        except Exception as e:
+            logger.warning(f"Failed to call {method_name}: {e}")
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +49,11 @@ class PromptGeneratorAgent:
         # Get agent-specific configuration
         self.agent_config = get_agent_config(config, 'prompt_generator')
         self.llm = self._setup_llm()
+        
+        # Initialize agent evaluator if enabled
+        self.evaluator = None
+        if config.get('agents', {}).get('agent_evaluator', {}).get('enabled', False):
+            self.evaluator = AgentEvaluator(config)
     
     def _setup_llm(self):
         """Setup LLM based on agent-specific configuration"""
@@ -86,7 +87,7 @@ class PromptGeneratorAgent:
         """
         # Start MLflow run for prompt generation
         mlflow_logger = get_mlflow_logger()
-        run_id = mlflow_logger.start_run(
+        safe_log_call(mlflow_logger, "start_run",
             run_name="prompt_generation",
             tags={
                 "agent": "prompt_generator",
@@ -100,7 +101,7 @@ class PromptGeneratorAgent:
         logger.info(f"Generating prompt from requirement: {requirement_file_path}")
         
         # Log parameters
-        mlflow_logger.log_params({
+        safe_log_call(mlflow_logger, "log_params", {
             "requirement_file_path": requirement_file_path,
             "assignment_file_path": assignment_file_path,
             "output_file_path": output_file_path,
@@ -119,11 +120,11 @@ class PromptGeneratorAgent:
                 assignment_description = f.read().strip()
             
             # Log input files as artifacts
-            mlflow_logger.log_text(requirement, "input_requirement.txt")
-            mlflow_logger.log_text(assignment_description, "input_assignment.txt")
+            safe_log_call(mlflow_logger, "log_text", requirement, "input_requirement.txt")
+            safe_log_call(mlflow_logger, "log_text", assignment_description, "input_assignment.txt")
             
             # Log trace step: Reading inputs
-            mlflow_logger.log_trace_step("read_inputs", {
+            safe_log_call(mlflow_logger, "log_trace_step", "read_inputs", {
                 "requirement_file": requirement_file_path,
                 "assignment_file": assignment_file_path,
                 "requirement_length": len(requirement),
@@ -136,20 +137,20 @@ class PromptGeneratorAgent:
             llm_time = time.time() - llm_start_time
             
             # Log trace step: Template generation
-            mlflow_logger.log_trace_step("template_generation", {
+            safe_log_call(mlflow_logger, "log_trace_step", "template_generation", {
                 "generation_time": llm_time,
                 "template_length": len(jinja_template)
             }, step_number=2)
             
             # Log LLM performance metrics
-            mlflow_logger.log_metrics({
+            safe_log_call(mlflow_logger, "log_metrics", {
                 "llm_generation_time_seconds": llm_time,
                 "template_length_chars": len(jinja_template),
                 "template_length_lines": len(jinja_template.split('\n'))
             })
             
             # Log agent I/O
-            mlflow_logger.log_agent_input_output("prompt_generator", {
+            safe_log_call(mlflow_logger, "log_agent_input_output", "prompt_generator", {
                 "requirement": requirement,
                 "assignment_description": assignment_description
             }, {
@@ -166,13 +167,32 @@ class PromptGeneratorAgent:
             
             # Log the generated template as artifact and metrics
             prompt_name = Path(output_file_path).stem
-            mlflow_logger.log_text(jinja_template, f"generated_templates/{Path(output_file_path).name}")
-            mlflow_logger.log_prompt_metrics(jinja_template, prompt_name)
+            safe_log_call(mlflow_logger, "log_text", jinja_template, f"generated_templates/{Path(output_file_path).name}")
+            safe_log_call(mlflow_logger, "log_prompt_metrics", jinja_template, prompt_name)
+            
+            # Evaluate agent output if evaluator is enabled
+            if self.evaluator:
+                try:
+                    logger.info("Evaluating prompt generator output...")
+                    evaluation_result = self.evaluator.evaluate_prompt_generator(
+                        requirement,
+                        assignment_description,
+                        jinja_template,
+                        output_file_path
+                    )
+                    
+                    # Log evaluation metrics
+                    safe_log_call(mlflow_logger, "log_agent_evaluation_metrics", "prompt_generator", evaluation_result)
+                    
+                    logger.info(f"Prompt generator evaluation completed. Overall score: {evaluation_result.get('overall_score', 'N/A')}")
+                    
+                except Exception as eval_error:
+                    logger.warning(f"Error during prompt generator evaluation: {eval_error}")
             
             total_time = time.time() - start_time
             
             # Log final metrics
-            mlflow_logger.log_metrics({
+            safe_log_call(mlflow_logger, "log_metrics", {
                 "total_generation_time_seconds": total_time,
                 "template_generation_rate": 1.0 / total_time if total_time > 0 else 0
             })
@@ -182,12 +202,12 @@ class PromptGeneratorAgent:
             
         except Exception as e:
             # Log error metrics
-            mlflow_logger.log_metric("error_occurred", 1.0)
-            mlflow_logger.log_text(str(e), "error_log.txt")
+            safe_log_call(mlflow_logger, "log_metric", "error_occurred", 1.0)
+            safe_log_call(mlflow_logger, "log_text", str(e), "error_log.txt")
             logger.error(f"Error generating prompt: {e}")
             raise
         finally:
-            mlflow_logger.end_run()
+            safe_log_call(mlflow_logger, "end_run")
     
     def _generate_jinja_template(self, requirement: str, assignment_description: str) -> str:
         """Generate a Jinja2 template prompt from a requirement and assignment description using a Jinja template file, selected by prompt type."""
@@ -222,7 +242,7 @@ class PromptGeneratorAgent:
 
         # Log the prompt being sent to LLM
         mlflow_logger = get_mlflow_logger()
-        mlflow_logger.log_prompt(prompt, "prompt_generation", "llm_prompt")
+        safe_log_call(mlflow_logger, "log_prompt", prompt, "prompt_generation", "llm_prompt")
 
         response = self.llm.invoke([HumanMessage(content=prompt)])
         jinja_template = str(response).strip()
