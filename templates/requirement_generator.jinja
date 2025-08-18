@@ -7,8 +7,11 @@ INSTRUCTIONS:
 4. Include requirements for functionality, code quality, error handling, etc.
 5. Each requirement should be clear and specific
 6. Only include up to 10 requirements
+
 7. For each requirement, infer its type and add a type tag as the first line. The available types are:
-{type_instructions}
+{% for t in types %}
+- [{{ t.value }}] {{ t.description }}
+{% endfor %}
 
 OUTPUT FORMAT:
 Generate a list with each requirement starting with a dash (-):

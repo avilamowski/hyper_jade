@@ -246,11 +246,11 @@ class RequirementGeneratorAgent:
     def _generate_requirements_list(self, assignment_description: str) -> List[str]:
         """Generate a list of individual requirements from assignment description"""
         
+
         from src.agents.utils.prompt_types import PromptType
-        prompt_types = [f"[{t.value}]" for t in PromptType]
-        type_instructions = "\n".join([
-            f"- Use {tag} for requirements that are of type '{tag[1:-1]}'" for tag in prompt_types
-        ])
+        # Get allowed types from config (template keys)
+        templates_cfg = self.config.get('agents', {}).get('prompt_generator', {}).get('templates', {})
+        [t for t in PromptType if t.value in templates_cfg.keys()]
 
         template_name = self.agent_config.get("template")
         env = Environment(
@@ -260,7 +260,7 @@ class RequirementGeneratorAgent:
         template = env.get_template(template_name)
         prompt = template.render(
             assignment_description=assignment_description,
-            type_instructions=type_instructions
+            types=types
         )
         
         # Log the prompt being sent to LLM
