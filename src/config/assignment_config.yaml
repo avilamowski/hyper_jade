@@ -4,7 +4,7 @@
 # Global LLM Configuration (used as fallback if agent-specific config is not provided)
 model_name: "gpt-oss:latest"  # Default model for all agents
 provider: "ollama"
-temperature: 0.4
+temperature: 0.1
 
 # RAG Configuration
 enable_rag: false
@@ -26,17 +26,17 @@ agents:
     
   prompt_generator:
     enabled: true
-    include_examples: true
-    include_resources: true
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
     # model_name: "qwen2.5:7b"  # Different model for prompt generation
     # provider: "ollama"        # Different provider for prompt generation
     # temperature: 0.15         # Different temperature for prompt generation
+    example_quantity: 3
     templates:
+      examples: "examples.jinja"
       default: "prompt_generators/presence.jinja"
       # presence: "prompt_generators/presence.jinja"
-      requirement_presence: "prompt_generators/requirement_presence.jinja"
+      requirement_presence: "prompt_generators/requirement_presence2.jinja"
       # error_presence: "prompt_generators/error_presence.jinja"
       # conceptual: "prompt_generators/conceptual.jinja"
     
@@ -53,7 +53,7 @@ agents:
 
   # Agent Evaluator Configuration
   agent_evaluator:
-    enabled: true
+    enabled: false
     # Agent-specific model configuration for the evaluator
     model_name: "deepseek-r1:14b"  # Model for evaluation (should be high quality)
     provider: "ollama"         # Provider for evaluation

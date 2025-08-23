@@ -1,0 +1,59 @@
+You are a programming teacher that is showing students how to do this assignment requirement:
+[{{ requirement }}]
+
+Your task is to provide {{example_quantity}} examples of python code fragments that correctly implement this requirements and {{example_quantity}} examples of python code fragments that do not implement this requirement.
+Just provide the relevant code fragments, not the full program.
+
+For reference, here is a possible output for the requirement [The solution must validate if the input is a float]:
+
+```
+Good example 1: 
+    raw_input = input("Enter x1: ")
+    try:
+        x1 = float(raw_input)
+    except ValueError:
+	    print("Invalid input")
+
+Good 2:
+    raw_input = input()
+    if not raw_input.replace('.', '', 1).isdigit():
+        print("Invalid input")
+    else:
+        x1 = float(raw_input)
+
+
+Bad Example 1:
+    raw_input = input("Enter x1: ")
+    x1 = float(raw_input)
+
+Bad Example 2:
+    x1 = input()
+```
+
+You need to follow this EXACT structure (without the backticks):
+```
+Good example 1:
+    <CODE_FRAGMENT/>
+
+Good example 2:
+    <CODE_FRAGMENT/>
+
+...
+
+Good example {{example_quantity}}:
+    <CODE_FRAGMENT/>
+
+Bad Example 1:
+    <CODE_FRAGMENT/>
+
+Bad Example 2:
+    <CODE_FRAGMENT/>
+
+...
+
+Bad Example {{example_quantity}}:
+    <CODE_FRAGMENT/>
+```
+
+Remember that the requirement is:
+[{{ requirement }}]

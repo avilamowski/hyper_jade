@@ -210,7 +210,10 @@ class PromptGeneratorAgent:
             safe_log_call(mlflow_logger, "end_run")
     
     def _generate_jinja_template(self, requirement: str, assignment_description: str) -> str:
-        """Generate a Jinja2 template prompt from a requirement and assignment description using a Jinja template file, selected by prompt type."""
+        """
+        Generate a Jinja2 template prompt from a requirement and assignment description using a Jinja template file, selected by prompt type.
+        If the template expects examples, generate them first and inject into the final template.
+        """
         from jinja2 import Environment, FileSystemLoader, select_autoescape
         from src.agents.utils.prompt_types import PromptType
 
@@ -226,40 +229,45 @@ class PromptGeneratorAgent:
                     prompt_type = PromptType(type_tag)
                 except ValueError:
                     prompt_type = PromptType.PRESENCE
-                # Remove type tag from requirement for template rendering
                 requirement_body = "\n".join(lines[1:]) if len(lines) > 1 else ""
 
-        # Select template file based on prompt type from config
         template_map = self.agent_config.get("templates", {})
-        template_file = template_map.get(prompt_type.value, template_map.get("default"))
-
         env = Environment(
             loader=FileSystemLoader("templates"),
             autoescape=select_autoescape(["jinja"])
         )
+
+        examples_template_file = template_map["examples"]
+        examples_template = env.get_template(examples_template_file)
+        example_quantity = self.agent_config.get("example_quantity")
+        examples_prompt = examples_template.render(
+            requirement=requirement_body,
+            example_quantity=example_quantity
+        )
+        logger.info("Invoking LLM for examples...")
+        examples_response = self.llm.invoke([HumanMessage(content=examples_prompt)])
+        examples = str(examples_response).strip()
+        if "```" in examples:
+            examples = examples.split("```", 1)[-1].strip()
+        # Select template file for final prompt
+        template_file = template_map.get(prompt_type.value, template_map.get("default"))
         template = env.get_template(template_file)
-        prompt = template.render(requirement=requirement_body, assignment_description=assignment_description, code="{{ code }}")
+        prompt = template.render(requirement=requirement_body, assignment_description=assignment_description, code="{{ code }}", examples=examples)
 
-        # Log the prompt being sent to LLM
-        mlflow_logger = get_mlflow_logger()
-        safe_log_call(mlflow_logger, "log_prompt", prompt, "prompt_generation", "llm_prompt")
-
+        logger.info("Invoking LLM for template...")
         response = self.llm.invoke([HumanMessage(content=prompt)])
         jinja_template = str(response).strip()
 
         # Clean up the response if it contains markdown formatting
         if "```jinja" in jinja_template:
-            jinja_template = jinja_template.split("```jinja")[1].split("```")[0].strip()
+            jinja_template = jinja_template.split("```jinja", 1)[-1].split("```", 1)[0].strip()
         elif "```" in jinja_template:
-            jinja_template = jinja_template.split("```")[1].strip()
+            jinja_template = jinja_template.split("```", 1)[-1].strip()
 
         # Ensure the template has the basic structure - be more flexible with validation
         if "{{ code }}" not in jinja_template and "{{code}}" not in jinja_template:
-            # Try to fix common issues
             jinja_template = jinja_template.replace("{{ student_code }}", "{{ code }}")
             jinja_template = jinja_template.replace("{{code}}", "{{ code }}")
-
-            # If still not found, add it at the end
             if "{{ code }}" not in jinja_template:
                 jinja_template += "\n\nCode to analyze:\n{{ code }}"
 
