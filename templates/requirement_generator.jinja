@@ -6,20 +6,28 @@ INSTRUCTIONS:
 3. Each requirement should be independent
 4. Include requirements for functionality, code quality, error handling, etc.
 5. Each requirement should be clear and specific
-6. Only include up to 10 requirements
+6. Only include up to {{ max_requirements }} requirements
 
 7. For each requirement, infer its type and add a type tag as the first line. The available types are:
 {% for t in types %}
 - [{{ t.value }}] {{ t.description }}
 {% endfor %}
 
+8. CONTEXT DETECTION: Analyze the assignment to identify if requirements apply to specific functions:
+   - If the assignment explicitly mentions a function with a specific name (e.g., "function es_par(num)", "def es_par(num)", etc.), include the function name in the requirement
+   - If no specific function is mentioned, do not include any function context
+   - Function context should be included as: `function_name(parameters)` before the requirement description
+
 OUTPUT FORMAT:
 Generate a list with each requirement starting with a dash (-):
 
-- [presence]Requirement 1: Specific description of the first requirement
-- [presence]Requirement 2: Specific description of the second requirement
-- [conceptual]Requirement 3: Specific description of the third requirement
-...
+If a specific function is mentioned:
+- [presence] `es_par(num)` Requirement 1: Specific description of the first requirement
+- [presence] `es_par(num)` Requirement 2: Specific description of the second requirement
+
+If no specific function is mentioned:
+- [presence] Requirement 1: Specific description of the first requirement
+- [presence] Requirement 2: Specific description of the second requirement
 
 Return only the list with dashes, no additional text.
 

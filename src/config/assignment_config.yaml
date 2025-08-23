@@ -22,6 +22,7 @@ agents:
     provider: "ollama"   # Different provider for requirement generation
     temperature: 0.2     # Different temperature for requirement generation
     template: "requirement_generator.jinja"  # Jinja template for requirement generation
+    max_requirements: 10  # Maximum number of requirements to generate
     
   prompt_generator:
     enabled: true

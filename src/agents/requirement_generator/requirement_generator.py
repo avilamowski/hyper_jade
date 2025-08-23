@@ -129,6 +129,9 @@ class RequirementGeneratorAgent:
         safe_model_name = model_name.replace(":", "_")
         actual_output_path = Path(output_directory) / safe_model_name
         
+        # Get max_requirements from config
+        max_requirements = self.agent_config.get("max_requirements", 10)
+        
         # Log parameters
         safe_log_call(mlflow_logger, "log_params", {
             "assignment_file_path": assignment_file_path,
@@ -136,7 +139,8 @@ class RequirementGeneratorAgent:
             "actual_output_path": str(actual_output_path),
             "model_name": model_name,
             "provider": self.agent_config.get("provider", "unknown"),
-            "temperature": self.agent_config.get("temperature", 0.1)
+            "temperature": self.agent_config.get("temperature", 0.1),
+            "max_requirements": max_requirements
         })
         
         try:
@@ -268,7 +272,8 @@ class RequirementGeneratorAgent:
         template = env.get_template(template_name)
         prompt = template.render(
             assignment_description=assignment_description,
-            types=types
+            types=types,
+            max_requirements=self.agent_config.get("max_requirements", 10)
         )
         
         # Log the prompt being sent to LLM
@@ -348,6 +353,12 @@ class RequirementGeneratorAgent:
         # Validate that we got requirements
         if not requirements:
             raise ValueError("No requirements found in LLM response")
+        
+        # Limit to max_requirements if more were generated
+        max_requirements = self.agent_config.get("max_requirements", 10)
+        if len(requirements) > max_requirements:
+            logger.warning(f"Generated {len(requirements)} requirements, limiting to {max_requirements}")
+            requirements = requirements[:max_requirements]
         
         logger.info(f"Parsed {len(requirements)} requirements from response")
         
