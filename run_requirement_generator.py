@@ -66,7 +66,13 @@ def main():
     # Run the requirement generator
     print("🚀 Starting requirement generation...")
     print(f"📝 Assignment: {args.assignment}")
-    print(f"📁 Output directory: {args.output_dir}")
+    print(f"📁 Base output directory: {args.output_dir}")
+    
+    # Show the actual output directory that will be created
+    model_name = agent_config.get("model_name", "unknown")
+    safe_model_name = model_name.replace(":", "_")
+    actual_output_dir = f"{args.output_dir}/{safe_model_name}"
+    print(f"📁 Actual output directory: {actual_output_dir}")
     print("-" * 50)
     
     try:
@@ -88,7 +94,8 @@ def main():
         print("\n📊 REQUIREMENT GENERATION SUMMARY")
         print("=" * 50)
         print(f"Assignment file: {args.assignment}")
-        print(f"Output directory: {args.output_dir}")
+        print(f"Base output directory: {args.output_dir}")
+        print(f"Actual output directory: {actual_output_dir}")
         print(f"Number of requirements: {len(requirement_files)}")
         print(f"Generation time: {end_time - start_time:.2f} seconds")
         

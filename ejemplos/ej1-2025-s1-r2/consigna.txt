@@ -1,0 +1,117 @@
+Se pide implementar las siguientes funciones que reciben como parámetro un texto :
+
+
+
+1.validar(texto): (0,5 ptos.) retorna True si el texto no es vacío y contiene únicamente letras del idioma inglés, números, espacios y saltos de línea. En otro caso debe retornar False. 
+
+
+
+Ejemplo 1:
+
+texto:
+
+ 'Hola mundo \n \n 123'
+
+print(validar(texto))
+
+Ejemplo 2:
+
+texto :
+
+'Hola!!'
+
+print(validar(texto))
+
+Debe mostrar:
+
+True
+
+Debe mostrar:
+
+False
+
+
+
+2.mostrar_lineas(texto): (1,5 ptos.) que reciba un texto como parámetro y, si el texto es válido, muestre cada línea no vacía del texto en líneas separadas, precedidas por su número de línea original. 
+
+Requisitos:
+
+Las líneas vacías (que no contienen ningún carácter visible) no deben mostrarse.
+El número de línea que se muestra corresponde a la posición original de la línea en el texto, considerando todas las líneas, incluidas las vacías.
+En cada línea mostrada, las palabras deben separarse por un único espacio, sin importar cuántos espacios haya en el texto original.
+No debe agregarse espacio extra al final de la línea mostrada.
+
+
+Ejemplo 1:
+
+texto:
+
+ 'Hola  gente del universo\n \n123 \n Chau todos\n 90 adios'
+
+mostrar_lineas(texto)  
+
+Ejemplo 2:
+
+texto :
+
+'Hola!!'
+
+mostrar_lineas(texto)
+
+Debe mostrar:
+
+1: Hola gente del universo 
+
+3: 123 
+
+4: Chau todos 
+
+5: 90 adios 
+
+Debe mostrar:
+
+Texto inválido
+
+
+
+
+
+
+
+
+
+3.promedio_numeros(texto): (1,0 ptos.) si el texto es válido, debe calcular y mostrar el promedio de los números que aparecen en el texto. Se considera número a a cualquier palabra que contenga únicamente caracteres numéricos. 
+
+Ejemplo 1:
+
+texto :
+
+'Hola1  gente del universo\n \n123 \n Chau todos\n 90 adios'
+
+promedio_numeros(texto)
+
+Ejemplo 2:
+
+texto :
+
+'Hola!!'
+
+promedio_numeros(texto) 
+
+Debe mostrar:
+
+El promedio de los números en el texto es 106.50  
+
+Debe mostrar:
+
+Texto inválido
+
+
+
+
+
+4.sin_repetir(texto): (1,0 ptos.) si el texto es válido, debe escribir un archivo texto llamado 'sin_repeticiones.txt'  que contenga todas las palabras distintas que aparecen en el texto, ordenadas de mayor a menor longitud. 
+
+Si hay varias palabras con la misma longitud, deben incluirse todas, sin importar el orden entre ellas.
+No se deben  incluir en el archivo las palabras que contengan únicamente números .
+En caso que el texto sea inválido, el archivo no debe crearse.

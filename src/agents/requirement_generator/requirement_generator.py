@@ -124,11 +124,17 @@ class RequirementGeneratorAgent:
         start_time = time.time()
         logger.info(f"Generating requirements from assignment: {assignment_file_path}")
         
+        # Get model name for output directory
+        model_name = self.agent_config.get("model_name", "unknown")
+        safe_model_name = model_name.replace(":", "_")
+        actual_output_path = Path(output_directory) / safe_model_name
+        
         # Log parameters
         safe_log_call(mlflow_logger, "log_params", {
             "assignment_file_path": assignment_file_path,
             "output_directory": output_directory,
-            "model_name": self.agent_config.get("model_name", "unknown"),
+            "actual_output_path": str(actual_output_path),
+            "model_name": model_name,
             "provider": self.agent_config.get("provider", "unknown"),
             "temperature": self.agent_config.get("temperature", 0.1)
         })
@@ -175,9 +181,11 @@ class RequirementGeneratorAgent:
                 "generation_time": llm_time
             }, step_number=3)
             
-            # Create output directory if it doesn't exist
-            output_path = Path(output_directory)
+            # Create output directory with model name appended
+            output_path = actual_output_path
             output_path.mkdir(parents=True, exist_ok=True)
+            
+            logger.info(f"Using output directory: {output_path}")
             
             # Save each requirement as a separate file
             requirement_files = []
@@ -203,7 +211,7 @@ class RequirementGeneratorAgent:
             })
             
             # Log the entire requirements directory as artifacts
-            safe_log_call(mlflow_logger, "log_artifacts", output_directory, "requirements")
+            safe_log_call(mlflow_logger, "log_artifacts", str(output_path), "requirements")
             
             # Evaluate agent output if evaluator is enabled
             # Note: Evaluation is now handled by the standalone evaluator
@@ -250,7 +258,7 @@ class RequirementGeneratorAgent:
         from src.agents.utils.prompt_types import PromptType
         # Get allowed types from config (template keys)
         templates_cfg = self.config.get('agents', {}).get('prompt_generator', {}).get('templates', {})
-        [t for t in PromptType if t.value in templates_cfg.keys()]
+        types = [t for t in PromptType if t.value in templates_cfg.keys()]
 
         template_name = self.agent_config.get("template")
         env = Environment(

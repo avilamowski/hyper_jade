@@ -19,8 +19,8 @@ agents:
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
     # model_name: "deepseek-r1:14b"  # Different model for requirement generation
-    # provider: "openai"   # Different provider for requirement generation
-    # temperature: 0.2     # Different temperature for requirement generation
+    provider: "ollama"   # Different provider for requirement generation
+    temperature: 0.2     # Different temperature for requirement generation
     template: "requirement_generator.jinja"  # Jinja template for requirement generation
     
   prompt_generator:
@@ -34,9 +34,9 @@ agents:
     # temperature: 0.15         # Different temperature for prompt generation
     templates:
       default: "prompt_generators/presence.jinja"
-      presence: "prompt_generators/presence.jinja"
+      # presence: "prompt_generators/presence.jinja"
       requirement_presence: "prompt_generators/requirement_presence.jinja"
-      error_presence: "prompt_generators/error_presence.jinja"
+      # error_presence: "prompt_generators/error_presence.jinja"
       # conceptual: "prompt_generators/conceptual.jinja"
     
   code_corrector:
