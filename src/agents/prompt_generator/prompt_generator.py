@@ -225,12 +225,8 @@ class PromptGeneratorAgent:
             first_line = lines[0].strip()
             if first_line.startswith("[") and "]" in first_line:
                 type_tag = first_line[1:first_line.index("]")].strip().lower()
-                try:
-                    prompt_type = PromptType(type_tag)
-                except ValueError:
-                    prompt_type = PromptType.PRESENCE
-                requirement_body = "\n".join(lines[1:]) if len(lines) > 1 else ""
-
+                prompt_type = PromptType(type_tag)
+                requirement_body = first_line[first_line.index("]")+1:] + ("\n".join(lines[1:]).strip() if len(lines) > 1 else "")
         template_map = self.agent_config.get("templates", {})
         env = Environment(
             loader=FileSystemLoader("templates"),
