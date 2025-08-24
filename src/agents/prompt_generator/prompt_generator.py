@@ -8,12 +8,12 @@ corrector agent to analyze code against that specific requirement.
 """
 
 from __future__ import annotations
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 import logging
 import time
 from pathlib import Path
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 
@@ -245,15 +245,19 @@ class PromptGeneratorAgent:
             example_quantity=example_quantity
         )
         logger.info("Invoking LLM for examples...")
+        safe_log_call(get_mlflow_logger(), "log_text", examples_prompt, "examples_prompt.txt")
         examples_response = self.llm.invoke([HumanMessage(content=examples_prompt)])
         examples = str(examples_response).strip()
         if "```" in examples:
             examples = examples.split("```", 1)[-1].strip()
+        # Persist examples as MLflow artifact before prompt generation
+        mlflow_logger = get_mlflow_logger()
+        safe_log_call(mlflow_logger, "log_text", examples, "generated_examples.txt")
         # Select template file for final prompt
         template_file = template_map.get(prompt_type.value, template_map.get("default"))
         template = env.get_template(template_file)
         prompt = template.render(requirement=requirement_body, assignment_description=assignment_description, code="{{ code }}", examples=examples)
-
+        safe_log_call(get_mlflow_logger(), "log_text", prompt, "final_prompt.txt")
         logger.info("Invoking LLM for template...")
         response = self.llm.invoke([HumanMessage(content=prompt)])
         jinja_template = str(response).strip()
