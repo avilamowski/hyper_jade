@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Requirement Generator Agent
+Requirement Generator Agent (LangGraph single-pass)
 
 This agent takes an assignment description (consigna) and generates individual
 requirement files. Each requirement is saved as a separate .txt file.
+Uses a minimal LangGraph with a single node.
 """
 
 from __future__ import annotations
@@ -21,10 +22,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 
+# LangGraph
+from langgraph.graph import StateGraph, END
+
 from src.config import get_agent_config
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from src.agents.utils.agent_evaluator import AgentEvaluator
-from utils.prompt_types import PromptType
+from src.agents.utils.prompt_types import PromptType
 
 load_dotenv(override=False)
 # Configure logging to output to stdout
@@ -54,15 +58,19 @@ def safe_log_call(logger_instance, method_name, *args, **kwargs):
         except Exception as e:
             logger.warning(f"Failed to call {method_name}: {e}")
 
-class RequirementGeneratorState(TypedDict):
-    exams_path: str
-    assignment: str
-    requirement: str   
+
+class Requirement(TypedDict):
+    requirement: str
     type: PromptType
     function: str
 
+class RequirementGeneratorState(TypedDict):
+    exams_path: str
+    assignment: str
+    requirements: List[Requirement]
+
 class RequirementGeneratorAgent:
-    """Agent that generates individual requirement files from an assignment description"""
+    """Agent that generates individual requirement files from an assignment description using LangGraph"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
@@ -107,7 +115,7 @@ class RequirementGeneratorAgent:
         output_directory: str
     ) -> List[str]:
         """
-        Generate individual requirement files from an assignment description
+        Generate individual requirement files from an assignment description using LangGraph
         
         Args:
             assignment_file_path: Path to the assignment description (.txt file)
@@ -164,10 +172,20 @@ class RequirementGeneratorAgent:
                 "assignment_length": len(assignment_description)
             }, step_number=1)
             
-            logger.info("Generating requirements using LLM")
-            # Generate requirements using LLM
+            logger.info("Generating requirements using LangGraph")
+            # Generate requirements using LangGraph
             llm_start_time = time.time()
-            requirements = self._generate_requirements_list(assignment_description)
+            
+            # Build and run the LangGraph
+            app = self._build_graph()
+            state_in: RequirementGeneratorState = {
+                "exams_path": str(Path(assignment_file_path).parent),
+                "assignment": assignment_description,
+                "requirements": []
+            }
+            result_state = app.invoke(state_in)
+            
+            requirements = result_state.get("requirements", [])
             llm_time = time.time() - llm_start_time
             
             # Log LLM performance metrics
@@ -223,25 +241,6 @@ class RequirementGeneratorAgent:
             # Log the entire requirements directory as artifacts
             safe_log_call(mlflow_logger, "log_artifacts", str(output_path), "requirements")
             
-            # Evaluate agent output if evaluator is enabled
-            # Note: Evaluation is now handled by the standalone evaluator
-            # if self.evaluator:
-            #     try:
-            #         logger.info("Evaluating requirement generator output...")
-            #         evaluation_result = self.evaluator.evaluate_requirement_generator(
-            #             assignment_description,
-            #             requirements,
-            #             output_directory
-            #         )
-            #         
-            #         # Log evaluation metrics
-            #         safe_log_call(mlflow_logger, "log_agent_evaluation_metrics", "requirement_generator", evaluation_result)
-            #         
-            #         logger.info(f"Requirement generator evaluation completed. Overall score: {evaluation_result.get('overall_score', 'N/A')}")
-            #         
-            #     except Exception as eval_error:
-            #         logger.warning(f"Error during requirement generator evaluation: {eval_error}")
-            
             # Log trace step: Final completion
             safe_log_call(mlflow_logger, "log_trace_step", "requirement_generation_complete", {
                 "files_generated": len(requirement_files),
@@ -261,10 +260,11 @@ class RequirementGeneratorAgent:
         finally:
             safe_log_call(mlflow_logger, "end_run")
     
-    def _generate_requirements_list(self, assignment_description: str) -> List[str]:
-        """Generate a list of individual requirements from assignment description"""
+    # -------------------------- LangGraph Node ------------------------------ #
+    def _node_generate_requirements(self, state: RequirementGeneratorState) -> RequirementGeneratorState:
+        """LangGraph node that generates requirements from assignment description"""
+        assignment_description = state["assignment"]
         
-
         from src.agents.utils.prompt_types import PromptType
         # Get allowed types from config (template keys)
         templates_cfg = self.config.get('agents', {}).get('prompt_generator', {}).get('templates', {})
@@ -368,8 +368,18 @@ class RequirementGeneratorAgent:
         
         logger.info(f"Parsed {len(requirements)} requirements from response")
         
-        logger.info(f"Generated {len(requirements)} requirements")
-        return requirements
+        # Update state with generated requirements
+        state["requirements"] = requirements
+        return state
+    
+    # -------------------------- Graph Builder ------------------------------- #
+    def _build_graph(self):
+        """Build a minimal single-pass LangGraph for requirement generation."""
+        graph = StateGraph(RequirementGeneratorState)
+        graph.add_node("generate_requirements", self._node_generate_requirements)
+        graph.set_entry_point("generate_requirements")
+        graph.add_edge("generate_requirements", END)
+        return graph.compile()
     
     def _clean_llm_response(self, raw_content: str) -> str:
         """
