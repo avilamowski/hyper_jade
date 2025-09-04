@@ -18,16 +18,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.agents.utils.agent_evaluator import AgentEvaluator
-from src.config import get_agent_config
 
-def load_config(config_path: str) -> dict:
-    """Load configuration from YAML file"""
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except Exception as e:
-        print(f"Error loading config: {e}")
-        return {}
+from src.config import get_agent_config, load_config, load_langsmith_config
+
+
 
 def read_requirement_files(requirements_dir: str) -> list:
     """Read all requirement files from the specified directory"""
@@ -71,6 +65,7 @@ def main():
     if not config:
         print("Error: Could not load configuration")
         sys.exit(1)
+    load_langsmith_config()
     
     # Print model information
     agent_config = get_agent_config(config, 'agent_evaluator')

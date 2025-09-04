@@ -18,16 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.agents.requirement_generator.requirement_generator import RequirementGeneratorAgent
-from src.config import get_agent_config
-
-def load_config(config_path: str) -> dict:
-    """Load configuration from YAML file"""
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except Exception as e:
-        print(f"Error loading config: {e}")
-        return {}
+from src.config import get_agent_config, load_config, load_langsmith_config
 
 def main():
     """Main entry point for requirement generator"""
@@ -44,6 +35,7 @@ def main():
     if not config:
         print("Error: Could not load configuration")
         sys.exit(1)
+    load_langsmith_config()
     
     # Print model information
     agent_config = get_agent_config(config, 'requirement_generator')

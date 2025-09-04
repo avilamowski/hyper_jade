@@ -21,16 +21,7 @@ from src.agents.requirement_generator.requirement_generator import RequirementGe
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.core.mlflow_utils import mlflow_logger
-from src.config import get_agent_config
-
-def load_config(config_path: str) -> dict:
-    """Load configuration from YAML file"""
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except Exception as e:
-        print(f"Error loading config: {e}")
-        return {}
+from src.config import get_agent_config, load_config, load_langsmith_config
 
 def main():
     """Main entry point"""
@@ -62,6 +53,7 @@ def main():
     if not config:
         print("Error: Could not load configuration")
         sys.exit(1)
+    load_langsmith_config()
     
     # Print model information
     print("🤖 Model Configuration:")

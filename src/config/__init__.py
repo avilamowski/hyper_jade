@@ -3,7 +3,9 @@ Configuration utilities for the assignment evaluation system
 """
 
 from typing import Dict, Any, Optional
-
+import yaml
+import os
+from dotenv import load_dotenv, dotenv_values
 
 def get_agent_config(config: Dict[str, Any], agent_name: str) -> Dict[str, Any]:
     """
@@ -58,3 +60,36 @@ def get_global_config(config: Dict[str, Any]) -> Dict[str, Any]:
         'logging': config.get('logging', {}),
         'languages': config.get('languages', {})
     }
+
+
+def load_config(config_path: str) -> dict:
+    """Load configuration from YAML file"""
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading config: {e}")
+        return {}
+    
+    
+def load_langsmith_config():
+    """Load LangSmith config from config/langsmith_config.yaml and .env"""
+    config_path = os.path.join(os.path.dirname(__file__), "langsmith_config.yaml")
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading langsmith config: {e}")
+        config = {}
+    load_dotenv(override=True)
+    DOTENV = dotenv_values()
+    langsmith = config.get("langsmith", {})
+    if langsmith.get("enable"):
+        print("🔧 LangSmith integration enabled")
+        os.environ["LANGSMITH_TRACING"] = langsmith.get("tracing", "")
+        if langsmith.get("endpoint"):
+            os.environ["LANGSMITH_ENDPOINT"] = langsmith["endpoint"]
+        if DOTENV.get("LANGSMITH_API_KEY"):
+            os.environ["LANGSMITH_API_KEY"] = DOTENV["LANGSMITH_API_KEY"]
+        if DOTENV.get("LANGSMITH_PROJECT"):
+            os.environ["LANGSMITH_PROJECT"] = DOTENV["LANGSMITH_PROJECT"]
