@@ -7,7 +7,7 @@ requirement files. Each requirement is saved as a separate .txt file.
 """
 
 from __future__ import annotations
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, TypedDict
 import logging
 import json
 import time
@@ -24,7 +24,7 @@ from langchain_openai import ChatOpenAI
 from src.config import get_agent_config
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from src.agents.utils.agent_evaluator import AgentEvaluator
-
+from utils.prompt_types import PromptType
 
 load_dotenv(override=False)
 # Configure logging to output to stdout
@@ -54,6 +54,12 @@ def safe_log_call(logger_instance, method_name, *args, **kwargs):
         except Exception as e:
             logger.warning(f"Failed to call {method_name}: {e}")
 
+class RequirementGeneratorState(TypedDict):
+    exams_path: str
+    assignment: str
+    requirement: str   
+    type: PromptType
+    function: str
 
 class RequirementGeneratorAgent:
     """Agent that generates individual requirement files from an assignment description"""

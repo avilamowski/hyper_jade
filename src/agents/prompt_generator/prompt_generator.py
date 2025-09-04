@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""
-Prompt Generator Agent
 
-This agent takes a single requirement file (.txt) and an assignment description,
-then generates a Jinja2 template prompt (.jinja) that will be used by the code 
-corrector agent to analyze code against that specific requirement.
+"""
+Prompt Generator Agent (LangGraph Node Version)
+
+This module defines two main nodes for LangChain/LangGraph:
+1. ExampleGenerationNode: Generates examples from a requirement.
+2. PromptGenerationNode: Generates a Jinja2 template prompt using examples and assignment description.
+Each node logs input/output and timing for traceability.
 """
 
 from __future__ import annotations
-from typing import Dict, Any
+from typing import Dict, Any, TypedDict
 import logging
 import time
 from pathlib import Path
 
+from src.agents.requirement_generator.requirement_generator import RequirementGeneratorState
 from langchain_core.messages import HumanMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
@@ -21,6 +24,7 @@ from src.config import get_agent_config
 from src.agents.utils.agent_evaluator import AgentEvaluator
 
 # Import MLflow logger lazily to avoid circular imports
+
 def get_mlflow_logger():
     """Get MLflow logger instance, importing it only when needed"""
     try:
@@ -29,6 +33,7 @@ def get_mlflow_logger():
     except ImportError:
         logger.warning("MLflow not available - logging will be disabled")
         return None
+
 
 def safe_log_call(logger_instance, method_name, *args, **kwargs):
     """Safely call a logging method, doing nothing if logger is None"""
@@ -39,24 +44,130 @@ def safe_log_call(logger_instance, method_name, *args, **kwargs):
         except Exception as e:
             logger.warning(f"Failed to call {method_name}: {e}")
 
+
 logger = logging.getLogger(__name__)
 
+
+# --- LangGraph Node: Example Generation ---
+def example_generation_node(requirement: str, agent_config: dict, llm, mlflow_logger=None) -> dict:
+    """
+    Node for generating examples from a requirement.
+    Returns a dict with examples and trace info.
+    """
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    import time
+    start_time = time.time()
+    template_map = agent_config.get("templates", {})
+    env = Environment(
+        loader=FileSystemLoader("templates"),
+        autoescape=select_autoescape(["jinja"])
+    )
+    examples_template_file = template_map["examples"]
+    examples_template = env.get_template(examples_template_file)
+    example_quantity = agent_config.get("example_quantity")
+    examples_prompt = examples_template.render(
+        requirement=requirement,
+        example_quantity=example_quantity
+    )
+    logger.info("[Node] Invoking LLM for examples...")
+    safe_log_call(mlflow_logger, "log_text", examples_prompt, "examples_prompt.txt")
+    examples_response = llm.invoke([HumanMessage(content=examples_prompt)])
+    examples = str(examples_response).strip()
+    if "```" in examples:
+        examples = examples.split("```", 1)[-1].strip()
+    safe_log_call(mlflow_logger, "log_text", examples, "generated_examples.txt")
+    duration = time.time() - start_time
+    trace = {
+        "node": "example_generation",
+        "input": requirement,
+        "output": examples,
+        "duration": duration
+    }
+    safe_log_call(mlflow_logger, "log_trace_step", "example_generation", trace, step_number=1)
+    return {"examples": examples, "trace": trace}
+
+# --- LangGraph Node: Prompt Generation ---
+def prompt_generation_node(requirement: str, assignment_description: str, examples: str, agent_config: dict, llm, mlflow_logger=None) -> dict:
+    """
+    Node for generating a Jinja2 template prompt using requirement, assignment, and examples.
+    Returns a dict with jinja_template and trace info.
+    """
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    from src.agents.utils.prompt_types import PromptType
+    import time
+    start_time = time.time()
+    # Extract prompt type from requirement (first line)
+    lines = requirement.splitlines()
+    prompt_type = PromptType.PRESENCE
+    requirement_body = requirement
+    if lines:
+        first_line = lines[0].strip()
+        if first_line.startswith("[") and "]" in first_line:
+            type_tag = first_line[1:first_line.index("]")].strip().lower()
+            prompt_type = PromptType(type_tag)
+            requirement_body = first_line[first_line.index("]")+1:] + ("\n".join(lines[1:]).strip() if len(lines) > 1 else "")
+    template_map = agent_config.get("templates", {})
+    env = Environment(
+        loader=FileSystemLoader("templates"),
+        autoescape=select_autoescape(["jinja"])
+    )
+    template_file = template_map.get(prompt_type.value, template_map.get("default"))
+    template = env.get_template(template_file)
+    prompt = template.render(requirement=requirement_body, assignment_description=assignment_description, code="{{ code }}", examples=examples)
+    safe_log_call(mlflow_logger, "log_text", prompt, "final_prompt.txt")
+    logger.info("[Node] Invoking LLM for template...")
+    response = llm.invoke([HumanMessage(content=prompt)])
+    jinja_template = str(response).strip()
+    # Clean up markdown formatting
+    if "```jinja" in jinja_template:
+        jinja_template = jinja_template.split("```jinja", 1)[-1].split("```", 1)[0].strip()
+    elif "```" in jinja_template:
+        jinja_template = jinja_template.split("```", 1)[-1].strip()
+    # Ensure the template has the basic structure
+    if "{{ code }}" not in jinja_template and "{{code}}" not in jinja_template:
+        jinja_template = jinja_template.replace("{{ student_code }}", "{{ code }}")
+        jinja_template = jinja_template.replace("{{code}}", "{{ code }}")
+        if "{{ code }}" not in jinja_template:
+            jinja_template += "\n\nCode to analyze:\n{{ code }}"
+    duration = time.time() - start_time
+    trace = {
+        "node": "prompt_generation",
+        "input": {
+            "requirement": requirement,
+            "assignment_description": assignment_description,
+            "examples": examples
+        },
+        "output": jinja_template,
+        "duration": duration
+    }
+    safe_log_call(mlflow_logger, "log_trace_step", "prompt_generation", trace, step_number=2)
+    return {"jinja_template": jinja_template, "trace": trace}
+
+
+# --- LangGraph Graph Definition ---
+try:
+    from langgraph.graph import StateGraph
+except ImportError:
+    StateGraph = None  # LangGraph not installed
+
+class PromptGeneratorState(RequirementGeneratorState):
+    prompt_template: str
+
+
 class PromptGeneratorAgent:
-    """Agent that generates Jinja2 template prompts from individual requirements"""
-    
+    """
+    Agent that orchestrates the example and prompt generation nodes, and exposes itself as a LangGraph node/graph.
+    """
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        # Get agent-specific configuration
         self.agent_config = get_agent_config(config, 'prompt_generator')
         self.llm = self._setup_llm()
-        
-        # Initialize agent evaluator if enabled
         self.evaluator = None
         if config.get('agents', {}).get('agent_evaluator', {}).get('enabled', False):
             self.evaluator = AgentEvaluator(config)
-    
+        self.graph = self._build_graph() if StateGraph else None
+
     def _setup_llm(self):
-        """Setup LLM based on agent-specific configuration"""
         if self.agent_config.get("provider") == "openai":
             return ChatOpenAI(
                 model=self.agent_config.get("model_name", "gpt-4"),
@@ -67,25 +178,66 @@ class PromptGeneratorAgent:
                 model=self.agent_config.get("model_name", "qwen2.5:7b"),
                 temperature=self.agent_config.get("temperature", 0.1)
             )
-    
-    def generate_prompt(
-        self,
-        requirement_file_path: str,
-        assignment_file_path: str,
-        output_file_path: str
-    ) -> str:
+
+    def _build_graph(self):
         """
-        Generate a Jinja2 template prompt from a single requirement file and assignment description
-        
-        Args:
-            requirement_file_path: Path to the requirement file (.txt)
-            assignment_file_path: Path to the assignment description file (.txt)
-            output_file_path: Path where the Jinja2 template will be saved
-            
-        Returns:
-            Path to the generated Jinja2 template file
+        Build a LangGraph graph that wires up the example and prompt generation nodes.
+        The graph expects input dict with keys: requirement, assignment_description.
         """
-        # Start MLflow run for prompt generation
+        graph = StateGraph(PromptGeneratorState)
+        # Register nodes
+        def example_node_wrapper(state):
+            result = example_generation_node(
+                state["requirement"], self.agent_config, self.llm, get_mlflow_logger()
+            )
+            state = dict(state)
+            state["examples"] = result["examples"]
+            state["example_trace"] = result["trace"]
+            return state
+        def prompt_node_wrapper(state):
+            result = prompt_generation_node(
+                state["requirement"], state["assignment_description"], state["examples"], self.agent_config, self.llm, get_mlflow_logger()
+            )
+            state = dict(state)
+            state["jinja_template"] = result["jinja_template"]
+            state["prompt_trace"] = result["trace"]
+            return state
+        graph.add_node("example_generation", example_node_wrapper)
+        graph.add_node("prompt_generation", prompt_node_wrapper)
+        # Wire nodes: example_generation -> prompt_generation
+        graph.set_entry_point("example_generation")
+        graph.add_edge("example_generation", "prompt_generation")
+        graph.add_edge("prompt_generation", "__end__")
+        return graph
+
+    def as_graph_node(self):
+        """
+        Expose the agent as a LangGraph node for use in external graphs.
+        Returns a function that takes a state dict and returns a state dict with the generated template.
+        """
+        def node(state):
+            # Run the graph if available
+            if self.graph:
+                result = self.graph.run(state)
+                return result
+            # Fallback: run sequentially
+            requirement = state["requirement"]
+            assignment_description = state["assignment_description"]
+            example_result = example_generation_node(requirement, self.agent_config, self.llm, get_mlflow_logger())
+            examples = example_result["examples"]
+            prompt_result = prompt_generation_node(requirement, assignment_description, examples, self.agent_config, self.llm, get_mlflow_logger())
+            state = dict(state)
+            state["examples"] = examples
+            state["jinja_template"] = prompt_result["jinja_template"]
+            state["example_trace"] = example_result["trace"]
+            state["prompt_trace"] = prompt_result["trace"]
+            return state
+        return node
+
+    def generate_prompt(self, requirement_file_path: str, assignment_file_path: str, output_file_path: str) -> str:
+        """
+        Orchestrates the nodes for prompt generation.
+        """
         mlflow_logger = get_mlflow_logger()
         safe_log_call(mlflow_logger, "start_run",
             run_name="prompt_generation",
@@ -96,80 +248,34 @@ class PromptGeneratorAgent:
                 "output_file": Path(output_file_path).name
             }
         )
-        
         start_time = time.time()
-        logger.info(f"Generating prompt from requirement: {requirement_file_path}")
-        
-        # Log parameters
-        safe_log_call(mlflow_logger, "log_params", {
-            "requirement_file_path": requirement_file_path,
-            "assignment_file_path": assignment_file_path,
-            "output_file_path": output_file_path,
-            "model_name": self.agent_config.get("model_name", "unknown"),
-            "provider": self.agent_config.get("provider", "unknown"),
-            "temperature": self.agent_config.get("temperature", 0.1)
-        })
-        
         try:
-            # Read the requirement
             with open(requirement_file_path, 'r', encoding='utf-8') as f:
                 requirement = f.read().strip()
-            
-            # Read the assignment description
             with open(assignment_file_path, 'r', encoding='utf-8') as f:
                 assignment_description = f.read().strip()
-            
-            # Log input files as artifacts
             safe_log_call(mlflow_logger, "log_text", requirement, "input_requirement.txt")
             safe_log_call(mlflow_logger, "log_text", assignment_description, "input_assignment.txt")
-            
-            # Log trace step: Reading inputs
             safe_log_call(mlflow_logger, "log_trace_step", "read_inputs", {
                 "requirement_file": requirement_file_path,
                 "assignment_file": assignment_file_path,
                 "requirement_length": len(requirement),
                 "assignment_length": len(assignment_description)
-            }, step_number=1)
-            
-            # Generate Jinja2 template prompt
-            llm_start_time = time.time()
-            jinja_template = self._generate_jinja_template(requirement, assignment_description)
-            llm_time = time.time() - llm_start_time
-            
-            # Log trace step: Template generation
-            safe_log_call(mlflow_logger, "log_trace_step", "template_generation", {
-                "generation_time": llm_time,
-                "template_length": len(jinja_template)
-            }, step_number=2)
-            
-            # Log LLM performance metrics
-            safe_log_call(mlflow_logger, "log_metrics", {
-                "llm_generation_time_seconds": llm_time,
-                "template_length_chars": len(jinja_template),
-                "template_length_lines": len(jinja_template.split('\n'))
-            })
-            
-            # Log agent I/O
-            safe_log_call(mlflow_logger, "log_agent_input_output", "prompt_generator", {
-                "requirement": requirement,
-                "assignment_description": assignment_description
-            }, {
-                "jinja_template": jinja_template,
-                "generation_time": llm_time
-            })
-            
+            }, step_number=0)
+            # Node 1: Example Generation
+            example_result = example_generation_node(requirement, self.agent_config, self.llm, mlflow_logger)
+            examples = example_result["examples"]
+            # Node 2: Prompt Generation
+            prompt_result = prompt_generation_node(requirement, assignment_description, examples, self.agent_config, self.llm, mlflow_logger)
+            jinja_template = prompt_result["jinja_template"]
             # Save the template
             output_path = Path(output_file_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(jinja_template)
-            
-            # Log the generated template as artifact and metrics
             prompt_name = Path(output_file_path).stem
             safe_log_call(mlflow_logger, "log_text", jinja_template, f"generated_templates/{Path(output_file_path).name}")
             safe_log_call(mlflow_logger, "log_prompt_metrics", jinja_template, prompt_name)
-            
             # Evaluate agent output if evaluator is enabled
             if self.evaluator:
                 try:
@@ -180,96 +286,21 @@ class PromptGeneratorAgent:
                         jinja_template,
                         output_file_path
                     )
-                    
-                    # Log evaluation metrics
                     safe_log_call(mlflow_logger, "log_agent_evaluation_metrics", "prompt_generator", evaluation_result)
-                    
                     logger.info(f"Prompt generator evaluation completed. Overall score: {evaluation_result.get('overall_score', 'N/A')}")
-                    
                 except Exception as eval_error:
                     logger.warning(f"Error during prompt generator evaluation: {eval_error}")
-            
             total_time = time.time() - start_time
-            
-            # Log final metrics
             safe_log_call(mlflow_logger, "log_metrics", {
                 "total_generation_time_seconds": total_time,
                 "template_generation_rate": 1.0 / total_time if total_time > 0 else 0
             })
-            
             logger.info(f"Generated Jinja2 template: {output_path}")
             return str(output_path)
-            
         except Exception as e:
-            # Log error metrics
             safe_log_call(mlflow_logger, "log_metric", "error_occurred", 1.0)
             safe_log_call(mlflow_logger, "log_text", str(e), "error_log.txt")
             logger.error(f"Error generating prompt: {e}")
             raise
         finally:
             safe_log_call(mlflow_logger, "end_run")
-    
-    def _generate_jinja_template(self, requirement: str, assignment_description: str) -> str:
-        """
-        Generate a Jinja2 template prompt from a requirement and assignment description using a Jinja template file, selected by prompt type.
-        If the template expects examples, generate them first and inject into the final template.
-        """
-        from jinja2 import Environment, FileSystemLoader, select_autoescape
-        from src.agents.utils.prompt_types import PromptType
-
-        # Extract prompt type from requirement (first line)
-        lines = requirement.splitlines()
-        prompt_type = PromptType.PRESENCE
-        requirement_body = requirement
-        if lines:
-            first_line = lines[0].strip()
-            if first_line.startswith("[") and "]" in first_line:
-                type_tag = first_line[1:first_line.index("]")].strip().lower()
-                prompt_type = PromptType(type_tag)
-                requirement_body = first_line[first_line.index("]")+1:] + ("\n".join(lines[1:]).strip() if len(lines) > 1 else "")
-        template_map = self.agent_config.get("templates", {})
-        env = Environment(
-            loader=FileSystemLoader("templates"),
-            autoescape=select_autoescape(["jinja"])
-        )
-
-        examples_template_file = template_map["examples"]
-        examples_template = env.get_template(examples_template_file)
-        example_quantity = self.agent_config.get("example_quantity")
-        examples_prompt = examples_template.render(
-            requirement=requirement_body,
-            example_quantity=example_quantity
-        )
-        logger.info("Invoking LLM for examples...")
-        safe_log_call(get_mlflow_logger(), "log_text", examples_prompt, "examples_prompt.txt")
-        examples_response = self.llm.invoke([HumanMessage(content=examples_prompt)])
-        examples = str(examples_response).strip()
-        if "```" in examples:
-            examples = examples.split("```", 1)[-1].strip()
-        # Persist examples as MLflow artifact before prompt generation
-        mlflow_logger = get_mlflow_logger()
-        safe_log_call(mlflow_logger, "log_text", examples, "generated_examples.txt")
-        # Select template file for final prompt
-        template_file = template_map.get(prompt_type.value, template_map.get("default"))
-        template = env.get_template(template_file)
-        prompt = template.render(requirement=requirement_body, assignment_description=assignment_description, code="{{ code }}", examples=examples)
-        safe_log_call(get_mlflow_logger(), "log_text", prompt, "final_prompt.txt")
-        logger.info("Invoking LLM for template...")
-        response = self.llm.invoke([HumanMessage(content=prompt)])
-        jinja_template = str(response).strip()
-
-        # Clean up the response if it contains markdown formatting
-        if "```jinja" in jinja_template:
-            jinja_template = jinja_template.split("```jinja", 1)[-1].split("```", 1)[0].strip()
-        elif "```" in jinja_template:
-            jinja_template = jinja_template.split("```", 1)[-1].strip()
-
-        # Ensure the template has the basic structure - be more flexible with validation
-        if "{{ code }}" not in jinja_template and "{{code}}" not in jinja_template:
-            jinja_template = jinja_template.replace("{{ student_code }}", "{{ code }}")
-            jinja_template = jinja_template.replace("{{code}}", "{{ code }}")
-            if "{{ code }}" not in jinja_template:
-                jinja_template += "\n\nCode to analyze:\n{{ code }}"
-
-        logger.info(f"Generated Jinja2 template successfully for type: {prompt_type.value}")
-        return jinja_template
