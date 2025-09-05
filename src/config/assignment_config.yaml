@@ -19,9 +19,9 @@ agents:
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
     # model_name: "deepseek-r1:14b"  # Different model for requirement generation
-    provider: "ollama"   # Different provider for requirement generation
-    temperature: 0.2     # Different temperature for requirement generation
-    template: "requirement_generator.jinja"  # Jinja template for requirement generation
+    # provider: "ollama"   # Different provider for requirement generation
+    # temperature: 0.2     # Different temperature for requirement generation
+    template: "requirement_generator_tags.jinja"  # Jinja template for requirement generation
     max_requirements: 10  # Maximum number of requirements to generate
     
   prompt_generator:

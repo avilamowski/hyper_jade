@@ -1,0 +1,5 @@
+Make a program that receives inputs until the input is empty
+Each input should be a name that only contains alphabetic characters, no numbers, and no symbols
+then, show them sorted alphabetically, print the length frequencies, print the character frequencies
+the analysis should not consider repetitions of names.
+All the results must be shown in function called "show_results".
