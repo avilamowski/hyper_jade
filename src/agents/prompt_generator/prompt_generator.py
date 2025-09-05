@@ -42,10 +42,10 @@ def add_prompts(
         new = []
     return existing + new
 
-
-def keep_first(existing: Any, new: Any) -> Any:
+def keep_last(existing: Any, new: Any) -> Any:
     """Reducer that keeps the first value and discards subsequent ones"""
-    return existing if existing is not None else new
+    # return existing if existing is not None else new
+    return new
 
 
 logger = logging.getLogger(__name__)
@@ -153,9 +153,9 @@ def prompt_generation_node(
 
 class PromptGeneratorState(TypedDict):
     # All fields are Annotated to allow concurrent writes
-    assignment_description: Annotated[str, keep_first]
-    requirements: Annotated[List[str], keep_first]  # List of requirement strings
-
+    assignment_description: Annotated[str, keep_last]
+    requirements: Annotated[List[str], keep_last]  # List of requirement strings
+    
     # Output - use Annotated to allow multiple concurrent writes
     generated_prompts: Annotated[
         List[Dict[str, Any]], add_prompts
