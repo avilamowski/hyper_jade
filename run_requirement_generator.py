@@ -4,6 +4,7 @@ Requirement Generator Agent - Standalone Runner
 
 This script allows running the requirement generator agent independently
 to generate individual requirement files from assignment descriptions.
+Each requirement is saved as a separate JSON file containing structured data.
 """
 
 import sys
@@ -24,7 +25,7 @@ def main():
     """Main entry point for requirement generator"""
     parser = argparse.ArgumentParser(description="Requirement Generator Agent")
     parser.add_argument("--assignment", "-a", required=True, help="Path to assignment description file (.txt)")
-    parser.add_argument("--output-dir", "-o", required=True, help="Output directory for requirement files")
+    parser.add_argument("--output-dir", "-o", required=True, help="Output directory for requirement JSON files")
     parser.add_argument("--config", default="src/config/assignment_config.yaml", help="Configuration file path")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     
@@ -63,23 +64,44 @@ def main():
     # Show the actual output directory that will be created
     model_name = agent_config.get("model_name", "unknown")
     safe_model_name = model_name.replace(":", "_")
-    actual_output_dir = f"{args.output_dir}/{safe_model_name}"
+    actual_output_dir = Path(args.output_dir) / safe_model_name
     print(f"📁 Actual output directory: {actual_output_dir}")
     print("-" * 50)
     
     try:
         start_time = time.time()
         
-        # Generate requirements
-        requirement_files = agent.generate_requirements(
-            assignment_file_path=args.assignment,
-            output_directory=args.output_dir
-        )
+        # Read the assignment description
+        with open(args.assignment, 'r', encoding='utf-8') as f:
+            assignment_description = f.read().strip()
+        
+        # Generate requirements using the LangGraph agent
+        requirements = agent.generate_requirements(assignment_description)
+        
+        # Create output directory
+        actual_output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save each requirement as a separate JSON file
+        requirement_files = []
+        for i, requirement in enumerate(requirements, 1):
+            filename = f"requirement_{i:02d}.json"
+            file_path = actual_output_dir / filename
+            
+            # Convert requirement to a serializable dictionary
+            requirement_data = {
+                "requirement": requirement["requirement"],
+                "function": requirement["function"],
+                "type": requirement["type"].value if hasattr(requirement["type"], 'value') else str(requirement["type"])
+            }
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(requirement_data, f, indent=2, ensure_ascii=False)
+            requirement_files.append(str(file_path))
         
         end_time = time.time()
         
         # Output results
-        print(f"✅ Generated {len(requirement_files)} requirement files")
+        print(f"✅ Generated {len(requirement_files)} requirement JSON files")
         print(f"⏱️  Generation time: {end_time - start_time:.2f} seconds")
         
         # Print summary
@@ -91,7 +113,7 @@ def main():
         print(f"Number of requirements: {len(requirement_files)}")
         print(f"Generation time: {end_time - start_time:.2f} seconds")
         
-        print(f"\n📋 Generated requirement files:")
+        print(f"\n📋 Generated requirement JSON files:")
         for i, file_path in enumerate(requirement_files, 1):
             file_name = Path(file_path).name
             print(f"  {i}. {file_name}")
@@ -103,8 +125,10 @@ def main():
                 print(f"File: {file_path}")
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        print(f"Content preview: {content[:100]}...")
+                        content = json.load(f)
+                        print(f"Requirement: {content.get('requirement', 'N/A')[:100]}...")
+                        print(f"Function: {content.get('function', 'N/A')}")
+                        print(f"Type: {content.get('type', 'N/A')}")
                 except Exception as e:
                     print(f"Error reading file: {e}")
                 print("-" * 30)

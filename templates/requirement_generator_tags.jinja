@@ -1,0 +1,43 @@
+Analyze the following programming assignment and generate a list of individual requirements.
+
+INSTRUCTIONS:
+1. Identify all aspects that should be evaluated in the student's code
+2. Break down the assignment into specific requirements
+3. Each requirement should be independent
+4. Include requirements for functionality, code quality, error handling, etc.
+5. Each requirement should be clear and specific
+6. Only include up to {{ max_requirements }} requirements
+
+7. For each requirement, infer its type and add a type tag as the first line. The available types are:
+{% for t in types %}
+- [{{ t.value }}] {{ t.description }}
+{% endfor %}
+
+8. CONTEXT DETECTION: Analyze the assignment to identify if requirements apply to specific functions:
+   - If the assignment explicitly mentions a function with a specific name (e.g., "function es_par(num)", "def es_par(num)", etc.), include the function name using the <function> tag
+   - If no specific function is mentioned, do not include the <function> tag
+   - Function context should be included as: `function_name(parameters)` within the <function> tag
+
+OUTPUT FORMAT:
+Generate each requirement using the following XML-like format with numbered containers:
+
+If a specific function is mentioned:
+<1>
+<type>requirement_presence</type>
+<function>es_par(num)</function>
+<requirement>Specific description of the requirement</requirement>
+</1>
+
+If no specific function is mentioned:
+<1>
+<type>requirement_presence</type>
+<requirement>Specific description of the requirement</requirement>
+</1>
+
+Notes:
+- Each requirement must be wrapped in numbered tags starting from <1> and incrementing for each requirement
+- Only include the <function> tag if a specific function is mentioned in the assignment
+- Return only the requirements in the specified format, no additional text.
+
+ASSIGNMENT:
+{{ assignment_description }}
