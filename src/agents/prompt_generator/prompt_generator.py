@@ -25,8 +25,9 @@ from src.agents.utils.prompt_types import PromptType
 from langchain_core.messages import HumanMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
+from src.config import get_agent_config
 
 def add_prompts(existing: List[Dict[str, Any]], new: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Custom aggregation function for generated_prompts"""
@@ -40,7 +41,6 @@ def keep_first(existing: Any, new: Any) -> Any:
     """Reducer that keeps the first value and discards subsequent ones"""
     return existing if existing is not None else new
 
-from src.config import get_agent_config
 
 logger = logging.getLogger(__name__)
 
@@ -163,24 +163,6 @@ class PromptGeneratorAgent:
 
     # -------------------------- LangGraph Nodes ------------------------------ #
     
-    def _node_prepare_batch(self, state: PromptGeneratorState) -> PromptGeneratorState:
-        """Prepare batch for parallel processing - initialize state structures"""
-        logger.info("Preparing batch for parallel processing...")
-        
-        # Ensure assignment_description is available (should be pre-loaded by caller)
-        if "assignment_description" not in state or not state["assignment_description"]:
-            # Fallback: use assignment field as description (for backward compatibility)
-            state["assignment_description"] = state.get("assignment", "")
-            logger.warning("assignment_description not provided - using assignment field as fallback")
-        
-        # Initialize generated_prompts list if not present
-        if "generated_prompts" not in state:
-            state["generated_prompts"] = []
-        
-        requirements = state.get("requirements", [])
-        logger.info(f"Prepared batch with {len(requirements)} requirements")
-        
-        return state
 
     def _create_requirement_processor(self, requirement: str, index: int):
         """Create a node function for processing a specific requirement"""
@@ -216,8 +198,8 @@ class PromptGeneratorAgent:
 
     def _create_dynamic_graph(self, requirements: List[str]):
         """Create dynamic graph with nodes for each requirement"""
-        # Create a fresh graph for this batch
-        dynamic_graph = self._build_base_graph()
+        # Create a fresh graph for this batch without the direct edge
+        dynamic_graph = self._build_base_graph(with_direct_edge=False)
         
         # Add a node for each requirement
         for i, requirement in enumerate(requirements):
@@ -226,8 +208,8 @@ class PromptGeneratorAgent:
             
             dynamic_graph.add_node(node_name, node_function)
             
-            # Connect prepare_batch to this requirement node
-            dynamic_graph.add_edge("prepare_batch", node_name)
+            # Connect START to this requirement node
+            dynamic_graph.add_edge(START, node_name)
             
             # Connect this requirement node to collect_results
             dynamic_graph.add_edge(node_name, "collect_results")
@@ -247,19 +229,16 @@ class PromptGeneratorAgent:
 
     # -------------------------- Graph Builder ------------------------------- #
     
-    def _build_base_graph(self):
+    def _build_base_graph(self, with_direct_edge: bool = True):
         """Build the base LangGraph structure without dynamic nodes"""
         graph = StateGraph(PromptGeneratorState)
         
         # Add base nodes
-        graph.add_node("prepare_batch", self._node_prepare_batch)
         graph.add_node("collect_results", self._node_collect_results)
         
-        # Set entry point
-        graph.set_entry_point("prepare_batch")
-        
-        # Add edge from prepare_batch to collect_results (will be modified dynamically)
-        graph.add_edge("prepare_batch", "collect_results")
+        # Only add direct edge if we're not going to have dynamic nodes
+        if with_direct_edge:
+            graph.add_edge(START, "collect_results")
         graph.add_edge("collect_results", END)
         
         return graph
