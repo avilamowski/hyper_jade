@@ -237,16 +237,28 @@ def main():
                 "output_directory": str(prompts_dir)
             }, step_number=2)
             
-            prompt_files = []
+            # Read assignment description once
+            with open(args.assignment, 'r', encoding='utf-8') as f:
+                assignment_description = f.read().strip()
             
+            # Read all requirements at once
+            requirements = []
             for req_file in selected_requirements:
+                with open(req_file, 'r', encoding='utf-8') as f:
+                    requirement_content = f.read().strip()
+                    requirements.append(requirement_content)
+            
+            # Generate all prompts in parallel using batch processing
+            results = prompt_agent.generate_prompts_batch(requirements, assignment_description)
+            
+            # Save all generated templates
+            prompt_files = []
+            for i, result in enumerate(results):
+                req_file = selected_requirements[i]
                 prompt_file = prompts_dir / f"{req_file.stem}.jinja"
-                prompt_path = prompt_agent.generate_prompt(
-                    requirement_file_path=str(req_file),
-                    assignment_file_path=args.assignment,
-                    output_file_path=str(prompt_file)
-                )
-                prompt_files.append(prompt_path)
+                with open(prompt_file, 'w', encoding='utf-8') as f:
+                    f.write(result["jinja_template"])
+                prompt_files.append(prompt_file)
                 print(f"  Generated prompt: {prompt_file.name}")
             
             print(f"✅ Generated {len(prompt_files)} prompt templates")
