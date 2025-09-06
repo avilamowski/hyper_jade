@@ -24,7 +24,7 @@ from langgraph.graph import StateGraph, END
 
 from src.config import get_agent_config
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from src.agents.utils.prompt_types import PromptType
+from src.models import PromptType, Requirement
 from src.agents.utils.text_processors import clean_llm_response_tags
 
 load_dotenv(override=False)
@@ -96,10 +96,6 @@ def parse_requirements_from_xml_tags(
     return requirements
 
 
-class Requirement(TypedDict):
-    requirement: str
-    function: str
-    type: PromptType
 
 
 class RequirementGeneratorState(TypedDict):

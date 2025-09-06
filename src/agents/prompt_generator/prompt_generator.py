@@ -23,7 +23,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from src.agents.requirement_generator.requirement_generator import (
     RequirementGeneratorState,
 )
-from src.agents.utils.prompt_types import PromptType
+from src.models import PromptType, Requirement, GeneratedPrompt
 from langchain_core.messages import HumanMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
@@ -33,8 +33,8 @@ from src.config import get_agent_config
 
 
 def add_prompts(
-    existing: List[Dict[str, Any]], new: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
+    existing: List[GeneratedPrompt], new: List[GeneratedPrompt]
+) -> List[GeneratedPrompt]:
     """Custom aggregation function for generated_prompts"""
     if existing is None:
         existing = []
@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 # --- LangGraph Node: Example Generation ---
-def example_generation_node(requirement: str, agent_config: dict, llm) -> str:
+def example_generation_node(requirement: Requirement, agent_config: dict, llm) -> str:
     """
     Node for generating examples from a requirement.
     Returns the generated examples as a string.
@@ -65,8 +65,11 @@ def example_generation_node(requirement: str, agent_config: dict, llm) -> str:
     examples_template_file = template_map["examples"]
     examples_template = env.get_template(examples_template_file)
     example_quantity = agent_config.get("example_quantity")
+    
+    # Use the requirement text from the Requirement object
+    requirement_text = requirement["requirement"]
     examples_prompt = examples_template.render(
-        requirement=requirement, example_quantity=example_quantity
+        requirement=requirement_text, example_quantity=example_quantity
     )
 
     logger.info("[Node] Invoking LLM for examples...")
@@ -87,7 +90,7 @@ def example_generation_node(requirement: str, agent_config: dict, llm) -> str:
 
 # --- LangGraph Node: Prompt Generation ---
 def prompt_generation_node(
-    requirement: str,
+    requirement: Requirement,
     assignment_description: str,
     examples: str,
     agent_config: dict,
@@ -98,18 +101,9 @@ def prompt_generation_node(
     Returns the generated Jinja2 template as a string.
     """
 
-    # Extract prompt type from requirement (first line)
-    lines = requirement.splitlines()
-    prompt_type = PromptType.PRESENCE
-    requirement_body = requirement
-    if lines:
-        first_line = lines[0].strip()
-        if first_line.startswith("[") and "]" in first_line:
-            type_tag = first_line[1 : first_line.index("]")].strip().lower()
-            prompt_type = PromptType(type_tag)
-            requirement_body = first_line[first_line.index("]") + 1 :] + (
-                "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
-            )
+    # Extract prompt type from the Requirement object
+    prompt_type = requirement["type"]
+    requirement_body = requirement["requirement"]
 
     template_map = agent_config.get("templates", {})
     env = Environment(
@@ -154,11 +148,11 @@ def prompt_generation_node(
 class PromptGeneratorState(TypedDict):
     # All fields are Annotated to allow concurrent writes
     assignment_description: Annotated[str, keep_last]
-    requirements: Annotated[List[str], keep_last]  # List of requirement strings
+    requirements: Annotated[List[Requirement], keep_last]  # List of requirement strings
     
     # Output - use Annotated to allow multiple concurrent writes
     generated_prompts: Annotated[
-        List[Dict[str, Any]], add_prompts
+        List[GeneratedPrompt], add_prompts
     ]  # List of {requirement, template, examples, etc.}
 
 
@@ -188,7 +182,7 @@ class PromptGeneratorAgent:
 
     # -------------------------- LangGraph Nodes ------------------------------ #
 
-    def _create_requirement_processor(self, requirement: str, index: int):
+    def _create_requirement_processor(self, requirement: Requirement, index: int):
         """Create a node function for processing a specific requirement"""
 
         def process_requirement_node(
@@ -197,7 +191,7 @@ class PromptGeneratorAgent:
             """Process a single requirement - generate examples and prompt template"""
             assignment_description = state["assignment_description"]
 
-            logger.info(f"Processing requirement {index + 1}: {requirement[:50]}...")
+            logger.info(f"Processing requirement {index + 1}: {requirement['requirement'][:50]}...")
 
             # Generate examples
             examples = example_generation_node(requirement, self.agent_config, self.llm)
@@ -211,9 +205,9 @@ class PromptGeneratorAgent:
                 self.llm,
             )
 
-            # Store result
-            result = {
-                "requirement": requirement,
+            # Store result with full requirement data
+            result: GeneratedPrompt = {
+                "requirement": requirement,  # Store the full Requirement object
                 "examples": examples,
                 "jinja_template": jinja_template,
                 "index": index,
@@ -227,8 +221,8 @@ class PromptGeneratorAgent:
 
         return process_requirement_node
 
-    def _create_dynamic_graph(self, requirements: List[str]):
-        """Create dynamic graph with nodes for each requirement"""
+    def _create_dynamic_graph(self, requirements: List[Requirement]):
+        """Create dynamic graph with nodes for each requirement, connecting each directly to END"""
         # Create a fresh graph for this batch without the direct edge
         dynamic_graph = self._build_base_graph(with_direct_edge=False)
 
@@ -242,23 +236,13 @@ class PromptGeneratorAgent:
             # Connect START to this requirement node
             dynamic_graph.add_edge(START, node_name)
 
-            # Connect this requirement node to collect_results
-            dynamic_graph.add_edge(node_name, "collect_results")
+            # Connect this requirement node directly to END
+            dynamic_graph.add_edge(node_name, END)
 
         # Compile the graph with all dynamic connections
         self.graph = dynamic_graph.compile()
 
-    def _node_collect_results(
-        self, state: PromptGeneratorState
-    ) -> PromptGeneratorState:
-        """Collect all results and prepare final state"""
-        logger.info(f"Collecting {len(state['generated_prompts'])} generated prompts")
 
-        # Sort results by index to maintain order
-        state["generated_prompts"].sort(key=lambda x: x["index"])
-
-        logger.info("Results collected successfully")
-        return state
 
     # -------------------------- Graph Builder ------------------------------- #
 
@@ -266,13 +250,9 @@ class PromptGeneratorAgent:
         """Build the base LangGraph structure without dynamic nodes"""
         graph = StateGraph(PromptGeneratorState)
 
-        # Add base nodes
-        graph.add_node("collect_results", self._node_collect_results)
-
         # Only add direct edge if we're not going to have dynamic nodes
         if with_direct_edge:
-            graph.add_edge(START, "collect_results")
-        graph.add_edge("collect_results", END)
+            graph.add_edge(START, END)
 
         return graph
 
@@ -284,36 +264,32 @@ class PromptGeneratorAgent:
     # -------------------------- Public API ---------------------------------- #
 
     def generate_prompt(
-        self, requirement: str, assignment_description: str
-    ) -> Dict[str, Any]:
+        self, requirement: Requirement, assignment_description: str
+    ) -> GeneratedPrompt:
         """
         Generate a single prompt from requirement and assignment content.
         Returns a dictionary with the generated template and examples.
 
         Args:
-            requirement: The requirement text (already read from file)
+            requirement: The Requirement object with requirement, function, and type fields
             assignment_description: The assignment description text (already read from file)
         """
-        logger.info("Generating prompt from content")
+        logger.info("Generating prompt from Requirement object")
 
         # For single requirement, use batch processing with one item
         results = self.generate_prompts_batch([requirement], assignment_description)
 
-        return {
-            "requirement": results[0]["requirement"],
-            "examples": results[0]["examples"],
-            "jinja_template": results[0]["jinja_template"],
-        }
+        return results[0]
 
     def generate_prompts_batch(
-        self, requirements: List[str], assignment_description: str
-    ) -> List[Dict[str, Any]]:
+        self, requirements: List[Requirement], assignment_description: str
+    ) -> List[GeneratedPrompt]:
         """
         Generate multiple prompts in parallel from a list of requirements.
         Returns a list of dictionaries with generated templates and examples.
 
         Args:
-            requirements: List of requirement texts (already read from files)
+            requirements: List of Requirement objects
             assignment_description: The assignment description text (already read from file)
         """
         logger.info(
@@ -333,17 +309,11 @@ class PromptGeneratorAgent:
         # Run the graph with dynamic nodes
         result_state = self.graph.invoke(state)
 
-        # Extract results in order
-        results = []
-        for result in result_state["generated_prompts"]:
-            results.append(
-                {
-                    "requirement": result["requirement"],
-                    "examples": result["examples"],
-                    "jinja_template": result["jinja_template"],
-                    "index": result["index"],
-                }
-            )
+        # Extract results and sort by index to maintain order
+        results: List[GeneratedPrompt] = sorted(
+            result_state["generated_prompts"], 
+            key=lambda x: x["index"]
+        )
 
         logger.info(f"Generated {len(results)} prompts in parallel")
         return results
@@ -362,11 +332,15 @@ class PromptGeneratorAgent:
         """
         logger.info("Generating prompts from rubric")
 
-        # Convert rubric items to requirement strings
-        requirements = []
+        # Convert rubric items to Requirement objects
+        requirements: List[Requirement] = []
         for item in rubric.items:
-            # Create a requirement string from the rubric item
-            requirement = f"[{item.id}] {item.title}\n{item.description}"
+            # Create a Requirement object from the rubric item
+            requirement: Requirement = {
+                "requirement": f"{item.title}\n{item.description}",
+                "function": "",  # No specific function mentioned in rubric
+                "type": PromptType.REQUIREMENT_PRESENCE  # Default type for rubric items
+            }
             requirements.append(requirement)
 
         # Use batch processing to generate prompts
