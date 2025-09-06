@@ -1,6 +1,5 @@
-
+from typing import List, TypedDict, Annotated
 from enum import Enum
-
 
 class PromptType(Enum):
 	PRESENCE = ("presence", "Checks if something that must be present in the code is implemented.")
@@ -13,3 +12,17 @@ class PromptType(Enum):
 		obj._value_ = value
 		obj.description = description
 		return obj
+
+
+class Requirement(TypedDict):
+    requirement: str
+    function: str
+    type: PromptType
+
+
+class GeneratedPrompt(TypedDict):
+    requirement: Requirement
+    examples: str
+    jinja_template: str
+    index: int
+

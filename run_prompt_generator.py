@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.config import get_agent_config, load_config, load_langsmith_config
+from src.models import Requirement, PromptType
 
 # Import MLflow logger lazily to avoid circular imports
 def get_mlflow_logger():
@@ -40,6 +41,25 @@ def safe_log_call(logger_instance, method_name, *args, **kwargs):
         except Exception as e:
             logging.warning(f"Failed to call {method_name}: {e}")
 
+def load_requirement_from_json(json_file_path: str) -> Requirement:
+    """Load a requirement from a JSON file and convert it to a Requirement object"""
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Convert the type string to PromptType enum
+        prompt_type = PromptType(data["type"]) if isinstance(data["type"], str) else data["type"]
+        
+        requirement: Requirement = {
+            "requirement": data["requirement"],
+            "function": data["function"],
+            "type": prompt_type
+        }
+        
+        return requirement
+    except Exception as e:
+        raise ValueError(f"Error loading requirement from {json_file_path}: {e}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -51,7 +71,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Main entry point for prompt generator"""
     parser = argparse.ArgumentParser(description="Prompt Generator Agent")
-    parser.add_argument("--requirement", "-r", nargs="+", required=True, help="Path(s) to requirement file(s) (.txt)")
+    parser.add_argument("--requirement", "-r", nargs="+", required=True, help="Path(s) to requirement file(s) (.json)")
     parser.add_argument("--assignment", "-a", required=True, help="Path to assignment description file (.txt)")
     parser.add_argument("--output", "-o", help="Output path for Jinja2 template (.jinja) - required for single requirement")
     parser.add_argument("--output-dir", help="Output directory for multiple templates - required for multiple requirements")
@@ -135,16 +155,20 @@ def main():
         logger.info("Reading input files...")
         requirements = []
         for req_file in args.requirement:
-            with open(req_file, 'r', encoding='utf-8') as f:
-                requirement_content = f.read().strip()
-                requirements.append(requirement_content)
+            requirement = load_requirement_from_json(req_file)
+            requirements.append(requirement)
         
         with open(args.assignment, 'r', encoding='utf-8') as f:
             assignment_description = f.read().strip()
         
         # Log input files as artifacts
-        for i, req_content in enumerate(requirements):
-            safe_log_call(mlflow_logger, "log_text", req_content, f"input_requirement_{i+1}.txt")
+        for i, requirement in enumerate(requirements):
+            req_json = json.dumps({
+                "requirement": requirement["requirement"],
+                "function": requirement["function"], 
+                "type": requirement["type"].value
+            }, indent=2)
+            safe_log_call(mlflow_logger, "log_text", req_json, f"input_requirement_{i+1}.json")
         safe_log_call(mlflow_logger, "log_text", assignment_description, "input_assignment.txt")
         safe_log_call(mlflow_logger, "log_trace_step", "read_inputs", {
             "requirement_files": args.requirement,
@@ -169,50 +193,83 @@ def main():
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(jinja_template)
             
-            # Log the generated template
+            # Save the state as JSON (excluding jinja_template)
+            state_output_path = output_path.with_suffix('.json')
+            state_data = {
+                "requirement": {
+                    "requirement": result["requirement"]["requirement"],
+                    "function": result["requirement"]["function"],
+                    "type": result["requirement"]["type"].value
+                },
+                "examples": result["examples"],
+                "index": result["index"]
+            }
+            with open(state_output_path, 'w', encoding='utf-8') as f:
+                json.dump(state_data, f, indent=2, ensure_ascii=False)
+            
+            # Log the generated template and state
             prompt_name = output_path.stem
             safe_log_call(mlflow_logger, "log_text", jinja_template, f"generated_templates/{output_path.name}")
+            safe_log_call(mlflow_logger, "log_text", json.dumps(state_data, indent=2), f"generated_states/{state_output_path.name}")
             safe_log_call(mlflow_logger, "log_prompt_metrics", jinja_template, prompt_name)
             
-            output_files = [output_path]
+            output_files = [output_path, state_output_path]
         else:
             logger.info(f"Generating {num_requirements} Jinja2 templates in parallel using core logic...")
             results = agent.generate_prompts_batch(requirements, assignment_description)
-            
-            # Save all templates
+            print(results)
+            # Save all templates and states
             output_files = []
             output_dir = Path(args.output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             
             for i, result in enumerate(results):
-                # Save the template
-                output_path = output_dir / f"prompt_{i+1:02d}.jinja"
-                with open(output_path, 'w', encoding='utf-8') as f:
+                # Save the Jinja template
+                template_output_path = output_dir / f"prompt_{i+1:02d}.jinja"
+                with open(template_output_path, 'w', encoding='utf-8') as f:
                     f.write(result["jinja_template"])
-                output_files.append(output_path)
+                output_files.append(template_output_path)
                 
-                # Log the examples and template
+                # Save the state as JSON (excluding jinja_template)
+                state_output_path = output_dir / f"prompt_{i+1:02d}.json"
+                state_data = {
+                    "requirement": {
+                        "requirement": result["requirement"]["requirement"],
+                        "function": result["requirement"]["function"],
+                        "type": result["requirement"]["type"].value
+                    },
+                    "examples": result["examples"],
+                    "index": result["index"]
+                }
+                with open(state_output_path, 'w', encoding='utf-8') as f:
+                    json.dump(state_data, f, indent=2, ensure_ascii=False)
+                output_files.append(state_output_path)
+                
+                # Log the examples, template, and state
                 safe_log_call(mlflow_logger, "log_text", result["examples"], f"generated_examples_{i+1}.txt")
-                safe_log_call(mlflow_logger, "log_text", result["jinja_template"], f"generated_templates/{output_path.name}")
+                safe_log_call(mlflow_logger, "log_text", result["jinja_template"], f"generated_templates/{template_output_path.name}")
+                safe_log_call(mlflow_logger, "log_text", json.dumps(state_data, indent=2), f"generated_states/{state_output_path.name}")
                 safe_log_call(mlflow_logger, "log_prompt_metrics", result["jinja_template"], f"prompt_{i+1}")
                 
-                print(f"  Generated prompt: {output_path.name}")
+                print(f"  Generated prompt: {template_output_path.name} & {state_output_path.name}")
         
         end_time = time.time()
         total_time = end_time - start_time
         
         # Log final metrics
+        actual_templates_generated = num_requirements  # Use the actual number of requirements processed
         safe_log_call(mlflow_logger, "log_metrics", {
             "total_generation_time_seconds": total_time,
-            "template_generation_rate": len(output_files) / total_time if total_time > 0 else 0,
-            "num_templates_generated": len(output_files)
+            "template_generation_rate": actual_templates_generated / total_time if total_time > 0 else 0,
+            "num_templates_generated": actual_templates_generated
         })
         
         # Output results
         if num_requirements == 1:
             print(f"✅ Generated Jinja2 template: {output_files[0]}")
+            print(f"✅ Generated state JSON: {output_files[1]}")
         else:
-            print(f"✅ Generated {len(output_files)} Jinja2 templates in parallel")
+            print(f"✅ Generated {actual_templates_generated} Jinja2 templates and state files in parallel")
         print(f"⏱️  Generation time: {total_time:.2f} seconds")
         
         # Print summary
@@ -222,9 +279,10 @@ def main():
         print(f"Assignment file: {args.assignment}")
         if num_requirements == 1:
             print(f"Output template: {output_files[0]}")
+            print(f"Output state: {output_files[1]}")
         else:
             print(f"Output directory: {args.output_dir}")
-            print(f"Generated templates: {len(output_files)}")
+            print(f"Generated template pairs: {num_requirements}")
         print(f"Generation time: {total_time:.2f} seconds")
         
         if args.verbose and num_requirements == 1:
