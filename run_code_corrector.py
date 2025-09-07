@@ -112,7 +112,7 @@ def main():
     parser.add_argument("--output", "-o", help="Output JSON file path for single correction")
     parser.add_argument("--output-dir", help="Output directory for multiple corrections")
     parser.add_argument("--config", default="src/config/assignment_config.yaml", help="Configuration file path")
-    parser.add_argument("--assignment", "-a", help="Assignment description (optional)")
+    parser.add_argument("--assignment", "-a", help="Path to assignment description file (.txt) (optional)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     
     args = parser.parse_args()
@@ -158,6 +158,11 @@ def main():
         print(f"Error: Code file not found: {args.code}")
         sys.exit(1)
     
+    # Check if assignment file exists (if provided)
+    if args.assignment and not os.path.exists(args.assignment):
+        print(f"Error: Assignment file not found: {args.assignment}")
+        sys.exit(1)
+    
     # Initialize agent
     try:
         agent = CodeCorrectorAgent(config)
@@ -190,12 +195,18 @@ def main():
     else:
         print(f"📁 Output directory: {args.output_dir}")
     if args.assignment:
-        print(f"📝 Assignment description: {args.assignment}")
+        print(f"📝 Assignment: {args.assignment}")
     print("-" * 50)
     
 
     try:
         start_time = time.time()
+        
+        # Read assignment description from file if provided
+        assignment_description = ""
+        if args.assignment:
+            with open(args.assignment, 'r', encoding='utf-8') as f:
+                assignment_description = f.read().strip()
         
         # Read input files
         logger.info("Reading input files...")
@@ -228,6 +239,8 @@ def main():
             safe_log_call(mlflow_logger, "log_text", prompt_json, f"input_prompt_{i+1}.json")
             safe_log_call(mlflow_logger, "log_text", generated_prompt["jinja_template"], f"input_template_{i+1}.jinja")
         safe_log_call(mlflow_logger, "log_text", student_code, "input_code.py")
+        if assignment_description:
+            safe_log_call(mlflow_logger, "log_text", assignment_description, "input_assignment.txt")
         safe_log_call(mlflow_logger, "log_trace_step", "read_inputs", {
             "prompt_files": args.prompt,
             "code_file": args.code,
@@ -238,13 +251,14 @@ def main():
         # Generate corrections using the core logic
         if num_prompts == 1:
             logger.info("Generating single correction using core logic...")
-            correction = agent.correct_code(generated_prompts[0], submission, args.assignment or "")
+            correction = agent.correct_code(generated_prompts[0], submission, assignment_description)
             
             # Save the correction
             metadata = {
                 "prompt_file": args.prompt[0],
                 "code_file": args.code,
-                "assignment_description": args.assignment or ""
+                "assignment_file": args.assignment or "",
+                "assignment_description": assignment_description
             }
             save_corrections_state([correction], args.output, metadata)
             
@@ -262,7 +276,7 @@ def main():
             output_files = [args.output]
         else:
             logger.info(f"Generating {num_prompts} corrections in parallel using core logic...")
-            corrections = agent.correct_code_batch(generated_prompts, submission, args.assignment or "")
+            corrections = agent.correct_code_batch(generated_prompts, submission, assignment_description)
             
             # Save all corrections
             output_files = []
@@ -276,7 +290,8 @@ def main():
                 metadata = {
                     "prompt_file": args.prompt[i],
                     "code_file": args.code,
-                    "assignment_description": args.assignment or ""
+                    "assignment_file": args.assignment or "",
+                    "assignment_description": assignment_description
                 }
                 save_corrections_state([correction], str(individual_output_path), metadata)
                 output_files.append(individual_output_path)
@@ -300,7 +315,8 @@ def main():
                 "prompt_files": args.prompt,
                 "code_file": args.code,
                 "num_corrections": len(corrections),
-                "assignment_description": args.assignment or ""
+                "assignment_file": args.assignment or "",
+                "assignment_description": assignment_description
             }
             save_corrections_state(corrections, str(combined_output_path), combined_metadata)
             output_files.append(combined_output_path)
