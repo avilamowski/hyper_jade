@@ -1,1 +1,8 @@
-from models.models import PromptType, Requirement, GeneratedPrompt, Submission, Correction
+from .models import (
+    PromptType,
+    Requirement,
+    GeneratedPrompt,
+    Submission,
+    Correction,
+    GroupedCode,
+)
