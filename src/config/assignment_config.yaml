@@ -48,6 +48,14 @@ agents:
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
     # model_name: "gpt-4-turbo"  # Different model for code correction
+    
+  group_functions:
+    enabled: true
+    # Agent-specific model configuration (optional)
+    # Uncomment and modify these lines to use a different model for this agent
+    # model_name: "gpt-4"  # Different model for function grouping
+    # provider: "openai"   # Different provider for function grouping
+    # temperature: 0.1     # Different temperature for function grouping
     # provider: "openai"         # Different provider for code correction
     # temperature: 0.05          # Different temperature for code correction
 
