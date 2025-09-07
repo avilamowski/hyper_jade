@@ -25,4 +25,11 @@ class GeneratedPrompt(TypedDict):
     examples: str
     jinja_template: str
     index: int
+    
 
+class Submission(TypedDict):
+	code: str
+
+class Correction(TypedDict):
+	requirement: Requirement
+	result: str

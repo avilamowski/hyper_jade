@@ -1,1 +1,1 @@
-from models.models import PromptType, Requirement, GeneratedPrompt
+from models.models import PromptType, Requirement, GeneratedPrompt, Submission, Correction

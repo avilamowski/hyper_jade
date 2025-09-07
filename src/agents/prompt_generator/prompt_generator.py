@@ -30,23 +30,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
 from src.config import get_agent_config
-
-
-def add_prompts(
-    existing: List[GeneratedPrompt], new: List[GeneratedPrompt]
-) -> List[GeneratedPrompt]:
-    """Custom aggregation function for generated_prompts"""
-    if existing is None:
-        existing = []
-    if new is None:
-        new = []
-    return existing + new
-
-def keep_last(existing: Any, new: Any) -> Any:
-    """Reducer that keeps the first value and discards subsequent ones"""
-    # return existing if existing is not None else new
-    return new
-
+from src.agents.utils.reducers import keep_last, concat
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +136,7 @@ class PromptGeneratorState(TypedDict):
     
     # Output - use Annotated to allow multiple concurrent writes
     generated_prompts: Annotated[
-        List[GeneratedPrompt], add_prompts
+        List[GeneratedPrompt], concat
     ]  # List of {requirement, template, examples, etc.}
 
 
