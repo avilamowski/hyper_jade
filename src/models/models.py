@@ -1,24 +1,20 @@
 from typing import List, TypedDict, Annotated
 from enum import Enum
-
-
 class PromptType(Enum):
-    PRESENCE = (
-        "presence",
-        "Checks if something that must be present in the code is implemented.",
-    )
-    CONCEPTUAL = (
-        "conceptual",
-        "Checks if a conceptual understanding or pattern is present in the code.",
-    )
-    REQUIREMENT_PRESENCE = (
-        "requirement_presence",
-        "Checks if a specific requirement is implemented in the code.",
-    )
-    ERROR_PRESENCE = (
-        "error_presence",
-        "Checks if a forbidden or erroneous pattern is present in the code.",
-    )
+    CONCEPTUAL = ("conceptual", "Checks if a conceptual understanding or pattern is present in the code.")
+    """
+    Checks if a conceptual understanding or pattern is present in the code, returning a rationale for the answer.
+    """
+    REQUIREMENT_PRESENCE = ("requirement_presence", "Checks if a specific requirement is implemented in the code.")
+    """ 
+    Identifies if a specific requirement is implemented in the code.
+    If is implemented, returns the lines of code that implement the requirement.
+    """
+    ERROR_PRESENCE = ("error_presence", "Checks if a forbidden or erroneous pattern is present in the code.")
+    """ 
+    Identifies if a specific error is present in the code.
+    If is implemented, returns the lines of code that implement the requirement.
+    """
 
     def __new__(cls, value, description):
         obj = object.__new__(cls)

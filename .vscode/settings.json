@@ -1,3 +1,9 @@
 {
-    "workbench.editor.enablePreview": false
+    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "./.venv/lib/python3.13/site-packages:${env:PYTHONPATH}"
+    },
+    "python.envFile": "${workspaceFolder}/.env"
 }

@@ -3,7 +3,8 @@
 Prompt Generator Agent - Standalone Runner
 
 This script allows running the prompt generator agent independently
-to generate Jinja2 template prompts from individual requirement files.
+to generate Jinja2 template prompts from requirement files.
+It handles both single and multiple requirements using the same unified approach.
 """
 
 import sys
@@ -73,8 +74,7 @@ def main():
     parser = argparse.ArgumentParser(description="Prompt Generator Agent")
     parser.add_argument("--requirement", "-r", nargs="+", required=True, help="Path(s) to requirement file(s) (.json)")
     parser.add_argument("--assignment", "-a", required=True, help="Path to assignment description file (.txt)")
-    parser.add_argument("--output", "-o", help="Output path for Jinja2 template (.jinja) - required for single requirement")
-    parser.add_argument("--output-dir", help="Output directory for multiple templates - required for multiple requirements")
+    parser.add_argument("--output-dir", required=True, help="Output directory for generated templates")
     parser.add_argument("--config", default="src/config/assignment_config.yaml", help="Configuration file path")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     
@@ -93,17 +93,8 @@ def main():
     print(f"🔧 Provider: {agent_config.get('provider', 'Unknown')}")
     print("-" * 50)
     
-    # Validate arguments based on number of requirements
+    # Get number of requirements
     num_requirements = len(args.requirement)
-    
-    if num_requirements == 1:
-        if not args.output:
-            print("Error: --output is required when processing a single requirement")
-            sys.exit(1)
-    else:
-        if not args.output_dir:
-            print("Error: --output-dir is required when processing multiple requirements")
-            sys.exit(1)
     
     # Check if files exist
     for req_file in args.requirement:
@@ -125,7 +116,7 @@ def main():
     # Start MLflow run for prompt generation
     mlflow_logger = get_mlflow_logger()
     requirement_files_str = ", ".join([Path(req).name for req in args.requirement])
-    output_info = Path(args.output).name if args.output else f"{num_requirements}_files"
+    output_info = f"{num_requirements}_files"
     
     safe_log_call(mlflow_logger, "start_run",
         run_name="prompt_generation",
@@ -142,10 +133,7 @@ def main():
     print("🚀 Starting prompt generation...")
     print(f"📋 Requirements: {', '.join([Path(req).name for req in args.requirement])}")
     print(f"📝 Assignment: {args.assignment}")
-    if args.output:
-        print(f"📄 Output: {args.output}")
-    else:
-        print(f"📁 Output directory: {args.output_dir}")
+    print(f"📁 Output directory: {args.output_dir}")
     print("-" * 50)
     
     try:
@@ -177,24 +165,24 @@ def main():
             "assignment_length": len(assignment_description)
         }, step_number=0)
         
-        # Generate Jinja2 template prompts using the core logic
-        if num_requirements == 1:
-            logger.info("Generating single Jinja2 template using core logic...")
-            result = agent.generate_prompt(requirements[0], assignment_description)
-            jinja_template = result["jinja_template"]
-            examples = result["examples"]
-            
-            # Log the examples that were generated (for debugging)
-            safe_log_call(mlflow_logger, "log_text", examples, "generated_examples.txt")
-            
-            # Save the template
-            output_path = Path(args.output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(jinja_template)
+        # Generate Jinja2 template prompts using the core logic (always use batch method)
+        logger.info(f"Generating {num_requirements} Jinja2 template(s) using batch method...")
+        results = agent.generate_prompts_batch(requirements, assignment_description)
+        
+        # Save all templates and states
+        output_files = []
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        for i, result in enumerate(results):
+            # Save the Jinja template
+            template_output_path = output_dir / f"prompt_{i+1:02d}.jinja"
+            with open(template_output_path, 'w', encoding='utf-8') as f:
+                f.write(result["jinja_template"])
+            output_files.append(template_output_path)
             
             # Save the state as JSON (excluding jinja_template)
-            state_output_path = output_path.with_suffix('.json')
+            state_output_path = output_dir / f"prompt_{i+1:02d}.json"
             state_data = {
                 "requirement": {
                     "requirement": result["requirement"]["requirement"],
@@ -206,52 +194,15 @@ def main():
             }
             with open(state_output_path, 'w', encoding='utf-8') as f:
                 json.dump(state_data, f, indent=2, ensure_ascii=False)
+            output_files.append(state_output_path)
             
-            # Log the generated template and state
-            prompt_name = output_path.stem
-            safe_log_call(mlflow_logger, "log_text", jinja_template, f"generated_templates/{output_path.name}")
+            # Log the examples, template, and state
+            safe_log_call(mlflow_logger, "log_text", result["examples"], f"generated_examples_{i+1}.txt")
+            safe_log_call(mlflow_logger, "log_text", result["jinja_template"], f"generated_templates/{template_output_path.name}")
             safe_log_call(mlflow_logger, "log_text", json.dumps(state_data, indent=2), f"generated_states/{state_output_path.name}")
-            safe_log_call(mlflow_logger, "log_prompt_metrics", jinja_template, prompt_name)
+            safe_log_call(mlflow_logger, "log_prompt_metrics", result["jinja_template"], f"prompt_{i+1}")
             
-            output_files = [output_path, state_output_path]
-        else:
-            logger.info(f"Generating {num_requirements} Jinja2 templates in parallel using core logic...")
-            results = agent.generate_prompts_batch(requirements, assignment_description)
-            print(results)
-            # Save all templates and states
-            output_files = []
-            output_dir = Path(args.output_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            for i, result in enumerate(results):
-                # Save the Jinja template
-                template_output_path = output_dir / f"prompt_{i+1:02d}.jinja"
-                with open(template_output_path, 'w', encoding='utf-8') as f:
-                    f.write(result["jinja_template"])
-                output_files.append(template_output_path)
-                
-                # Save the state as JSON (excluding jinja_template)
-                state_output_path = output_dir / f"prompt_{i+1:02d}.json"
-                state_data = {
-                    "requirement": {
-                        "requirement": result["requirement"]["requirement"],
-                        "function": result["requirement"]["function"],
-                        "type": result["requirement"]["type"].value
-                    },
-                    "examples": result["examples"],
-                    "index": result["index"]
-                }
-                with open(state_output_path, 'w', encoding='utf-8') as f:
-                    json.dump(state_data, f, indent=2, ensure_ascii=False)
-                output_files.append(state_output_path)
-                
-                # Log the examples, template, and state
-                safe_log_call(mlflow_logger, "log_text", result["examples"], f"generated_examples_{i+1}.txt")
-                safe_log_call(mlflow_logger, "log_text", result["jinja_template"], f"generated_templates/{template_output_path.name}")
-                safe_log_call(mlflow_logger, "log_text", json.dumps(state_data, indent=2), f"generated_states/{state_output_path.name}")
-                safe_log_call(mlflow_logger, "log_prompt_metrics", result["jinja_template"], f"prompt_{i+1}")
-                
-                print(f"  Generated prompt: {template_output_path.name} & {state_output_path.name}")
+            print(f"  Generated prompt: {template_output_path.name} & {state_output_path.name}")
         
         end_time = time.time()
         total_time = end_time - start_time
@@ -265,11 +216,7 @@ def main():
         })
         
         # Output results
-        if num_requirements == 1:
-            print(f"✅ Generated Jinja2 template: {output_files[0]}")
-            print(f"✅ Generated state JSON: {output_files[1]}")
-        else:
-            print(f"✅ Generated {actual_templates_generated} Jinja2 templates and state files in parallel")
+        print(f"✅ Generated {actual_templates_generated} Jinja2 template(s) and state file(s)")
         print(f"⏱️  Generation time: {total_time:.2f} seconds")
         
         # Print summary
@@ -277,12 +224,8 @@ def main():
         print("=" * 50)
         print(f"Requirement files: {', '.join([Path(req).name for req in args.requirement])}")
         print(f"Assignment file: {args.assignment}")
-        if num_requirements == 1:
-            print(f"Output template: {output_files[0]}")
-            print(f"Output state: {output_files[1]}")
-        else:
-            print(f"Output directory: {args.output_dir}")
-            print(f"Generated template pairs: {num_requirements}")
+        print(f"Output directory: {args.output_dir}")
+        print(f"Generated template pairs: {num_requirements}")
         print(f"Generation time: {total_time:.2f} seconds")
         
         if args.verbose and num_requirements == 1:
@@ -290,9 +233,9 @@ def main():
             print("=" * 50)
             print("Template content:")
             print("-" * 30)
-            print(jinja_template)
+            print(results[0]["jinja_template"])
             print("-" * 30)
-            print(f"Template size: {len(jinja_template)} characters")
+            print(f"Template size: {len(results[0]['jinja_template'])} characters")
         
     except Exception as e:
         # Log error metrics

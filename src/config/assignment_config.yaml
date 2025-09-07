@@ -2,8 +2,10 @@
 # This system coordinates three specialized agents for automated code evaluation
 
 # Global LLM Configuration (used as fallback if agent-specific config is not provided)
-model_name: "gpt-oss:latest"  # Default model for all agents
-provider: "ollama"
+# model_name: "gpt-oss:latest"  # Default model for all agents
+# provider: "ollama"
+model_name: "gpt-4o-mini"
+provider: "openai"
 temperature: 0.1
 
 # RAG Configuration
@@ -34,11 +36,10 @@ agents:
     example_quantity: 3
     templates:
       examples: "examples.jinja"
-      default: "prompt_generators/presence.jinja"
-      # presence: "prompt_generators/presence.jinja"
-      requirement_presence: "prompt_generators/requirement_presence2.jinja"
-      # error_presence: "prompt_generators/error_presence.jinja"
-      # conceptual: "prompt_generators/conceptual.jinja"
+      default: "prompt_generators/requirement_presence.jinja"
+      requirement_presence: "prompt_generators/requirement_presence.jinja"
+      error_presence: "prompt_generators/error_presence.jinja"
+      conceptual: "prompt_generators/conceptual.jinja"
     
   code_corrector:
     enabled: true

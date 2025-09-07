@@ -6,7 +6,7 @@ Your task is to create a prompt for the *Analyzer* using the format Jinja2 templ
 So you can add jinja variables using \{\{ <variable_name> \}\} that you want.
 In principle, there should always be a variable called `code` that will contain the student code to analyze, preferably at the end of the template.
 
-You can also instruct *The Analyzer* to return specific results using tags with XML notation, like <RESULT>YES</RESULT> or <RESULT>NO</RESULT>, or <LINES>354-366</LINES>.
+You can also instruct *The Analyzer* to return specific results using tags with XML notation, like <LINES>354-366</LINES> or <LINES>12,15,23</LINES>.
 
 The error *The Analyzer* will analyze is the following:
 ERROR:
@@ -25,21 +25,22 @@ PROMPT STRUCTURE:
 *The Analyzer* is a static code analyzer.
 
 *The Analyzer*'s Task:
-- *The Analyzer* should determine if the code contains the forbidden behavior: [You should describe what must be avoided based on the error]
+- *The Analyzer* should identify the specific lines where the forbidden behavior occurs: [You should describe what must be located based on the error]
 
 Definition:
-- [You should define what constitutes valid/invalid code for this error]
+- [You should define what constitutes the forbidden behavior and what lines should be identified]
 
 {{ examples }}
 
 *The Analyzer* Instructions:
-- *The Analyzer* should Return YES if the code contains the forbidden behavior.
-- *The Analyzer* should Return NO otherwise.
+- *The Analyzer* should identify the exact line numbers where the forbidden behavior occurs.
+- *The Analyzer* should return the line numbers in the specified format.
 
 *The Analyzer* should write the output with this output format (strict and exact):
-<RESULT>YES</RESULT>
+<LINES>X-Y</LINES>
 or
-<RESULT>NO</RESULT>
+<LINES>X,Y,Z</LINES>
+(where X, Y, Z are line numbers)
 
 Code to analyze:
 \{\{ code \}\}
@@ -50,7 +51,8 @@ IMPORTANT:
 - You should use "\{\{ code \}\}" (with double braces) for the Jinja2 variable
 - The template will be filled with student code later
 - You should focus on the specific error given
-- You must provide clear examples of what passes and what fails
+- You must provide clear examples of what lines should be identified
+- The code will have line numbers at the beginning of each line
 
 Generate only the template, no explanations or additional text.
 Example:
@@ -60,43 +62,40 @@ PROMPT STRUCTURE:
 *The Analyzer* is a static code analyzer.
 
 *The Analyzer*'s Task:
-- *The Analyzer* should determine if the code contains the forbidden behavior: infinite loops that can cause the program to hang indefinitely.
+- *The Analyzer* should identify the specific lines where the forbidden behavior occurs: infinite loops that can cause the program to hang indefinitely.
 
 Definition:
-- Invalid code contains infinite loops where the loop condition never becomes false, causing the program to run forever. Valid code has proper loop termination conditions or uses break statements to exit loops.
+- The forbidden behavior occurs where the code contains loops that will never terminate, either due to missing loop conditions or variables that are never updated.
 
-Examples that should return <RESULT>YES</RESULT>:
-Example 1:
-    while True:
-        print("Hello")
-        # No break or condition to exit
-        
-Example 2:
-    i = 0
-    while i < 10:
-        print(i)
-        # i is never incremented, so condition never becomes false
+Example that should return <LINES>2-4</LINES>:
+    1: while True:
+    2:     print("Hello")
+    3:     # No break or condition to exit
+    4:     continue
 
-Examples that should return <RESULT>NO</RESULT>:
-Example 1:
-    while True:
-        print("Hello")
-        break
-        
-Example 2:
-    i = 0
-    while i < 10:
-        print(i)
-        i += 1
+Example that should return <LINES>3-6</LINES>:
+    1: i = 0
+    2: while i < 10:
+    3:     print(i)
+    4:     # i is never incremented, so condition never becomes false
+    5:     if i == 5:
+    6:         print("Halfway")
+
+Example that should return <LINES>1-3</LINES>:
+    1: for i in range(10):
+    2:     while True:
+    3:         print("Infinite")
+    4:     print("This never executes")
 
 *The Analyzer* Instructions:
-- *The Analyzer* should Return YES if the code contains the forbidden behavior.
-- *The Analyzer* should Return NO otherwise.
+- *The Analyzer* should identify the exact line numbers where the forbidden behavior occurs.
+- *The Analyzer* should return the line numbers in the specified format.
 
 *The Analyzer* should write the output with this Output format (strict and exact):
-<RESULT>YES</RESULT>
+<LINES>X-Y</LINES>
 or
-<RESULT>NO</RESULT>
+<LINES>X,Y,Z</LINES>
+(where X, Y, Z are line numbers)
 
 Code to analyze:
 \{\{ code \}\}

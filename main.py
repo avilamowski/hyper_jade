@@ -22,6 +22,7 @@ from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.core.mlflow_utils import mlflow_logger
 from src.config import get_agent_config, load_config, load_langsmith_config
+from src.models import PromptType, Submission
 
 def main():
     """Main entry point"""
@@ -41,7 +42,7 @@ def main():
     parser.add_argument("--only-requirements", action="store_true", help="Only generate requirements and exit")
     parser.add_argument("--only-prompts", action="store_true", help="Only generate prompts and exit")
     parser.add_argument("--only-analysis", action="store_true", help="Only run code analysis and exit")
-    parser.add_argument("--requirement-index", type=int, help="Work only with the requirement at this index (0-based)")
+    parser.add_argument("--requirement-index", type=int, action="append", help="Work only with the requirement at this index (0-based). Can be used multiple times to select multiple requirements.")
     parser.add_argument("--requirement-name", help="Work only with the requirement with this specific name")
     parser.add_argument("--generate-examples", action="store_true", help="Generate examples for requirements")
     parser.add_argument("--single-requirement-pipeline", type=int, help="Execute complete pipeline for single requirement: generate requirements, take requirement at index, generate prompt, and run analysis")
@@ -137,7 +138,10 @@ def main():
     print(f"📁 Output directory: {output_dir}")
     print(f"🎯 Execution mode: {execution_mode}")
     if args.requirement_index is not None:
-        print(f"🎯 Working with requirement index: {args.requirement_index}")
+        if len(args.requirement_index) == 1:
+            print(f"🎯 Working with requirement index: {args.requirement_index[0]}")
+        else:
+            print(f"🎯 Working with requirement indices: {', '.join(map(str, args.requirement_index))}")
     if args.requirement_name:
         print(f"🎯 Working with requirement: {args.requirement_name}")
     print("-" * 50)
@@ -161,10 +165,29 @@ def main():
                 "output_directory": str(requirements_dir)
             }, step_number=1)
             
-            requirement_files = requirement_agent.generate_requirements(
-                assignment_file_path=args.assignment,
-                output_directory=str(requirements_dir)
-            )
+            # Read the assignment description
+            with open(args.assignment, 'r', encoding='utf-8') as f:
+                assignment_description = f.read().strip()
+            
+            # Generate requirements using the agent
+            requirements = requirement_agent.generate_requirements(assignment_description)
+            
+            # Save each requirement as a separate JSON file
+            requirement_files = []
+            for i, requirement in enumerate(requirements, 1):
+                filename = f"requirement_{i:02d}.json"
+                file_path = requirements_dir / filename
+                
+                # Convert requirement to a serializable dictionary
+                requirement_data = {
+                    "requirement": requirement["requirement"],
+                    "function": requirement["function"],
+                    "type": requirement["type"].value if hasattr(requirement["type"], 'value') else str(requirement["type"])
+                }
+                
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(requirement_data, f, indent=2, ensure_ascii=False)
+                requirement_files.append(str(file_path))
             print(f"✅ Generated {len(requirement_files)} requirement files")
             
             # Generate examples if requested
@@ -174,7 +197,7 @@ def main():
                 examples_dir.mkdir(exist_ok=True)
                 
                 # Get the list of requirement files that were just generated (search recursively)
-                requirement_files_list = list(requirements_dir.rglob("*.txt"))
+                requirement_files_list = list(requirements_dir.rglob("*.json"))
                 
                 for req_file in requirement_files_list:
                     example_file = examples_dir / f"example_{req_file.stem}.txt"
@@ -194,7 +217,7 @@ def main():
             return
         
         # Get list of requirement files (search recursively in subdirectories)
-        requirement_files = list(requirements_dir.rglob("*.txt"))
+        requirement_files = list(requirements_dir.rglob("*.json"))
         if not requirement_files:
             print("❌ No requirement files found!")
             print(f"   Searched in: {requirements_dir}")
@@ -203,9 +226,18 @@ def main():
         
         # Filter requirements if specific index or name is requested
         if args.requirement_index is not None or args.requirement_name or args.single_requirement_pipeline is not None:
-            target_index = args.requirement_index if args.requirement_index is not None else args.single_requirement_pipeline
-            
-            if target_index is not None:
+            if args.requirement_index is not None:
+                # Handle multiple requirement indices
+                selected_requirements = []
+                for target_index in args.requirement_index:
+                    if target_index >= len(requirement_files):
+                        print(f"❌ Requirement index {target_index} out of range. Only {len(requirement_files)} requirements exist.")
+                        return
+                    selected_requirements.append(requirement_files[target_index])
+                    print(f"🎯 Working with requirement {target_index}: {requirement_files[target_index].name}")
+            elif args.single_requirement_pipeline is not None:
+                # Handle single requirement pipeline mode
+                target_index = args.single_requirement_pipeline
                 if target_index >= len(requirement_files):
                     print(f"❌ Requirement index {target_index} out of range. Only {len(requirement_files)} requirements exist.")
                     return
@@ -245,8 +277,19 @@ def main():
             requirements = []
             for req_file in selected_requirements:
                 with open(req_file, 'r', encoding='utf-8') as f:
-                    requirement_content = f.read().strip()
-                    requirements.append(requirement_content)
+                    requirement_data = json.load(f)
+                    # Convert type string back to PromptType enum
+                    type_str = requirement_data["type"]
+                    # Find the matching PromptType enum by value
+                    prompt_type = None
+                    for pt in PromptType:
+                        if pt.value == type_str:
+                            prompt_type = pt
+                            break
+                    if prompt_type is None:
+                        raise ValueError(f"Unknown prompt type: {type_str}")
+                    requirement_data["type"] = prompt_type
+                    requirements.append(requirement_data)
             
             # Generate all prompts in parallel using batch processing
             results = prompt_agent.generate_prompts_batch(requirements, assignment_description)
@@ -292,18 +335,39 @@ def main():
             "output_directory": str(analysis_dir)
         }, step_number=3)
         
-        analysis_files = []
+        # Read student code
+        with open(args.code, 'r', encoding='utf-8') as f:
+            student_code = f.read().strip()
         
-        for prompt_file in prompt_files:
-            analysis_file = analysis_dir / f"analysis_{prompt_file.stem}.txt"
-            analysis = code_agent.analyze_code(
-                prompt_template_path=str(prompt_file),
-                code_file_path=args.code,
-                output_file_path=str(analysis_file),
-                additional_context=args.context
-            )
+        # Create submission object
+        submission: Submission = {"code": student_code}
+        
+        # Load generated prompts from the results we created earlier
+        generated_prompts = []
+        for i, result in enumerate(results):
+            generated_prompt = {
+                "requirement": requirements[i],
+                "examples": result["examples"],
+                "jinja_template": result["jinja_template"],
+                "index": i
+            }
+            generated_prompts.append(generated_prompt)
+        
+        # Generate corrections using batch processing
+        corrections = code_agent.correct_code_batch(
+            generated_prompts, 
+            submission, 
+            assignment_description
+        )
+        
+        # Save analysis results
+        analysis_files = []
+        for i, correction in enumerate(corrections):
+            analysis_file = analysis_dir / f"analysis_{prompt_files[i].stem}.txt"
+            with open(analysis_file, 'w', encoding='utf-8') as f:
+                f.write(correction["result"])
             analysis_files.append(str(analysis_file))
-            print(f"  Analyzed with {prompt_file.name}")
+            print(f"  Analyzed with {prompt_files[i].name}")
         
         end_time = time.time()
         total_pipeline_time = end_time - start_time
