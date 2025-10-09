@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not add the updated stock to past sales.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

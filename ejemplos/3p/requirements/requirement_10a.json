@@ -1,0 +1,5 @@
+{
+  "requirement": "Code has bad indentation.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not validate that the quantity parameter is a positive integer.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

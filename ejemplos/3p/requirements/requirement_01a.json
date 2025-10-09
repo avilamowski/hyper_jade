@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not receive the path parameter.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

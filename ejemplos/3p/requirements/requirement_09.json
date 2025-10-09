@@ -1,0 +1,5 @@
+{
+  "requirement": "Execution errors. Use of functions/structures/data types not seen in class.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

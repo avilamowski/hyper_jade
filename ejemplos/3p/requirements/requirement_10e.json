@@ -1,0 +1,5 @@
+{
+  "requirement": "Code is delivered outside the requested function.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

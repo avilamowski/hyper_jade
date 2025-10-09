@@ -1,0 +1,5 @@
+{
+  "requirement": "Code uses undefined variables.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not correctly update the file with new data.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

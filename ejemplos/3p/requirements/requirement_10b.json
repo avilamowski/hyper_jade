@@ -1,0 +1,5 @@
+{
+  "requirement": "Code contains infinite loops.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

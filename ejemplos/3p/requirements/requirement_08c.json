@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not correctly save the file after modifications.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

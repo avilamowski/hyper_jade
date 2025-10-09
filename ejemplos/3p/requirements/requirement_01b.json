@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not receive the quantity parameter.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

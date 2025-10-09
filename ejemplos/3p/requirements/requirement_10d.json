@@ -1,0 +1,5 @@
+{
+  "requirement": "Code has poor modularization.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

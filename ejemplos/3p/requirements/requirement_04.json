@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not correctly read the file and load it into lists.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

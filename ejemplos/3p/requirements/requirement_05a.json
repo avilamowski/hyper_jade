@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not generate the requested number of sales.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

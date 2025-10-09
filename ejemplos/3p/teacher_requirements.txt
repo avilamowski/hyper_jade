@@ -1,10 +1,10 @@
-- [requirement_presence] Requirement 1: Does not receive the path or quantity as a parameter (or receives the path but does not use it).
-- [conceptual] Requirement 2: Does not validate that the parameter is a positive integer.
-- [conceptual] Requirement 3: Does not correctly load into lists the products 1000-1009 with stock 100.
-- [conceptual] Requirement 4: Does not correctly read the file and load it into lists.
-- [conceptual] Requirement 5: Does not generate the requested number of sales or the number per sale (1-5 units).
-- [conceptual] Requirement 6: Does not correctly subtract the sale from the stock.
-- [conceptual] Requirement 7: Does not add the updated stock to past sales.
-- [conceptual] Requirement 8: Does not correctly save/update/create the file.
-- [conceptual] Requirement 9: Execution errors. Use of functions/structures/data types not seen in class.
-- [conceptual] Requirement 10: Bad indentation, infinite loop, undefined variables, poor modularization, code delivered outside the requested function.
+- Requirement 1: Does not receive the path or quantity as a parameter (or receives the path but does not use it).
+- Requirement 2: Does not validate that the parameter is a positive integer.
+- Requirement 3: Does not correctly load into lists the products 1000-1009 with stock 100.
+- Requirement 4: Does not correctly read the file and load it into lists.
+- Requirement 5: Does not generate the requested number of sales or the number per sale (1-5 units).
+- Requirement 6: Does not correctly subtract the sale from the stock.
+- Requirement 7: Does not add the updated stock to past sales.
+- Requirement 8: Does not correctly save/update/create the file.
+- Requirement 9: Execution errors. Use of functions/structures/data types not seen in class.
+- Requirement 10: Bad indentation, infinite loop, undefined variables, poor modularization, code delivered outside the requested function.

@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not correctly subtract the sale from the stock.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}
