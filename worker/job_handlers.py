@@ -203,6 +203,7 @@ class JobHandlers:
             # Fetch requirements and prompt_templates
             requirements = []
             generated_prompts = []
+            requirement_mapping = {}  # Map requirement content to requirement_id for correct ordering
             for req_id in requirement_ids:
                 req = self.api_client.get_requirement(assignment_id, req_id)
                 requirements.append(req)
@@ -223,6 +224,10 @@ class JobHandlers:
                         if pt.value == req_dict["type"]:
                             req_dict["type"] = pt
                             break
+                
+                # Store the mapping from requirement content to requirement_id
+                requirement_mapping[req.requirement] = req_id
+                
                 generated_prompt = {
                     "requirement": req_dict,
                     "examples": "",  # Not used in correction
@@ -240,10 +245,28 @@ class JobHandlers:
             agent = CodeCorrectorAgent(config)
             # Run correction agent
             corrections = agent.correct_code_batch(generated_prompts, submission, assignment_description)
+            
+            # Map corrections back to correct requirement_ids using requirement content
+            logger.info(f"📊 Mapping {len(corrections)} corrections to correct requirement IDs")
             created_count = 0
-            for i, correction in enumerate(corrections):
+            processed_requirements = set()  # Track which requirements we've processed
+            
+            for correction in corrections:
                 try:
-                    req_id = requirement_ids[i]
+                    # Find the correct requirement_id by matching the requirement content
+                    requirement_content = correction["requirement"]["requirement"]
+                    req_id = requirement_mapping.get(requirement_content)
+                    
+                    if not req_id:
+                        logger.error(f"❌ Could not find requirement_id for requirement: {requirement_content[:50]}...")
+                        continue
+                    
+                    if req_id in processed_requirements:
+                        logger.warning(f"⚠️ Duplicate correction for requirement {req_id}, skipping")
+                        continue
+                    
+                    processed_requirements.add(req_id)
+                    
                     correction_create = CorrectionCreate(
                         requirement_id=req_id,
                         result=correction["result"]
@@ -252,12 +275,19 @@ class JobHandlers:
                     created_count += 1
                     logger.info(f"📝 Created correction for requirement {req_id}: {created_corr.correction_id}")
                 except Exception as e:
-                    logger.error(f"❌ Failed to create correction for requirement {requirement_ids[i]}: {e}")
+                    logger.error(f"❌ Failed to create correction for requirement: {e}")
+            
+            # Log any missing corrections
+            expected_req_ids = set(requirement_mapping.values())
+            missing_req_ids = expected_req_ids - processed_requirements
+            if missing_req_ids:
+                logger.warning(f"⚠️ Missing corrections for requirements: {missing_req_ids}")
+            
             result = {
                 "message": f"Created {created_count} corrections for submission {submission_id}",
                 "submission_id": submission_id,
                 "assignment_id": assignment_id,
-                "requirement_ids": requirement_ids,
+                "requirement_ids": list(processed_requirements),  # Return actually processed requirement IDs
                 "job_type": "create_correction",
                 "count": created_count
             }
