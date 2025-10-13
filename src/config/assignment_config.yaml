@@ -38,7 +38,7 @@ agents:
       examples: "examples.jinja"
       default: "prompt_generators/requirement_presence.jinja"
       requirement_presence: "prompt_generators/requirement_presence.jinja"
-      error_presence: "prompt_generators/error_presence.jinja"
+      error_presence: "prompt_generators/error_explain.jinja"
       conceptual: "prompt_generators/conceptual.jinja"
     
   code_corrector:
@@ -64,8 +64,8 @@ agents:
   agent_evaluator:
     enabled: false
     # Agent-specific model configuration for the evaluator
-    model_name: "deepseek-r1:14b"  # Model for evaluation (should be high quality)
-    provider: "ollama"         # Provider for evaluation
+    # model_name: "deepseek-r1:14b"  # Model for evaluation (should be high quality)
+    # provider: "ollama"         # Provider for evaluation
     temperature: 0.1           # Low temperature for consistent evaluation
     enable_teacher_comparison: true  # Enable comparison with teacher examples
     teacher_comparison_criteria:
