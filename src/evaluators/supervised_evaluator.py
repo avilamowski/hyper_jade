@@ -26,13 +26,29 @@ class SupervisedEvaluator:
         self.evaluator_config = get_agent_config(self.config, "agent_evaluator")
         
         # Hardcoded criteria for supervised evaluation
+        # Canonical metric keys (new names). Values are weights used in averaging.
         self.criteria = {
             "completeness": 1.0,
-            "trigger_happy": 1.0,
-            "false_positives": 1.0,
+            "restraint": 1.0,  # renamed from trigger_happy
+            "precision": 1.0,  # renamed from false_positives
             "content_similarity": 1.0,
-            "internal_content_correctness": 1.0,
-            "external_content_correctness": 1.0
+            "internal_correctness": 1.0,
+            "external_correctness": 1.0
+        }
+
+        # Acceptable synonyms for backwards-compatibility when parsing evaluator outputs
+        # Map synonyms (old names or alternate spellings) to canonical keys
+        self._synonym_map = {
+            "trigger_happy": "restraint",
+            "restraint": "restraint",
+            "false_positives": "precision",
+            "precision": "precision",
+            "internal_content_correctness": "internal_correctness",
+            "internal_correctness": "internal_correctness",
+            "external_content_correctness": "external_correctness",
+            "external_correctness": "external_correctness",
+            "content_similarity": "content_similarity",
+            "completeness": "completeness",
         }
         
         # Allow passing an existing LLM instance so tracing context is shared
@@ -82,6 +98,37 @@ class SupervisedEvaluator:
         result_text = correction["result"]
         
         return f"Requirement: {requirement_text}\nFunction: {function_name}\nFeedback: {result_text}"
+
+    def _extract_result_text(self, raw_response) -> str:
+        """Return only the useful text from an LLM response.
+
+        Prefer the content field or typical OpenAI-like shapes. If the
+        response contains an XML-like <RESULT>...</RESULT> tag, return its
+        inner text. Otherwise return the stripped text.
+        """
+        import re
+
+        if hasattr(raw_response, 'content'):
+            text = raw_response.content
+        elif isinstance(raw_response, dict):
+            # openai-style dict: choices -> [ { message: { content } } ]
+            choices = raw_response.get('choices')
+            if choices and isinstance(choices, list) and len(choices) > 0:
+                first = choices[0]
+                # try several common locations
+                text = (first.get('message', {}) or {}).get('content') or first.get('text') or str(raw_response)
+            else:
+                text = raw_response.get('text') or str(raw_response)
+        else:
+            text = str(raw_response)
+
+        # If the model wrapped the result inside <RESULT> tags, extract it
+        m = re.search(r"<RESULT>(.*?)</RESULT>", text, flags=re.DOTALL | re.IGNORECASE)
+        if m:
+            # return the full RESULT block so the parser can detect the wrapper
+            return m.group(0).strip()
+
+        return text.strip()
     
     def _render_evaluation_prompt(self, generated_text: str, reference_text: str, submission_code: str) -> tuple[str, str]:
         rendered = self.template.render(
@@ -99,33 +146,108 @@ class SupervisedEvaluator:
     def _parse_evaluation_response(self, response_text: str) -> Dict[str, Any]:
         scores = {}
         explanations = {}
+        # First, try to extract a machine-readable XML <RESULT> block if present
+        import re
+        from xml.etree import ElementTree
+
+        m = re.search(r"<RESULT>(.*?)</RESULT>", response_text, flags=re.DOTALL | re.IGNORECASE)
+        if m:
+            xml_text = m.group(1)
+            try:
+                # Wrap with a root for safe parsing if needed
+                root = ElementTree.fromstring(f"<root>{xml_text}</root>")
+                for child in root:
+                    # handle namespaces: use localname
+                    tag = (child.tag.split('}')[-1]).strip().lower().replace(' ', '_')
+
+                    # Try to find nested <SCORE> and <EXPLANATION> children (case-insensitive)
+                    score_text = None
+                    explanation_text = None
+                    for sub in list(child):
+                        subtag = (sub.tag.split('}')[-1]).strip().lower()
+                        if subtag == 'score' and sub.text:
+                            score_text = sub.text.strip()
+                        elif subtag == 'explanation' and sub.text:
+                            explanation_text = sub.text.strip()
+
+                    # If no nested children, fall back to direct text content (legacy flat format)
+                    if score_text is None:
+                        if child.text and child.text.strip():
+                            score_text = child.text.strip()
+
+                    if score_text is not None:
+                        try:
+                            val = float(score_text)
+                        except ValueError:
+                            # not a numeric score, skip
+                            continue
+
+                        # map tag to canonical name if synonym present
+                        canonical = self._synonym_map.get(tag, tag)
+
+                        # Do not accept an overall_score from the LLM; it will be computed programmatically
+                        if canonical == 'overall_score':
+                            continue
+
+                        if canonical in self.criteria:
+                            scores[canonical] = val
+                            if explanation_text:
+                                explanations[canonical] = explanation_text
+
+                # If we found XML scores, return early (explanations may be present)
+                if scores:
+                    return {"scores": scores, "explanations": explanations}
+            except ElementTree.ParseError:
+                # fall back to line parsing below
+                pass
+
         lines = response_text.strip().split('\n')
         
         for line in lines:
             line = line.strip()
-            if ':' in line and any(criterion in line.lower() for criterion in self.criteria.keys()):
-                parts = line.split(':', 1)
-                if len(parts) == 2:
-                    key_part = parts[0].strip().lower().replace(' ', '_')
-                    value_part = parts[1].strip()
-                    
-                    score_str = value_part
-                    explanation = ""
-                    
-                    if ' - ' in value_part:
-                        score_str, explanation = value_part.split(' - ', 1)
-                        explanation = explanation.strip()
-                    
-                    try:
-                        score = float(score_str.strip())
-                        for criterion in self.criteria.keys():
-                            if criterion in key_part or key_part in criterion:
-                                scores[criterion] = score
-                                if explanation:
-                                    explanations[criterion] = explanation
-                                break
-                    except ValueError:
-                        continue
+            if ':' not in line:
+                continue
+
+            parts = line.split(':', 1)
+            if len(parts) != 2:
+                continue
+
+            raw_key = parts[0].strip().lower()
+            # normalize key text (replace spaces/hyphens with underscore)
+            key_part = raw_key.replace('-', ' ').replace('  ', ' ').strip().replace(' ', '_')
+            value_part = parts[1].strip()
+
+            score_str = value_part
+            explanation = ""
+            if ' - ' in value_part:
+                score_str, explanation = value_part.split(' - ', 1)
+                explanation = explanation.strip()
+
+            # Resolve the canonical criterion name from synonyms map
+            canonical = None
+            for syn, canon in self._synonym_map.items():
+                if syn in key_part or key_part in syn:
+                    canonical = canon
+                    break
+
+            if canonical is None:
+                # try direct presence of canonical names
+                for criterion in self.criteria.keys():
+                    if criterion in key_part or key_part in criterion:
+                        canonical = criterion
+                        break
+
+            if canonical is None:
+                # unknown metric; skip
+                continue
+
+            try:
+                score = float(score_str.strip())
+                scores[canonical] = score
+                if explanation:
+                    explanations[canonical] = explanation
+            except ValueError:
+                continue
         
         return {"scores": scores, "explanations": explanations}
 
@@ -221,11 +343,9 @@ class SupervisedEvaluator:
         response = self.llm.invoke(messages)
         evaluation_time = time.time() - start_time
         
-        if hasattr(response, 'content'):
-            response_content = response.content
-        else:
-            response_content = str(response)
-        
+        # Keep only the textual content of the LLM response (no telemetry)
+        response_content = self._extract_result_text(response)
+
         parsed_result = self._parse_evaluation_response(response_content)
         scores = parsed_result["scores"]
         explanations = parsed_result["explanations"]
@@ -244,6 +364,7 @@ class SupervisedEvaluator:
             "evaluation_time": evaluation_time,
             "generated_text_length": len(generated_text),
             "reference_text_length": len(reference_correction),
+            # raw_response contains only the extracted textual result
             "raw_response": response_content
         }
 
@@ -271,10 +392,18 @@ def evaluate_supervised_correction(inputs: Dict[str, str], outputs: Dict[str, st
         result = evaluator._evaluate_single_correction([mock_correction], reference_correction, submission)
         
         langsmith_results = []
-        for criterion, score in result.get("scores", {}).items():
-            explanation = result.get("explanations", {}).get(criterion, f"Evaluated {criterion.replace('_', ' ')} aspect")
+        # Normalize output keys to canonical metric names using evaluator's synonym map
+        for raw_criterion, score in result.get("scores", {}).items():
+            criterion_key = raw_criterion
+            # If evaluator exposes synonym map, use it; otherwise fall back to raw key
+            try:
+                canonical = evaluator._synonym_map.get(raw_criterion, raw_criterion)
+            except Exception:
+                canonical = raw_criterion
+
+            explanation = result.get("explanations", {}).get(raw_criterion, result.get("explanations", {}).get(canonical, f"Evaluated {canonical.replace('_', ' ')} aspect"))
             langsmith_results.append({
-                "key": criterion,
+                "key": canonical,
                 "score": float(score),
                 "max_score": 5.0,
                 "rationale": explanation

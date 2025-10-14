@@ -86,13 +86,29 @@ class CodeCorrectorAgent:
         return re.sub(r"```[a-zA-Z]*\n|```", "", text).strip()
 
     def _call_llm(self, rendered_prompt: str) -> str:
+        def _extract_text(raw):
+            # Prefer .content
+            if hasattr(raw, "content"):
+                return raw.content
+            # dict-like OpenAI shape
+            if isinstance(raw, dict):
+                choices = raw.get("choices")
+                if choices and isinstance(choices, list) and len(choices) > 0:
+                    first = choices[0]
+                    return (first.get("message", {}) or {}).get("content") or first.get("text") or str(raw)
+                return raw.get("text") or str(raw)
+            # fallback to str
+            return str(raw)
+
         try:
             if isinstance(self.llm, ChatOpenAI):
                 resp = self.llm.invoke([HumanMessage(content=rendered_prompt)])
-                out = getattr(resp, "content", str(resp))
+                out_text = _extract_text(resp)
             else:
-                out = self.llm.invoke(rendered_prompt)
-            return self._strip_code_fences(str(out))
+                resp = self.llm.invoke(rendered_prompt)
+                out_text = _extract_text(resp)
+
+            return self._strip_code_fences(out_text)
         except Exception as e:
             raise RuntimeError(f"LLM invocation failed: {e}")
 

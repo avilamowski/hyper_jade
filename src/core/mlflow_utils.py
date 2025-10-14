@@ -54,24 +54,40 @@ class MLflowLogger:
     
     def start_run(self, run_name: str, tags: Optional[Dict[str, str]] = None) -> str:
         """Start a new MLflow run and return the run ID"""
+        mlflow.start_run(run_name=run_name)
+        if tags:
+            mlflow.set_tags(tags)
+        run_id = mlflow.active_run().info.run_id
+        logger.info(f"Started MLflow run: {run_name} (ID: {run_id})")
+        return run_id
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def run(self, run_name: str, tags: Optional[Dict[str, str]] = None):
+        """Context manager that starts and ends an MLflow run.
+
+        Usage:
+            with mlflow_logger.run('name', tags=...):
+                ...
+        """
+        run_id = None
         try:
-            mlflow.start_run(run_name=run_name)
-            if tags:
-                mlflow.set_tags(tags)
-            run_id = mlflow.active_run().info.run_id
-            logger.info(f"Started MLflow run: {run_name} (ID: {run_id})")
-            return run_id
+            run_id = self.start_run(run_name=run_name, tags=tags)
+            yield run_id
         except Exception as e:
-            logger.warning(f"Could not start MLflow run: {e}")
-            return None
+            logger.exception(f"MLflow run '{run_name}' failed: {e}")
+            raise
+        finally:
+            try:
+                self.end_run()
+            except Exception:
+                pass
     
     def end_run(self):
         """End the current MLflow run"""
-        try:
-            mlflow.end_run()
-            logger.info("Ended MLflow run")
-        except Exception as e:
-            logger.warning(f"Could not end MLflow run: {e}")
+        mlflow.end_run()
+        logger.info("Ended MLflow run")
     
     def log_metric(self, key: str, value: float, step: Optional[int] = None):
         """Log a metric to MLflow"""

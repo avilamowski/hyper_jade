@@ -1,24 +1,5 @@
 #!/usr/bin/env python3
-"""
-Supervised Evaluator - Top-level orchestrator
-
-This script coordinates the supervised evaluation pipeline:
-1. Generates prompts from requirements using PromptGeneratorAgent
-2. Builds evaluation dataset from submissions and reference corrections
-3. Generates corrections using CodeCorrectorAgent
-4. Evaluates generated corrections against reference corrections using SupervisedEvaluator
-
-Receives:
-- assignment txt
-- requirement jsons
-- submissions list of .py files
-- reference correction list of .txt files
-- output path for results
-
-Outputs:
-- corrections json
-- evaluation of corrections json
-"""
+"""Supervised evaluator runner."""
 
 import sys
 import os
@@ -30,7 +11,6 @@ import mlflow
 from pathlib import Path
 from typing import List, Dict, Any
 
-# Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
@@ -41,18 +21,16 @@ from src.core.mlflow_utils import mlflow_logger
 from src.models import Requirement, GeneratedPrompt, Submission, Correction, PromptType
 from src.agents.utils.composite_llm import CompositeLLM
 
-# Import LangSmith tracing utilities
+# LangSmith tracing: optional, provide no-op fallbacks when not installed
 try:
     from langsmith import trace, traceable
     LANGSMITH_AVAILABLE = True
-except ImportError:
+except Exception:
     LANGSMITH_AVAILABLE = False
-    # Define no-op decorators and context managers
     def traceable(name: str = None, run_type: str = None):
         def decorator(func):
             return func
         return decorator
-    
     class NoOpContext:
         def __enter__(self):
             return self
@@ -60,7 +38,6 @@ except ImportError:
             pass
         def add_tags(self, tags):
             pass
-    
     def trace(name: str = None, run_type: str = None):
         return NoOpContext()
 
@@ -75,7 +52,6 @@ logger = logging.getLogger(__name__)
 
 @traceable(name="generate_prompts", run_type="chain")
 def generate_prompts_traced(prompt_generator: PromptGeneratorAgent, requirements: List[Requirement], assignment_text: str) -> List[GeneratedPrompt]:
-    """Generate prompts with LangSmith tracing"""
     return prompt_generator.generate_prompts_batch(requirements, assignment_text)
 
 
@@ -90,18 +66,13 @@ def process_submission_traced(
     assignment_text: str,
     submission_index: int
 ) -> tuple[List[Correction], Dict[str, Any]]:
-    """Process a single submission with both correction and evaluation in one LangSmith trace"""
-    
-    # Create a context that groups both operations
+    # Group correction and evaluation in one LangSmith trace
     with trace(name=f"submission_{submission_index+1}_processing", run_type="chain") as run_context:
         run_context.add_tags([f"submission_index:{submission_index}", "correction_and_evaluation"])
         
-        # Generate corrections for this submission
         with trace(name="generate_corrections", run_type="llm") as correction_context:
             correction_context.add_tags(["code_correction", f"prompts_count:{len(generated_prompts)}"])
             submission_corrections = code_corrector.correct_code_batch(generated_prompts, submission, assignment_text)
-        
-        # Evaluate the corrections for this submission
         with trace(name="evaluate_corrections", run_type="llm") as evaluation_context:
             evaluation_context.add_tags(["evaluation", f"corrections_count:{len(submission_corrections)}"])
             evaluation_results = supervised_evaluator.evaluate_corrections(
@@ -116,68 +87,38 @@ def process_submission_traced(
 
 def load_assignment(assignment_path: str) -> str:
     """Load assignment description from file"""
-    try:
-        with open(assignment_path, 'r', encoding='utf-8') as f:
-            return f.read().strip()
-    except Exception as e:
-        raise RuntimeError(f"Failed to load assignment from {assignment_path}: {e}")
+    with open(assignment_path, 'r', encoding='utf-8') as f:
+        return f.read().strip()
 
 
 def load_requirements(requirement_paths: List[str]) -> List[Requirement]:
-    """Load requirements from JSON files"""
     requirements = []
     for req_path in requirement_paths:
-        try:
-            with open(req_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            # Convert type string to PromptType enum
-            prompt_type = PromptType(data["type"]) if isinstance(data["type"], str) else data["type"]
-            
-            requirement: Requirement = {
-                "requirement": data["requirement"],
-                "function": data["function"],
-                "type": prompt_type
-            }
-            requirements.append(requirement)
-        except Exception as e:
-            logger.error(f"Failed to load requirement from {req_path}: {e}")
-            continue
-    
+        with open(req_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        prompt_type = PromptType(data["type"]) if isinstance(data.get("type"), str) else data.get("type")
+        requirements.append({
+            "requirement": data["requirement"],
+            "function": data["function"],
+            "type": prompt_type
+        })
     return requirements
 
 
 def load_submissions(submission_paths: List[str]) -> List[Submission]:
-    """Load student submissions from Python files"""
     submissions = []
     for sub_path in submission_paths:
-        try:
-            with open(sub_path, 'r', encoding='utf-8') as f:
-                code = f.read()
-            
-            submission: Submission = {
-                "code": code
-            }
-            submissions.append(submission)
-        except Exception as e:
-            logger.error(f"Failed to load submission from {sub_path}: {e}")
-            continue
-    
+        with open(sub_path, 'r', encoding='utf-8') as f:
+            code = f.read()
+        submissions.append({"code": code})
     return submissions
 
 
 def load_reference_corrections(correction_paths: List[str]) -> List[str]:
-    """Load reference corrections from text files"""
     corrections = []
     for corr_path in correction_paths:
-        try:
-            with open(corr_path, 'r', encoding='utf-8') as f:
-                correction = f.read().strip()
-            corrections.append(correction)
-        except Exception as e:
-            logger.error(f"Failed to load reference correction from {corr_path}: {e}")
-            continue
-    
+        with open(corr_path, 'r', encoding='utf-8') as f:
+            corrections.append(f.read().strip())
     return corrections
 
 
@@ -260,15 +201,14 @@ This will:
         sys.exit(1)
     load_langsmith_config()
     
-    # Log LangSmith tracing status
+    # LangSmith configuration: warn but don't fail to preserve existing callers
     if LANGSMITH_AVAILABLE:
-        langsmith_project = os.environ.get("LANGSMITH_PROJECT")
-        if langsmith_project:
-            logger.info(f"🔗 LangSmith tracing enabled for project: {langsmith_project}")
+        if not os.environ.get("LANGSMITH_API_KEY") or not os.environ.get("LANGSMITH_PROJECT"):
+            logger.warning("LangSmith available but not fully configured; traces may be incomplete")
         else:
-            logger.info("🔗 LangSmith available but no project configured")
+            logger.info(f"🔗 LangSmith tracing enabled for project: {os.environ.get('LANGSMITH_PROJECT')}")
     else:
-        logger.info("⚠️  LangSmith not available - traces will not be created")
+        logger.info("LangSmith library not installed; running without LangSmith tracing")
     
     # Create output directory
     output_dir = Path(args.output_dir)
@@ -301,88 +241,41 @@ This will:
         prompt_generator = PromptGeneratorAgent(config)
         code_corrector = CodeCorrectorAgent(config)
 
-        # Build a composite LLM routing map from agent configs. This allows the
-        # runner to use different providers per stage while presenting a single
-        # top-level object if desired. We keep changes confined to the runner
-        # by replacing the `.llm` attribute on the agents after construction.
-        try:
-            prompt_cfg = get_agent_config(config, 'prompt_generator')
-            corrector_cfg = get_agent_config(config, 'code_corrector')
-            evaluator_cfg = get_agent_config(config, 'agent_evaluator')
+        # Build composite LLM from agent configs
+        composite = CompositeLLM.from_agent_configs({
+            'prompt_generation': get_agent_config(config, 'prompt_generator'),
+            'code_correction': get_agent_config(config, 'code_corrector'),
+            'evaluation': get_agent_config(config, 'agent_evaluator'),
+        })
 
-            mapping = {
-                'prompt_generation': prompt_cfg,
-                'code_correction': corrector_cfg,
-                'evaluation': evaluator_cfg,
-            }
+        # Create shared bound object
+        shared = composite.get_shared_bound()
+        prompt_generator.llm = shared
+        code_corrector.llm = shared
+        supervised_evaluator = SupervisedEvaluator(config, llm=shared)
 
-            composite = CompositeLLM.from_agent_configs(mapping)
-
-            # Create one shared bound object so all stages use the same Python
-            # object (useful to keep tracing under one wrapper). The runner
-            # will set shared.stage before calling each agent.
-            shared = composite.get_shared_bound()
-
-            # Assign the same shared object to agents. We'll set `shared.stage`
-            # prior to each invocation to route to the correct backend.
-            prompt_generator.llm = shared
-            code_corrector.llm = shared
-
-            # Evaluator we create with the same shared object as well so
-            # evaluation calls remain in the same wrapper/tracing context.
-            supervised_evaluator = SupervisedEvaluator(config, llm=shared)
-        except Exception as e:
-            logger.warning(f"CompositeLLM not fully configured or failed to init: {e}. Falling back to default agent LLMs.")
-            # Fall back to original behavior: share the code_corrector's LLM instance
-            supervised_evaluator = SupervisedEvaluator(config, llm=code_corrector.llm)
         
         # Step 1: Generate prompts for all requirements
         logger.info("Step 1: Generating prompts (one dedicated MLflow run)...")
-        try:
-            mlflow_logger.start_run(run_name="prompt_generation", tags={
-                "agent": "prompt_generator",
-                "phase": "prompt_generation",
-                "assignment_file": Path(args.assignment).name
-            })
-
-            # Ensure shared LLM routes to prompt generation backend
-            try:
-                shared.stage = 'prompt_generation'
-            except Exception:
-                pass
-
-            # Use the traced function for prompt generation
+        with mlflow_logger.run(run_name="prompt_generation", tags={
+            "agent": "prompt_generator",
+            "phase": "prompt_generation",
+            "assignment_file": Path(args.assignment).name
+        }):
+            shared.stage = 'prompt_generation'
             generated_prompts = generate_prompts_traced(prompt_generator, requirements, assignment_text)
             logger.info(f"✓ Generated {len(generated_prompts)} prompts")
 
-        except Exception as e:
-            logger.exception(f"Prompt generation failed: {e}")
-            raise
-        finally:
-            mlflow_logger.end_run()
-        
-        # Step 2: For each submission: generate corrections and evaluate within the same LangSmith trace
         logger.info("Step 2: Processing submissions with unified LangSmith traces...")
         all_evals = []
         for i, submission in enumerate(submissions):
-            submission_name = f"submission_{i+1}"
-            try:
-                # start a run per submission
-                current_run_id = mlflow_logger.start_run(run_name=f"supervised_evaluation_{i+1}", tags={
-                    "agent": "supervised_evaluator",
-                    "submission_index": str(i),
-                    "assignment_file": Path(args.assignment).name
-                })
-
+            with mlflow_logger.run(run_name=f"supervised_evaluation_{i+1}", tags={
+                "agent": "supervised_evaluator",
+                "submission_index": str(i),
+                "assignment_file": Path(args.assignment).name
+            }):
                 logger.info(f"Processing submission {i+1}/{len(submissions)}")
-
-                # Set LLM stages for the operations (though they'll be in the same LangSmith trace)
-                try:
-                    shared.stage = 'code_correction'  # This will be used for both correction and evaluation
-                except Exception:
-                    pass
-
-                # Use the traced function that combines both correction and evaluation
+                shared.stage = 'code_correction'
                 submission_corrections, evaluation_results = process_submission_traced(
                     code_corrector=code_corrector,
                     supervised_evaluator=supervised_evaluator,
@@ -394,45 +287,24 @@ This will:
                     submission_index=i
                 )
 
-                # Save per-submission results
                 submission_output_dir = Path(args.output_dir) / f"submission_{i+1}"
                 submission_output_dir.mkdir(parents=True, exist_ok=True)
                 save_results(str(submission_output_dir), submission_corrections, evaluation_results)
 
-                # Log saved artifacts and key metrics to the current MLflow run
-                try:
-                    # Attach the saved files as artifacts to the current run
-                    mlflow_logger.log_artifacts(str(submission_output_dir), artifact_path=submission_output_dir.name)
+                mlflow_logger.log_artifacts(str(submission_output_dir), artifact_path=submission_output_dir.name)
+                if isinstance(evaluation_results, dict):
+                    overall = evaluation_results.get('overall_score')
+                    if overall is not None:
+                        mlflow_logger.log_metric('overall_score', float(overall))
 
-                    # Log main evaluation metrics if available
-                    if isinstance(evaluation_results, dict):
-                        overall = evaluation_results.get('overall_score')
-                        if overall is not None:
-                            mlflow_logger.log_metric('overall_score', float(overall))
+                    criterion_avgs = evaluation_results.get('criterion_averages', {})
+                    if isinstance(criterion_avgs, dict):
+                        for crit, val in criterion_avgs.items():
+                            mlflow_logger.log_metric(f"criterion_avg_{crit}", float(val))
 
-                        # Log per-criterion averages if present
-                        criterion_avgs = evaluation_results.get('criterion_averages', {})
-                        if isinstance(criterion_avgs, dict):
-                            for crit, val in criterion_avgs.items():
-                                try:
-                                    mlflow_logger.log_metric(f"criterion_avg_{crit}", float(val))
-                                except Exception:
-                                    continue
-
-                        # Also log the number of generated corrections for this submission
-                        try:
-                            mlflow_logger.log_metric('num_generated_corrections', len(submission_corrections))
-                        except Exception:
-                            pass
-                except Exception as e:
-                    logger.warning(f"Failed to log artifacts/metrics to MLflow for submission {i+1}: {e}")
+                    mlflow_logger.log_metric('num_generated_corrections', len(submission_corrections))
 
                 all_evals.append({"submission": submission_output_dir.name, "evaluation": evaluation_results})
-
-            except Exception as e:
-                logger.exception(f"Error processing submission {i+1}: {e}")
-            finally:
-                mlflow_logger.end_run()
 
         # Print aggregate summary
         logger.info("=" * 60)
