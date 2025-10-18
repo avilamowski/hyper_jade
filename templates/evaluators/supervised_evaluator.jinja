@@ -75,54 +75,54 @@ Please evaluate the AI-generated correction against the reference correction for
 {{ generated_correction }}
 
 **Instructions:**
-Carefully compare the AI-generated correction with the human reference correction. Focus on:
+Carefully compare the AI-generated correction with the human reference correction. For each metric below, provide a concise score and an explanatory sentence that justifies that score (this explanatory sentence should read like the grading rationale). Examples (concrete quoted observations) should be used to support the explanation only when you cite specific, concrete items (missed reference issues, extra AI issues, false positives, or precise imprecisions). In other words: explanation first, examples second and optional.
 
-1. **Missing Issues**: Count how many errors from the reference the AI missed
-2. **Extra Issues**: Count how many additional errors the AI reported that weren't in the reference
-3. **False Positives**: Identify AI errors that are actually incorrect (not just extra)
-4. **Explanation Quality**: Compare the AI's explanations with the reference explanations
-5. **Technical Accuracy**: Assess if AI explanations are technically sound
+1. **Missing Issues**: State how many reference issues the AI missed and give a short grading rationale. If you mention specific missed issues, append an "Examples:" list inside the same explanation containing quoted or brief summaries of those missed reference items (e.g., "Examples: \"failed to load products from CSV\"\").
+2. **Extra Issues**: State how many additional issues the AI reported and whether that count is justified. If you enumerate specific extra issues from the AI, append those as "Examples:" inside the explanation and mark each as valid/invalid.
+3. **False Positives**: If any AI-reported issues are incorrect, note that in the explanation and include short quoted AI claims under "Examples:" when applicable.
+4. **Explanation Quality / Content Similarity**: Provide a short evaluative sentence about alignment with the reference. If you call out particular alignments or omissions, include brief quotes under "Examples:" to show the mismatch or alignment.
+5. **Technical Accuracy / Internal Correctness**: Provide a short judgment sentence. If you describe specific technical imprecisions, include them as short quoted examples inside the same explanation.
 
-**IMPORTANT**: Be precise in counting errors and distinguishing between "trigger happy" (extra but potentially valid) vs "false positives" (extra and incorrect).
+**IMPORTANT**: Be precise in counting errors and distinguishing between "trigger happy" (extra but potentially valid) vs "false positives" (extra and incorrect). Only include an "Examples:" list when you refer to concrete observations — otherwise omit the Examples portion. When included, Examples must be placed inside the same <EXPLANATION> tag so the numeric <SCORE> remains machine-extractable.
 
 **Provide your evaluation in exactly this format (one criterion per line with explanation):**
-completeness: <score> - <explanation>
-restraint: <score> - <explanation>
-precision: <score> - <explanation>
-content_similarity: <score> - <explanation>
-internal_correctness: <score> - <explanation>
-external_correctness: <score> - <explanation>
+completeness: <score> - <explanation> [Examples: <list of missed reference issues or quotes>]
+restraint: <score> - <explanation> [Examples: <list the extra issues the AI reported (enumerate)>]
+precision: <score> - <explanation> [Examples: <list AI claims judged false with short evidence>]
+content_similarity: <score> - <explanation> [Examples: <quotes from reference vs AI showing alignment/mismatch>]
+internal_correctness: <score> - <explanation> [Examples: <AI imprecision quotes and short corrections>]
+external_correctness: <score> - <explanation> [Examples: <list where explanation misapplies to code or omitted context>]
 
 Machine-readable output (REQUIRED for automated extraction):
 - Wrap the machine-readable values inside an XML block using the <RESULT> tag.
 - For each metric, include a nested element whose children are two tags: <SCORE> (numeric) and <EXPLANATION> (short text). This keeps values and rationale machine-readable while preserving human explanations.
 - Keep the human-readable one-line evaluations as well (for reviewers). The automated system will extract the numeric score from the <SCORE> tag and may read <EXPLANATION> for short rationale.
 
-Example (machine-readable block placed at the end inside <RESULT> — include this exact nested structure in your response):
+Example (machine-readable block placed at the end inside <RESULT> — include this exact nested structure in your response). NOTE: include concrete Examples inside an <EXPLANATION> only when you reference concrete observations; otherwise the <EXPLANATION> can be a plain evaluative sentence. Keep Examples inside the same <EXPLANATION> tag so <SCORE> extraction is unaffected.
 NOTE: Do NOT include an <overall_score> tag — the evaluation system will compute the overall score programmatically from the individual metric <SCORE> values.
 <RESULT>
 	<completeness>
 		<SCORE>3</SCORE>
-		<EXPLANATION>AI missed 2 out of 5 errors mentioned in reference (logic error and boundary condition)</EXPLANATION>
+		<EXPLANATION>AI missed 2 out of 5 errors mentioned in reference (logic error and boundary condition). Examples: "fails to load products from CSV", "incorrect stock update when quantity is zero"</EXPLANATION>
 	</completeness>
 	<restraint>
 		<SCORE>4</SCORE>
-		<EXPLANATION>AI reported only 1 additional error not in reference</EXPLANATION>
+		<EXPLANATION>AI reported only 1 additional error not in reference. Examples: "use of global random seed"</EXPLANATION>
 	</restraint>
 	<precision>
 		<SCORE>2</SCORE>
-		<EXPLANATION>AI incorrectly flagged valid code as having syntax error</EXPLANATION>
+		<EXPLANATION>AI incorrectly flagged valid code as having syntax error. Examples: "claims missing colon in function def 'update_stock'" (not present)</EXPLANATION>
 	</precision>
 	<content_similarity>
 		<SCORE>3</SCORE>
-		<EXPLANATION>Partial overlap; some important details omitted</EXPLANATION>
+		<EXPLANATION>Partial overlap; some important details omitted. Examples: reference mentions CSV delimiter issue vs AI focusing on variable naming only</EXPLANATION>
 	</content_similarity>
 	<internal_correctness>
 		<SCORE>4</SCORE>
-		<EXPLANATION>Minor technical imprecision but essentially correct</EXPLANATION>
+		<EXPLANATION>Minor technical imprecision but essentially correct. Examples: AI states "parameter is mutated in-place" while the function actually rebinds the parameter to a new list</EXPLANATION>
 	</internal_correctness>
 	<external_correctness>
 		<SCORE>3</SCORE>
-		<EXPLANATION>Partially aligns; misses relevant context in the code</EXPLANATION>
+		<EXPLANATION>Partially aligns; misses relevant context in the code. Examples: AI says "function A calls B with filename" but B expects a parsed object, not a filename</EXPLANATION>
 	</external_correctness>
 </RESULT>
