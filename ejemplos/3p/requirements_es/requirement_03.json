@@ -1,0 +1,5 @@
+{
+  "requirement": "No carga correctamente en listas los productos 1000-1009 con stock 100.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

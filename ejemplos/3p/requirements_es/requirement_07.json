@@ -1,0 +1,5 @@
+{
+  "requirement": "No agrega el stock actualizado a las ventas anteriores.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

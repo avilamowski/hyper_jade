@@ -1,0 +1,5 @@
+{
+  "requirement": "No lee correctamente el archivo y lo carga en listas.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

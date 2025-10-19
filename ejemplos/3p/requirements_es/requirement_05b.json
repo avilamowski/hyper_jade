@@ -1,0 +1,5 @@
+{
+  "requirement": "No genera la cantidad correcta de unidades por venta (1-5 unidades).",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

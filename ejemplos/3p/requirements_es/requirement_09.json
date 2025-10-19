@@ -1,0 +1,5 @@
+{
+  "requirement": "Errores de ejecución. Uso de funciones/estructuras/tipos de datos no vistos en clase.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

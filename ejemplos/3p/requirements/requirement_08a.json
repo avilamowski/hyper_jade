@@ -1,5 +1,0 @@
-{
-  "requirement": "Does not correctly create the file when it doesn't exist.",
-  "function": "vender_productos",
-  "type": "error_presence"
-}

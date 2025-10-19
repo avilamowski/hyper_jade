@@ -5,11 +5,13 @@
 
 # Define which files to use (modify these lists as needed)
 ASSIGNMENT="ejemplos/3p/consigna.txt"
-REQUIREMENTS="ejemplos/3p/requirements/*.json"
+REQUIREMENTS="ejemplos/3p/requirements_es/*.json"
 # REQUIREMENTS="ejemplos/3p/requirements/requirement_06.json ejemplos/3p/requirements/requirement_07.json"
 SUBMISSIONS="ejemplos/3p/alu6.py"
 REFERENCE_CORRECTIONS="ejemplos/3p/alu6.txt"
-OUTPUT_DIR="outputs/supervised_evaluation"
+# Add a timestamp so multiple runs don't overwrite each other. Format: YYYYMMDDTHHMMSS
+TIMESTAMP=$(date +"%Y%m%dT%H%M%S")
+OUTPUT_DIR="outputs/supervised_evaluation/${TIMESTAMP}"
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"

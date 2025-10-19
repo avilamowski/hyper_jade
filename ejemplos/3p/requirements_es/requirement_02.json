@@ -1,0 +1,5 @@
+{
+  "requirement": "No valida que el parámetro 'cantidad' sea un entero positivo.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

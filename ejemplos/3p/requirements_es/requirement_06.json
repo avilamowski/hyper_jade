@@ -1,0 +1,5 @@
+{
+  "requirement": "No resta correctamente la venta del stock.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

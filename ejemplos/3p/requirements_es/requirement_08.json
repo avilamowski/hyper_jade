@@ -1,0 +1,5 @@
+{
+  "requirement": "No guarda/actualiza/crea correctamente el archivo cuando no existe.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}

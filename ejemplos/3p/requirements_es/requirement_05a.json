@@ -1,0 +1,5 @@
+{
+  "requirement": "No genera la cantidad solicitada de ventas.",
+  "function": "vender_productos",
+  "type": "error_presence"
+}
