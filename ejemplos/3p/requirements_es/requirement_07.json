@@ -1,5 +1,5 @@
 {
-  "requirement": "No agrega el stock actualizado a las ventas anteriores.",
+  "requirement": "No agrega a ventas pasadas el stock restado, o resta el número original en vez del stock.",
   "function": "vender_productos",
   "type": "error_presence"
 }

@@ -1,5 +1,5 @@
 {
-  "requirement": "No genera la cantidad solicitada de ventas.",
+  "requirement": "No genera la cantidad de ventas pedida o la cantidad por venta (1-5 unidades).",
   "function": "vender_productos",
   "type": "error_presence"
 }

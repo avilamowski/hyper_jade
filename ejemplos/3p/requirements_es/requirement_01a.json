@@ -1,5 +1,5 @@
 {
-  "requirement": "No recibe el parámetro 'path'.",
+  "requirement": "No recibe por parámetro la ruta.",
   "function": "vender_productos",
   "type": "error_presence"
 }
