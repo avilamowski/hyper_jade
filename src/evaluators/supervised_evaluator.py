@@ -22,7 +22,12 @@ logger = logging.getLogger(__name__)
 class SupervisedEvaluator:
     
     def __init__(self, config: Optional[Dict[str, Any]] = None, llm: Optional[Any] = None):
-        self.config = config or load_config()
+        # If a config dict was provided use it; otherwise load the default config file
+        if config is not None:
+            self.config = config
+        else:
+            # Default config path matches other modules
+            self.config = load_config("src/config/assignment_config.yaml")
         self.evaluator_config = get_agent_config(self.config, "agent_evaluator")
         
         # Hardcoded criteria for supervised evaluation
@@ -66,8 +71,12 @@ class SupervisedEvaluator:
             trim_blocks=True,
             lstrip_blocks=True,
         )
-        
-        self.template = self.jinja_env.get_template("supervised_evaluator.jinja")
+        supervised_cfg = {}
+        if isinstance(self.config, dict):
+            supervised_cfg = self.config.get("supervised_evaluator", {}) or {}
+        template_name = supervised_cfg.get("template")
+
+        self.template = self.jinja_env.get_template(template_name)
     
     def _setup_llm(self):
         provider = self.evaluator_config["provider"]

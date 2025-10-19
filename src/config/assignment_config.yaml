@@ -38,8 +38,8 @@ agents:
       examples: "examples.jinja"
       default: "prompt_generators/requirement_presence.jinja"
       requirement_presence: "prompt_generators/requirement_presence.jinja"
-      error_presence: "prompt_generators/error_explain.jinja"
-      conceptual: "prompt_generators/conceptual.jinja"
+      error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
+      conceptual: "prompt_generators/conceptual/conceptual.es2es.jinja"
     
   code_corrector:
     enabled: true
@@ -117,3 +117,11 @@ logging:
   level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: "assignment_evaluator.log"
+
+# Configuration for the supervised evaluator template
+# `template` should point to a Jinja template inside the templates/ folder.
+# An optional `template_es` can be provided for a Spanish-language variant.
+supervised_evaluator:
+  enabled: true
+  template: "supervised_evaluator.es.jinja"
+  # template: "supervised_evaluator.jinja"

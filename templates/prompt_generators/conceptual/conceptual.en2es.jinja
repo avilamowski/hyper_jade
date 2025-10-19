@@ -1,0 +1,100 @@
+PROMPT STRUCTURE:
+```
+*The Analyzer* is a static code analyzer.
+
+*The Analyzer*'s Task:
+- *The Analyzer* should evaluate how well the code demonstrates the conceptual property: [You should describe what conceptual aspect must be evaluated]
+
+Definition:
+- [You should define what constitutes different levels of the conceptual property, from poor (1-3) to excellent (8-10)]
+
+{{ examples }}
+
+*The Analyzer* Instructions:
+- *The Analyzer* should evaluate the code on a scale from 1 to 10 based on how well it demonstrates the conceptual property.
+- *The Analyzer* should provide a brief explanation of the score given. The explanation MUST be written in Spanish.
+
+*The Analyzer* should write the output with this output format (strict and exact):
+<SCORE>X</SCORE>
+<EXPLANATION>Breve explicación de por qué se dio esta puntuación</EXPLANATION>
+
+Code to analyze:
+{{ code }}
+```
+
+IMPORTANT:
+- This is a TEMPLATE for analysis, NOT code for you to implement
+- You should use "{{ code }}" (with double braces) for the Jinja2 variable
+- The template will be filled with student code later
+- You should focus on the specific conceptual property given
+- You must provide clear examples of different score levels
+
+Generate only the template, no explanations or additional text.
+Example:
+
+PROMPT STRUCTURE:
+```
+*The Analyzer* is a static code analyzer.
+
+*The Analyzer*'s Task:
+- *The Analyzer* should evaluate how well the code demonstrates the conceptual property: code modularization and separation of concerns.
+
+Definition:
+- Poor (1-3): Code is monolithic, everything in one function, no separation of concerns
+- Fair (4-6): Some functions exist but responsibilities are mixed, limited modularization
+- Good (7-8): Well-separated functions with clear responsibilities, good modularization
+- Excellent (9-10): Excellent modularization with clear separation of concerns, reusable components
+
+Examples that should return <SCORE>9-10</SCORE>:
+    def area_rectangulo(base, altura):
+        return base * altura
+
+    def area_triangulo(base, altura):
+        return (base * altura) / 2
+
+    def pedir_valores(figura):
+        base = float(input(f"Ingrese la base del {figura}: "))
+        altura = float(input(f"Ingrese la altura del {figura}: "))
+        return base, altura
+
+    b, h = pedir_valores("rectángulo")
+    print("Área del rectángulo:", area_rectangulo(b, h))
+
+    b, h = pedir_valores("triángulo")
+    print("Área del triángulo:", area_triangulo(b, h))
+
+Examples that should return <SCORE>4-6</SCORE>:
+    def area_rectangulo(base, altura):
+        return base * altura
+
+    def area_triangulo(base, altura):
+        return (base * altura) / 2
+
+    base = float(input("Base rectángulo: "))
+    altura = float(input("Altura rectángulo: "))
+    print("Área rectángulo:", area_rectangulo(base, altura))
+
+    base = float(input("Base triángulo: "))
+    altura = float(input("Altura triángulo: "))
+    print("Área triángulo:", area_triangulo(base, altura))
+
+Examples that should return <SCORE>1-3</SCORE>:
+    base = float(input("Base rectángulo: "))
+    altura = float(input("Altura rectángulo: "))
+    print("Área rectángulo:", base * altura)
+
+    base = float(input("Base triángulo: "))
+    altura = float(input("Altura triángulo: "))
+    print("Área triángulo:", (base * altura) / 2)
+
+*The Analyzer* Instructions:
+- *The Analyzer* should evaluate the code on a scale from 1 to 10 based on how well it demonstrates the conceptual property.
+- *The Analyzer* should provide a brief explanation of the score given. The explanation MUST be written in Spanish.
+
+*The Analyzer* should write the output with this Output format (strict and exact):
+<SCORE>X</SCORE>
+<EXPLANATION>Breve explicación de por qué se dio esta puntuación</EXPLANATION>
+
+Code to analyze:
+{{ code }}
+```
