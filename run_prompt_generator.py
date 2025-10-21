@@ -190,7 +190,8 @@ def main():
                     "type": result["requirement"]["type"].value
                 },
                 "examples": result["examples"],
-                "index": result["index"]
+                "index": result["index"],
+                "extra": result.get("extra", {})
             }
             with open(state_output_path, 'w', encoding='utf-8') as f:
                 json.dump(state_data, f, indent=2, ensure_ascii=False)

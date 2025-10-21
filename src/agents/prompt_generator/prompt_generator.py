@@ -138,6 +138,9 @@ class PromptGeneratorState(TypedDict):
     generated_prompts: Annotated[
         List[GeneratedPrompt], concat
     ]  # List of {requirement, template, examples, etc.}
+    
+    # Extra field for additional metadata/data that can be loaded any time
+    extra: Annotated[Optional[Dict[str, Any]], keep_last]
 
 
 class PromptGeneratorAgent:
@@ -288,6 +291,7 @@ class PromptGeneratorAgent:
             "assignment_description": assignment_description,
             "requirements": requirements,
             "generated_prompts": [],
+            "extra": {},
         }
 
         # Run the graph with dynamic nodes

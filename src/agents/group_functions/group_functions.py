@@ -46,6 +46,9 @@ class GroupFunctionsState(TypedDict):
 
     # Output - use Annotated to allow multiple concurrent writes
     grouped_code: Annotated[List[GroupedCode], concat]
+    
+    # Extra field for additional metadata/data that can be loaded any time
+    extra: Annotated[Optional[Dict[str, Any]], keep_last]
 
 
 def extract_functions_from_response(response: str) -> Dict[str, str]:
@@ -563,6 +566,7 @@ class GroupFunctionsAgent:
             "submissions": submissions,
             "function_names": [],
             "grouped_code": [],
+            "extra": {},
         }
 
         # Run the graph
@@ -591,6 +595,7 @@ class GroupFunctionsAgent:
             "submissions": [],
             "function_names": [],
             "grouped_code": [],
+            "extra": {},
         }
 
         # Run only the extraction node
@@ -623,6 +628,7 @@ class GroupFunctionsAgent:
             "submissions": submissions,
             "function_names": function_names,
             "grouped_code": [],
+            "extra": {},
         }
 
         # Run only the grouping node

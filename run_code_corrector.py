@@ -72,8 +72,8 @@ def load_jinja_template(jinja_path: str) -> str:
     except Exception as e:
         raise RuntimeError(f"Failed to load Jinja template from {jinja_path}: {e}")
 
-def save_corrections_state(corrections: list, output_path: str, metadata: dict = None):
-    """Save corrections and metadata to JSON file"""
+def save_corrections_state(corrections: list, output_path: str, metadata: dict = None, extra: dict = None):
+    """Save corrections, metadata, and extra data to JSON file"""
     output_data = {
         "corrections": [
             {
@@ -87,6 +87,7 @@ def save_corrections_state(corrections: list, output_path: str, metadata: dict =
             for correction in corrections
         ],
         "metadata": metadata or {},
+        "extra": extra or {},
         "timestamp": time.time()
     }
     

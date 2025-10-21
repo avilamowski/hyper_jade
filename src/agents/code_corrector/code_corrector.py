@@ -45,6 +45,9 @@ class CodeCorrectorState(TypedDict):
     
     # Output - use Annotated to allow multiple concurrent writes
     corrections: Annotated[List[Correction], concat]
+    
+    # Extra field for additional metadata/data that can be loaded any time
+    extra: Annotated[Optional[Dict[str, Any]], keep_last]
 
 
 # --------------------------------------------------------------------------- #
@@ -230,6 +233,7 @@ class CodeCorrectorAgent:
             "generated_prompts": generated_prompts,
             "submission": submission,
             "corrections": [],
+            "extra": {},
         }
 
         # Run the graph with dynamic nodes

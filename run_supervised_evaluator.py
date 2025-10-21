@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
-from src.evaluators.supervised_evaluator import SupervisedEvaluator
+from src.evaluators.supervised_evaluator_2step import SupervisedEvaluator2Step
 from src.config import load_config, get_agent_config, load_langsmith_config
 from src.core.mlflow_utils import mlflow_logger
 from src.models import Requirement, GeneratedPrompt, Submission, Correction, PromptType
@@ -58,7 +58,7 @@ def generate_prompts_traced(prompt_generator: PromptGeneratorAgent, requirements
 @traceable(name="submission_correction_and_evaluation", run_type="chain")
 def process_submission_traced(
     code_corrector: CodeCorrectorAgent,
-    supervised_evaluator: SupervisedEvaluator,
+    supervised_evaluator: Any,
     generated_prompts: List[GeneratedPrompt],
     submission: Submission,
     reference_correction: str,
@@ -122,8 +122,8 @@ def load_reference_corrections(correction_paths: List[str]) -> List[str]:
     return corrections
 
 
-def save_results(output_path: str, corrections: List[Correction], evaluation_results: Dict[str, Any]):
-    """Save both corrections and evaluation results to JSON files"""
+def save_results(output_path: str, corrections: List[Correction], evaluation_results: Dict[str, Any], extra: Dict[str, Any] = None):
+    """Save corrections, evaluation results, and extra data to JSON files"""
     # Save corrections
     corrections_path = Path(output_path) / "generated_corrections.json"
     corrections_data = {
@@ -142,7 +142,8 @@ def save_results(output_path: str, corrections: List[Correction], evaluation_res
         "metadata": {
             "total_corrections": len(corrections),
             "generation_method": "supervised_evaluation"
-        }
+        },
+        "extra": extra or {}
     }
     
     with open(corrections_path, 'w', encoding='utf-8') as f:
@@ -252,7 +253,8 @@ This will:
         shared = composite.get_shared_bound()
         prompt_generator.llm = shared
         code_corrector.llm = shared
-        supervised_evaluator = SupervisedEvaluator(config, llm=shared)
+        # Use the 2-step supervised evaluator implementation
+        supervised_evaluator = SupervisedEvaluator2Step(config, llm=shared)
 
         
         # Step 1: Generate prompts for all requirements
@@ -289,7 +291,10 @@ This will:
 
                 submission_output_dir = Path(args.output_dir) / f"submission_{i+1}"
                 submission_output_dir.mkdir(parents=True, exist_ok=True)
-                save_results(str(submission_output_dir), submission_corrections, evaluation_results)
+                
+                # Extract extra data for persistence
+                extra_data = evaluation_results.get('extra', {})
+                save_results(str(submission_output_dir), submission_corrections, evaluation_results, extra=extra_data)
 
                 mlflow_logger.log_artifacts(str(submission_output_dir), artifact_path=submission_output_dir.name)
                 if isinstance(evaluation_results, dict):

@@ -8,7 +8,7 @@ Uses a minimal LangGraph with a single node.
 """
 
 from __future__ import annotations
-from typing import Dict, List, Any, TypedDict
+from typing import Dict, List, Any, TypedDict, Optional
 from pathlib import Path
 import os
 import re
@@ -101,6 +101,9 @@ def parse_requirements_from_xml_tags(
 class RequirementGeneratorState(TypedDict):
     assignment: str
     requirements: List[Requirement]
+    
+    # Extra field for additional metadata/data that can be loaded any time
+    extra: Optional[Dict[str, Any]]
 
 class RequirementGeneratorAgent:
     """Agent that generates individual requirement files from an assignment description using LangGraph"""
@@ -138,7 +141,8 @@ class RequirementGeneratorAgent:
         app = self._build_graph()
         state_in: RequirementGeneratorState = {
             "assignment": assignment,
-            "requirements": []
+            "requirements": [],
+            "extra": {}
         }
         result_state = app.invoke(state_in)
         
