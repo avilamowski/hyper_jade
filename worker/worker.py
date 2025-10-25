@@ -29,6 +29,9 @@ def process_job(job_id: str, job_type: str, payload: dict):
     """
     return job_handlers.process_job(job_id, job_type, payload)
 
+# Make the function available at module level for RQ
+__all__ = ['process_job']
+
 class JadeWorker:
     """Independent JADE worker using REST API"""
     

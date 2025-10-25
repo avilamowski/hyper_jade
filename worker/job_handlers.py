@@ -1,7 +1,18 @@
 
 import time
 import logging
+import sys
+import os
+import traceback
+from pathlib import Path
 from typing import Dict, Any, List
+
+# Add parent directory to path to find src module
+current_file = Path(__file__)
+parent_dir = current_file.parent.parent
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
+
 from api_client import APIClient
 from job_manager import JobManager
 from models import StatusEnum, RequirementCreate, RequirementUpdate, CorrectionCreate
@@ -12,6 +23,13 @@ from job_definitions import (
     CreateCorrectionPayload,
     PAYLOAD_VALIDATORS
 )
+
+# Import src modules
+from src.config import load_config, load_langsmith_config
+from src.agents.requirement_generator.requirement_generator import RequirementGeneratorAgent
+from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
+from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
+from src.models import PromptType
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -54,13 +72,6 @@ class JobHandlers:
     
     def handle_generate_requirements(self, payload: GenerateRequirementsPayload) -> Dict[str, Any]:
         """Generate requirements for an assignment using the RequirementGeneratorAgent"""
-        import sys, os
-        from pathlib import Path
-        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-        from src.config import load_config, get_agent_config, load_langsmith_config
-        from src.agents.requirement_generator.requirement_generator import RequirementGeneratorAgent
-        from src.models import Requirement
-        import traceback
         assignment_id = payload.assignment_id
         logger.info(f"🔧 Generating requirements for assignment {assignment_id}")
         try:
@@ -101,13 +112,6 @@ class JobHandlers:
             raise
     
     def handle_generate_prompts(self, payload: GeneratePromptsPayload) -> Dict[str, Any]:
-        import sys, os
-        from pathlib import Path
-        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-        from src.config import load_config, get_agent_config, load_langsmith_config
-        from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
-        from src.models import Requirement
-        import traceback
         assignment_id = payload.assignment_id
         requirement_ids = payload.requirement_ids
         logger.info(f"🔧 Generating prompts for {len(requirement_ids)} requirements in assignment {assignment_id}")
@@ -132,7 +136,6 @@ class JobHandlers:
             load_langsmith_config()
             agent = PromptGeneratorAgent(config)
             # Convert type string to PromptType if needed
-            from src.models import PromptType
             for req in requirements:
                 if isinstance(req["type"], str):
                     for pt in PromptType:
@@ -172,13 +175,6 @@ class JobHandlers:
     
     def handle_create_correction(self, payload: CreateCorrectionPayload) -> Dict[str, Any]:
         """Create corrections for a submission using REST API"""
-        import sys, os
-        from pathlib import Path
-        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-        from src.config import load_config, get_agent_config, load_langsmith_config
-        from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
-        from src.models import Requirement, GeneratedPrompt, Submission
-        import traceback
         submission_id = payload.submission_id
         requirement_ids = payload.requirement_ids
         logger.info(f"🔧 Creating corrections for submission {submission_id} against {len(requirement_ids)} requirements")
@@ -218,7 +214,6 @@ class JobHandlers:
                     "type": req.type
                 }
                 # Convert type string to PromptType if needed
-                from src.models import PromptType
                 if isinstance(req_dict["type"], str):
                     for pt in PromptType:
                         if pt.value == req_dict["type"]:
