@@ -1,12 +1,22 @@
 import os
 import requests
 from typing import Dict, Any, List, Optional
-from models import (
-    RequirementCreate, RequirementUpdate, CorrectionCreate,
-    RequirementResponse, SubmissionResponse, CorrectionResponse,
-    AssignmentCreate, AssignmentUpdate, AssignmentResponse,
-    AssignmentCreatedResponse, RequirementCreatedResponse, SubmissionCreatedResponse, MessageResponse, SubmissionCreate
-)
+# Handle imports for both script execution and module import
+try:
+    from .models import (
+        RequirementCreate, RequirementUpdate, CorrectionCreate,
+        RequirementResponse, SubmissionResponse, CorrectionResponse,
+        AssignmentCreate, AssignmentUpdate, AssignmentResponse,
+        AssignmentCreatedResponse, RequirementCreatedResponse, SubmissionCreatedResponse, MessageResponse, SubmissionCreate
+    )
+except ImportError:
+    # When running as script, use absolute imports
+    from models import (
+        RequirementCreate, RequirementUpdate, CorrectionCreate,
+        RequirementResponse, SubmissionResponse, CorrectionResponse,
+        AssignmentCreate, AssignmentUpdate, AssignmentResponse,
+        AssignmentCreatedResponse, RequirementCreatedResponse, SubmissionCreatedResponse, MessageResponse, SubmissionCreate
+    )
 class APIClient:
     """REST API client for communicating with the JADE server"""
     

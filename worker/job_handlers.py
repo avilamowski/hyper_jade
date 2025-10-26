@@ -13,16 +13,29 @@ parent_dir = current_file.parent.parent
 if str(parent_dir) not in sys.path:
     sys.path.insert(0, str(parent_dir))
 
-from api_client import APIClient
-from job_manager import JobManager
-from models import StatusEnum, RequirementCreate, RequirementUpdate, CorrectionCreate
-from job_definitions import (
-    JobType,
-    GenerateRequirementsPayload,
-    GeneratePromptsPayload,
-    CreateCorrectionPayload,
-    PAYLOAD_VALIDATORS
-)
+# Handle imports for both script execution and module import
+try:
+    from .api_client import APIClient
+    from .job_manager import JobManager
+    from .models import StatusEnum, RequirementCreate, RequirementUpdate, CorrectionCreate
+    from .job_definitions import (
+        JobType,
+        GenerateRequirementsPayload,
+        GeneratePromptsPayload,
+        CreateCorrectionPayload,
+        PAYLOAD_VALIDATORS
+    )
+except ImportError:
+    from api_client import APIClient
+    from job_manager import JobManager
+    from models import StatusEnum, RequirementCreate, RequirementUpdate, CorrectionCreate
+    from job_definitions import (
+        JobType,
+        GenerateRequirementsPayload,
+        GeneratePromptsPayload,
+        CreateCorrectionPayload,
+        PAYLOAD_VALIDATORS
+    )
 
 # Import src modules
 from src.config import load_config, load_langsmith_config
@@ -30,8 +43,9 @@ from src.agents.requirement_generator.requirement_generator import RequirementGe
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.models import PromptType
+from src.agents.rag_prompt_generator.config import USE_RAG
+from src.agents.rag_prompt_generator.rag_prompt_generator import RAGPromptGeneratorAgent
 
-# LangSmith imports
 from langsmith import tracing_context, Client as LangSmithClient
 
 # Configure logging
@@ -53,6 +67,14 @@ class JobHandlers:
         """Simple LangSmith trace cleanup - just flush the client."""
         self.langsmith_client.flush()
         logger.debug("🔗 Flushed LangSmith traces")
+        
+        # Log RAG status on initialization
+        if USE_RAG:
+            logger.info("🧠 Worker initialized with RAG Mode: ENABLED")
+            logger.info("📚 Course theory integration: ACTIVE")
+        else:
+            logger.info("📝 Worker initialized with Standard Mode")
+            logger.info("📚 Course theory integration: INACTIVE")
     
     def process_job(self, job_id: str, job_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Process a job based on its type, using validated models from job_definitions."""
@@ -156,6 +178,15 @@ class JobHandlers:
         assignment_id = payload.assignment_id
         requirement_ids = payload.requirement_ids
         logger.info(f"🔧 Generating prompts for {len(requirement_ids)} requirements in assignment {assignment_id}")
+        
+        # Check RAG mode
+        if USE_RAG:
+            logger.info("🧠 RAG Mode: ENABLED - Using RAG-enhanced prompt generation")
+            logger.info("📚 Course theory integration: ACTIVE")
+        else:
+            logger.info("📝 Standard Mode: Using standard prompt generation")
+            logger.info("📚 Course theory integration: INACTIVE")
+            
         try:
             # Fetch assignment description from API
             assignment = self.api_client.get_assignment(assignment_id)
@@ -174,8 +205,20 @@ class JobHandlers:
             # Load config
             config_path = os.getenv("JADE_AGENT_CONFIG", "src/config/assignment_config.yaml")
             config = load_config(config_path)
-            agent = PromptGeneratorAgent(config)
-            # Convert type string to PromptType if needed
+            load_langsmith_config()
+            
+            # Choose agent based on RAG mode
+            if USE_RAG:
+                logger.info("🧠 Initializing RAG-enhanced prompt generator...")
+                agent = RAGPromptGeneratorAgent(config)
+                # Initialize RAG system
+                import asyncio
+                asyncio.run(agent.initialize())
+                logger.info("✅ RAG agent initialized successfully")
+            else:
+                logger.info("📝 Using standard prompt generator...")
+                agent = PromptGeneratorAgent(config)
+                
             for req in requirements:
                 if isinstance(req["type"], str):
                     for pt in PromptType:
@@ -183,13 +226,26 @@ class JobHandlers:
                             req["type"] = pt
                             break
             # Generate prompts
-            results = agent.generate_prompts_batch(requirements, assignment_description)
+            logger.info(f"🔧 Generating prompts for {len(requirements)} requirements")
+            import asyncio
+            results = asyncio.run(agent.generate_prompts_batch(requirements, assignment_description))
+            logger.info(f"📝 Generated {len(results)} prompt results")
             updated_count = 0
-            for i, result in enumerate(results):
+            
+            # Ensure we don't exceed bounds
+            max_results = min(len(results), len(requirement_ids), len(requirements))
+            logger.info(f"📊 Processing {max_results} results (results: {len(results)}, requirement_ids: {len(requirement_ids)}, requirements: {len(requirements)})")
+            
+            if len(results) != len(requirement_ids):
+                logger.warning(f"⚠️  Mismatch: {len(results)} results vs {len(requirement_ids)} requirement IDs")
+            
+            for i in range(max_results):
                 try:
                     req_id = requirement_ids[i]
-                    prompt_template = result["jinja_template"]
+                    result = results[i]
                     req_obj = requirements[i]
+                    prompt_template = result["jinja_template"]
+                    
                     req_update = RequirementUpdate(
                         requirement=req_obj["requirement"],
                         function=req_obj["function"],
@@ -198,8 +254,9 @@ class JobHandlers:
                     )
                     self.api_client.update_requirement(assignment_id, req_id, req_update)
                     updated_count += 1
+                    logger.info(f"✅ Updated requirement {req_id}")
                 except Exception as e:
-                    logger.error(f"❌ Failed to update requirement {requirement_ids[i]}: {e}")
+                    logger.error(f"❌ Failed to update requirement {requirement_ids[i] if i < len(requirement_ids) else 'unknown'}: {e}")
             result = {
                 "message": f"Generated and saved prompt templates for {updated_count} requirements",
                 "assignment_id": assignment_id,

@@ -154,6 +154,13 @@ class PromptGeneratorAgent:
         self.agent_config = get_agent_config(config, "prompt_generator")
         self.llm = self._setup_llm()
         self.graph = self._build_graph()
+        
+        # Log that we're using standard (non-RAG) mode
+        logger.info("📝 Initializing Standard Prompt Generator")
+        logger.info("=" * 50)
+        logger.info("🔧 RAG Mode: DISABLED")
+        logger.info("📚 Course theory integration: INACTIVE")
+        logger.info("=" * 50)
 
     def _setup_llm(self):
         if self.agent_config.get("provider") == "openai":

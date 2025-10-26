@@ -8,12 +8,20 @@ import sys
 import os
 import logging
 from rq import Queue, Worker
-from redis_conn import RedisConnection
-from job_manager import JobManager
+
+# Import worker modules - works both as module and direct execution
+try:
+    from .redis_conn import RedisConnection
+    from .job_manager import JobManager
+    from .job_handlers import JobHandlers
+except ImportError:
+    from redis_conn import RedisConnection
+    from job_manager import JobManager
+    from job_handlers import JobHandlers
+
 import json
 import subprocess
 import tempfile
-from job_handlers import JobHandlers
 
 # Configure logging
 logging.basicConfig(
@@ -108,9 +116,11 @@ def main():
     
     # Test API connection
     try:
-        from api_client import APIClient
+        try:
+            from .api_client import APIClient
+        except ImportError:
+            from api_client import APIClient
         api_client = APIClient()
-        # Try a simple request to test connectivity
         print(f"🌐 API Server: {api_client.base_url}")
         print("✅ API client initialized")
     except Exception as e:
