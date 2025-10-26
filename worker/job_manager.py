@@ -1,8 +1,14 @@
 import json
 from typing import Dict, Any, Optional
 from datetime import datetime
-from redis_conn import RedisConnection
-from models import StatusEnum, JobData
+# Handle imports for both script execution and module import
+try:
+    from .redis_conn import RedisConnection
+    from .models import StatusEnum, JobData
+except ImportError:
+    # When running as script, use absolute imports
+    from redis_conn import RedisConnection
+    from models import StatusEnum, JobData
 
 class JobManager:
     """Redis-based job management for the worker"""

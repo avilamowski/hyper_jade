@@ -8,12 +8,27 @@ import sys
 import os
 import logging
 from rq import Queue, Worker
-from redis_conn import RedisConnection
-from job_manager import JobManager
+# Add current directory to path for direct execution
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    current_dir = Path(__file__).parent
+    if str(current_dir) not in sys.path:
+        sys.path.insert(0, str(current_dir))
+
+# Import worker modules - works both as module and direct execution
+try:
+    from .redis_conn import RedisConnection
+    from .job_manager import JobManager
+    from .job_handlers import JobHandlers
+except ImportError:
+    from redis_conn import RedisConnection
+    from job_manager import JobManager
+    from job_handlers import JobHandlers
+
 import json
 import subprocess
 import tempfile
-from job_handlers import JobHandlers
 
 # Configure logging
 logging.basicConfig(
