@@ -24,7 +24,7 @@ export REDIS_URL=redis://localhost:6379
 
 3. Start the worker:
 ```bash
-python worker.py
+python main.py
 ```
 
 ## Job Types Supported
@@ -36,7 +36,7 @@ python worker.py
 ## Architecture
 
 ```
-worker.py           # Main entry point
+main.py             # Main entry point
 ├── models.py       # Pydantic models
 ├── api_client.py   # REST API communication
 ├── redis_conn.py   # Redis connection

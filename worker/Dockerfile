@@ -26,4 +26,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "from redis_conn import RedisConnection; RedisConnection.test_connection()" || exit 1
 
 # Run the worker
-CMD ["python", "worker.py"]
+CMD ["python", "main.py"]
