@@ -31,6 +31,9 @@ from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.models import PromptType
 
+# LangSmith imports
+from langsmith import tracing_context, Client as LangSmithClient
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,11 +43,48 @@ class JobHandlers:
     
     def __init__(self):
         self.api_client = APIClient()
+        # Load LangSmith configuration once during initialization
+        load_langsmith_config()
+        # Create a single LangSmith client instance to reuse
+        self.langsmith_client = LangSmithClient()
+        logger.info("🔗 LangSmith configuration loaded")
+    
+    def _finalize_langsmith_traces(self):
+        """Simple LangSmith trace cleanup - just flush the client."""
+        self.langsmith_client.flush()
+        logger.debug("🔗 Flushed LangSmith traces")
     
     def process_job(self, job_id: str, job_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Process a job based on its type, using validated models from job_definitions."""
         logger.info(f"🔄 Processing job {job_id} of type {job_type}")
         JobManager.update_job_status(job_id, StatusEnum.PROCESSING)
+        result = {} 
+        
+        # Wrap job execution in LangSmith tracing context for proper trace lifecycle
+        trace_name = f"worker_job_{job_type}"
+        trace_tags = [f"job_id:{job_id}", f"type:{job_type}"]
+        
+        logger.info(f"🔗 Starting LangSmith trace: {trace_name} with tags: {trace_tags}")
+        
+        try:
+            with tracing_context(name=trace_name, tags=trace_tags):
+                logger.info(f"🔗 Inside trace context for job ")
+                result = self._execute_job_internal(job_id, job_type, payload) 
+                logger.info(f"🔗 About to exit trace context for job {job_id}")
+
+        except Exception:
+            self._finalize_langsmith_traces() 
+            raise
+        
+        # FINAL STEP: Ensure all nested and parent trace data is sent before returning.
+        self._finalize_langsmith_traces()
+
+        logger.info(f"🔗 Exited trace context for job {job_id}")
+        logger.info(f"📝 Job {job_id} result: {result}")
+        return result
+        
+    def _execute_job_internal(self, job_id: str, job_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Internal job execution logic separated for cleaner tracing."""
         try:
             # Validate and parse payload using shared models
             if job_type == JobType.GENERATE_REQUIREMENTS or job_type == "generate_requirements":
@@ -58,6 +98,7 @@ class JobHandlers:
                 result = self.handle_create_correction(parsed_payload)
             else:
                 raise ValueError(f"Unknown job type: {job_type}")
+            
             JobManager.update_job_status(job_id, StatusEnum.COMPLETED)
             JobManager.set_job_result(job_id, result)
             self.api_client.notify_job_completed(job_id, result)
@@ -69,6 +110,7 @@ class JobHandlers:
             JobManager.update_job_status(job_id, StatusEnum.FAILED, error_msg)
             self.api_client.notify_job_failed(job_id, error_msg)
             raise
+            
     
     def handle_generate_requirements(self, payload: GenerateRequirementsPayload) -> Dict[str, Any]:
         """Generate requirements for an assignment using the RequirementGeneratorAgent"""
@@ -81,7 +123,6 @@ class JobHandlers:
             # Load config (use default path or env var)
             config_path = os.getenv("JADE_AGENT_CONFIG", "src/config/assignment_config.yaml")
             config = load_config(config_path)
-            load_langsmith_config()
             agent = RequirementGeneratorAgent(config)
             requirements = agent.generate_requirements(assignment_description)
             created_count = 0
@@ -133,7 +174,6 @@ class JobHandlers:
             # Load config
             config_path = os.getenv("JADE_AGENT_CONFIG", "src/config/assignment_config.yaml")
             config = load_config(config_path)
-            load_langsmith_config()
             agent = PromptGeneratorAgent(config)
             # Convert type string to PromptType if needed
             for req in requirements:
@@ -236,7 +276,6 @@ class JobHandlers:
             # Load config
             config_path = os.getenv("JADE_AGENT_CONFIG", "src/config/assignment_config.yaml")
             config = load_config(config_path)
-            load_langsmith_config()
             agent = CodeCorrectorAgent(config)
             # Run correction agent
             corrections = agent.correct_code_batch(generated_prompts, submission, assignment_description)

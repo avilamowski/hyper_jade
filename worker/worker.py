@@ -10,6 +10,9 @@ import logging
 from rq import Queue, Worker
 from redis_conn import RedisConnection
 from job_manager import JobManager
+import json
+import subprocess
+import tempfile
 from job_handlers import JobHandlers
 
 # Configure logging
@@ -19,15 +22,59 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global job handlers instance
-job_handlers = JobHandlers()
+
+def _spawn_job_process(job_id: str, job_type: str, payload: dict, timeout: int | None = None) -> dict:
+    """Spawn a short-lived Python process to run the actual job.
+
+    Communication is done via temporary JSON files. The child process will
+    read the input file, execute the job, write a JSON result to the output
+    file, and exit. This keeps the parent (worker/orchestrator) process
+    alive while allowing tracing libraries to finish when the child exits.
+    """
+    # Prepare temp files
+    in_f = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json')
+    out_f = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json')
+    try:
+        json.dump({"job_id": job_id, "job_type": job_type, "payload": payload}, in_f)
+        in_f.flush()
+        in_f.close()
+        out_f.close()
+
+        # Call the same module as a child process with flags to run the job
+        cmd = [sys.executable, os.path.abspath(__file__), '--run-job', in_f.name, out_f.name]
+        logger.info(f"📣 Spawning child process for job {job_id}: {cmd}")
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+
+        if proc.returncode != 0:
+            logger.error(f"Child process failed (rc={proc.returncode}): stdout={proc.stdout} stderr={proc.stderr}")
+            # Try to read out file if exists to give more context
+        try:
+            with open(out_f.name, 'r') as f:
+                result = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to read child output file: {e}")
+            raise RuntimeError(f"Child process failed: {proc.stderr or proc.stdout}") from e
+
+        return result
+    finally:
+        # Cleanup temp files if they still exist
+        try:
+            os.unlink(in_f.name)
+        except Exception:
+            pass
+        try:
+            os.unlink(out_f.name)
+        except Exception:
+            pass
+
 
 def process_job(job_id: str, job_type: str, payload: dict):
+    """RQ-exposed function. It spawns a child Python process that runs the
+    actual job and returns the child's result. This keeps the parent worker
+    long-running but makes the job execution ephemeral so traces finish.
     """
-    Job processing function for RQ worker
-    This function signature must match what the main server enqueues
-    """
-    return job_handlers.process_job(job_id, job_type, payload)
+    return _spawn_job_process(job_id, job_type, payload)
+
 
 # Make the function available at module level for RQ
 __all__ = ['process_job']
@@ -91,5 +138,43 @@ def main():
         logger.error(f"Worker error: {e}")
         sys.exit(1)
 
+def _run_job_child(input_path: str, output_path: str) -> None:
+    """Child process entrypoint: read input JSON, run job, write output JSON."""
+    import traceback
+    try:
+        with open(input_path, 'r') as f:
+            data = json.load(f)
+        job_id = data.get('job_id')
+        job_type = data.get('job_type')
+        payload = data.get('payload')
+
+        logger.info(f"🔧 Child process: running job {job_id} type={job_type}")
+
+        job_handlers = JobHandlers()
+        result = job_handlers.process_job(job_id, job_type, payload)
+
+        out = {"status": "ok", "result": result}
+        with open(output_path, 'w') as f:
+            json.dump(out, f)
+        logger.info(f"✅ Child process completed job {job_id}")
+        sys.exit(0)
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error(f"Child job runner exception: {e}\n{tb}")
+        out = {"status": "error", "error": str(e), "traceback": tb}
+        try:
+            with open(output_path, 'w') as f:
+                json.dump(out, f)
+        except Exception:
+            pass
+        sys.exit(2)
+
+
 if __name__ == "__main__":
-    main()
+    # If invoked with --run-job <in> <out>, run the child job runner and exit.
+    if len(sys.argv) >= 4 and sys.argv[1] == '--run-job':
+        input_path = sys.argv[2]
+        output_path = sys.argv[3]
+        _run_job_child(input_path, output_path)
+    else:
+        main()
