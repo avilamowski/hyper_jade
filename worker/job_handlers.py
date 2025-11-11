@@ -213,8 +213,26 @@ class JobHandlers:
                 agent = RAGPromptGeneratorAgent(config)
                 # Initialize RAG system
                 import asyncio
-                asyncio.run(agent.initialize())
-                logger.info("✅ RAG agent initialized successfully")
+                try:
+                    asyncio.run(agent.initialize())
+                    logger.info("✅ RAG agent initialized successfully")
+                except Exception as init_error:
+                    error_msg = str(init_error)
+                    # Check if this is a Weaviate connection error
+                    error_lower = error_msg.lower()
+                    # Detect Weaviate-specific errors
+                    is_weaviate_error = (
+                        "weaviate" in error_lower or
+                        ("not ready" in error_lower and "weaviate" in error_lower) or
+                        ("connection" in error_lower and ("weaviate" in error_lower or "8080" in error_msg)) or
+                        "failed to start" in error_lower
+                    )
+                    if is_weaviate_error:
+                        logger.error(f"❌ Weaviate connection failed: {error_msg}")
+                        raise Exception("Weaviate failed to start. Please ensure Weaviate is running.")
+                    else:
+                        # Re-raise other initialization errors as-is
+                        raise
             else:
                 logger.info("📝 Using standard prompt generator...")
                 agent = PromptGeneratorAgent(config)
@@ -228,7 +246,14 @@ class JobHandlers:
             # Generate prompts
             logger.info(f"🔧 Generating prompts for {len(requirements)} requirements")
             import asyncio
-            results = asyncio.run(agent.generate_prompts_batch(requirements, assignment_description))
+            import inspect
+            # Check if generate_prompts_batch is async
+            if inspect.iscoroutinefunction(agent.generate_prompts_batch):
+                # RAG agent uses async method
+                results = asyncio.run(agent.generate_prompts_batch(requirements, assignment_description))
+            else:
+                # Standard agent uses sync method
+                results = agent.generate_prompts_batch(requirements, assignment_description)
             logger.info(f"📝 Generated {len(results)} prompt results")
             updated_count = 0
             
