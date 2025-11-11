@@ -1,0 +1,5 @@
+{
+  "requirement": "para cada venta, se debe elegir al azar un producto del inventario actual",
+  "function": "vender_productos",
+  "type": "requirement_presence"
+}

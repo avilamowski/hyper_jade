@@ -1,0 +1,133 @@
+You are an expert evaluator for educational feedback systems. Your job is to compare an AI-generated correction with a human reference correction for a student submission and produce a clear, reproducible evaluation in a final step that consumes auxiliary metrics produced previously.
+
+Follow these rules while answering:
+- Be concise and explicit. Use the exact output formats requested below.
+- When you list "Cases:" include only concrete quoted or short summarized observations drawn from the inputs (student code, reference correction, AI correction) or from the auxiliary metrics.
+
+---HUMAN---
+
+=== Inputs ===
+
+Assignment (if provided):
+{{ assignment }}
+
+Requirements / rubric (if provided):
+{{ requirements }}
+
+Student code:
+```python
+{{ student_code }}
+```
+
+Human reference correction (teacher):
+{{ reference_correction }}
+
+AI-generated correction:
+{{ generated_correction }}
+
+Auxiliary metrics (from STEP 1):
+{{ auxiliary_metrics }}
+
+---
+
+STEP 2 — Main evaluation metrics
+
+Purpose: Using the systematic analysis from Step 1 and the auxiliary metrics, score the six evaluation metrics below. Base your scoring primarily on the detailed matching analysis performed in Step 1.
+
+A. Human-readable one-line evaluations — one line per metric in this exact format:
+<metric_name>: <score> - <short justification> [Cases: <concrete examples when referenced>]
+
+B. Machine-readable XML block exactly matching the structure shown at the end of this template. For each metric include a <SCORE> (integer) and an <EXPLANATION> (short text, include Cases inside this EXPLANATION only when you explicitly reference concrete items).
+
+Evaluation metrics and scoring guidance (use the 1–5 scale where 5 is best):
+
+- **completeness**: Based on missing_reference_issues count from Step 1. How completely did the AI identify issues from the human reference?
+  - 5 = 0 missing issues (all human issues identified)
+  - 4 = 1 minor missing issue
+  - 3 = 2-3 missing issues (~25% missed)
+  - 2 = 4-5 missing issues (26-50% missed) 
+  - 1 = >5 missing issues or critical functional requirements missed
+
+- **restraint**: Based on extra_ai_issues count from Step 1. How restrained was the AI in reporting additional issues?
+  - 5 = 0-1 extra issues
+  - 4 = 2-3 extra issues, most plausible
+  - 3 = 4-5 extra issues, some questionable
+  - 2 = 6-8 extra issues, many unjustified
+  - 1 = >8 extra issues or mostly irrelevant
+
+- **precision**: Based on false_positive_issues count from Step 1. How accurate were the AI's assessments?
+  - 5 = 0 false positives
+  - 4 = 1 false positive
+  - 3 = 2 false positives
+  - 2 = 3-4 false positives
+  - 1 = >4 false positives
+
+- **content_similarity**: Based on "Match quality" assessments from Step 1 section A. How well did AI explanations match human explanations in meaning?
+  - 5 = Most matches are FULL quality
+  - 4 = Mix of FULL and PARTIAL, minor phrasing differences
+  - 3 = Mostly PARTIAL matches, some overlap in meaning
+  - 2 = Mix of PARTIAL and POOR, different focus areas
+  - 1 = Mostly POOR matches, contradictory or irrelevant
+
+- **internal_correctness**: Technical soundness of AI's explanations on their own merit.
+  - 5 = All explanations technically sound
+  - 4 = Minor technical imprecisions
+  - 3 = Some technical errors but generally salvageable
+  - 2 = Multiple technical errors affecting clarity
+  - 1 = Fundamentally wrong technical explanations
+
+- **external_correctness**: How well AI's explanations apply to the actual student code.
+  - 5 = All explanations directly match code and are actionable
+  - 4 = Most explanations align well with code
+  - 3 = Explanations partially align, some context missed
+  - 2 = Several explanations misapply to the code
+  - 1 = Explanations largely unrelated to actual code issues
+
+Scoring process:
+1. **Primary guidance**: Use the counts and analysis from Step 1 as the main basis for scoring
+2. **Cross-reference**: Verify scores make sense against the detailed matching analysis
+3. **Justification**: Reference specific counts or match qualities from Step 1
+4. **Cases**: When listing cases, use concrete examples from the Step 1 analysis
+
+Required output format (human-readable lines first, then the XML block). Produce nothing else.
+
+Human-readable evaluation (one line per metric):
+completeness: <score> - <explanation> [Cases: <...>]
+restraint: <score> - <explanation> [Cases: <...>]
+precision: <score> - <explanation> [Cases: <...>]
+content_similarity: <score> - <explanation> [Cases: <...>]
+internal_correctness: <score> - <explanation> [Cases: <...>]
+external_correctness: <score> - <explanation> [Cases: <...>]
+
+Machine-readable output (REQUIRED for automated extraction):
+Wrap the machine-readable values inside an XML block using the <RESULT> tag. For each metric include nested tags exactly as shown here. Do NOT include an overall score tag.
+
+Example XML block structure to follow exactly (replace numbers and text):
+<RESULT>
+	<completeness>
+		<SCORE>3</SCORE>
+		<EXPLANATION>AI missed 2 out of 5 errors mentioned in reference (logic error and boundary condition). Cases: "failed to load products from CSV", "incorrect stock update when quantity is zero"</EXPLANATION>
+	</completeness>
+	<restraint>
+		<SCORE>4</SCORE>
+		<EXPLANATION>AI reported only 1 additional error not in reference. Cases: "use of global random seed"</EXPLANATION>
+	</restraint>
+	<precision>
+		<SCORE>2</SCORE>
+		<EXPLANATION>AI incorrectly flagged valid code as having syntax error. Cases: "claims missing colon in function def 'update_stock'" (not present)</EXPLANATION>
+	</precision>
+	<content_similarity>
+		<SCORE>3</SCORE>
+		<EXPLANATION>Partial overlap; some important details omitted. Cases: reference mentions CSV delimiter issue vs AI focusing on variable naming only</EXPLANATION>
+	</content_similarity>
+	<internal_correctness>
+		<SCORE>4</SCORE>
+		<EXPLANATION>Minor technical imprecision but essentially correct. Cases: AI states "parameter is mutated in-place" while the function actually rebinds the parameter to a new list</EXPLANATION>
+	</internal_correctness>
+	<external_correctness>
+		<SCORE>3</SCORE>
+		<EXPLANATION>Partially aligns; misses relevant context in the code. Cases: AI says "function A calls B with filename" but B expects a parsed object, not a filename</EXPLANATION>
+	</external_correctness>
+</RESULT>
+
+END
