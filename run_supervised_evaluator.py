@@ -242,11 +242,14 @@ This will:
         prompt_generator = PromptGeneratorAgent(config)
         code_corrector = CodeCorrectorAgent(config)
 
+        # Load evaluator config separately
+        evaluator_config = load_config("src/config/evaluator_config.yaml")
+
         # Build composite LLM from agent configs
         composite = CompositeLLM.from_agent_configs({
             'prompt_generation': get_agent_config(config, 'prompt_generator'),
             'code_correction': get_agent_config(config, 'code_corrector'),
-            'evaluation': get_agent_config(config, 'agent_evaluator'),
+            'evaluation': evaluator_config,  # Use evaluator config directly
         })
 
         # Create shared bound object
@@ -254,7 +257,7 @@ This will:
         prompt_generator.llm = shared
         code_corrector.llm = shared
         # Use the 2-step supervised evaluator implementation
-        supervised_evaluator = SupervisedEvaluator2Step(config, llm=shared)
+        supervised_evaluator = SupervisedEvaluator2Step(evaluator_config, llm=shared)
 
         
         # Step 1: Generate prompts for all requirements

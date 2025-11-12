@@ -13,7 +13,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from ..config import load_config, get_agent_config
+from ..config import load_config
 from ..models import Correction, Submission, Requirement
 
 logger = logging.getLogger(__name__)
@@ -26,9 +26,15 @@ class SupervisedEvaluator:
         if config is not None:
             self.config = config
         else:
-            # Default config path matches other modules
-            self.config = load_config("src/config/assignment_config.yaml")
-        self.evaluator_config = get_agent_config(self.config, "agent_evaluator")
+            # Load evaluator-specific config
+            self.config = load_config("src/config/evaluator_config.yaml")
+        
+        # For evaluator config, settings are at the top level, not under agents
+        self.evaluator_config = {
+            'model_name': self.config['model_name'],
+            'provider': self.config['provider'],
+            'temperature': self.config['temperature'],
+        }
         
         # Hardcoded criteria for supervised evaluation
         # Canonical metric keys (new names). Values are weights used in averaging.
@@ -71,10 +77,8 @@ class SupervisedEvaluator:
             trim_blocks=True,
             lstrip_blocks=True,
         )
-        supervised_cfg = {}
-        if isinstance(self.config, dict):
-            supervised_cfg = self.config.get("supervised_evaluator", {}) or {}
-        template_name = supervised_cfg.get("template")
+        supervised_cfg = self.config["supervised_evaluator"]
+        template_name = supervised_cfg["template"]
 
         self.template = self.jinja_env.get_template(template_name)
     
@@ -384,7 +388,13 @@ def evaluate_supervised_correction(inputs: Dict[str, str], outputs: Dict[str, st
     reference_correction = inputs.get("reference_correction", "")
     generated_correction = outputs.get("generated_correction", "")
     
-    evaluator = SupervisedEvaluator(config_path and load_config(config_path))
+    # If config_path is provided, use it; otherwise use default evaluator config
+    if config_path:
+        config = load_config(config_path)
+    else:
+        config = load_config("src/config/evaluator_config.yaml")
+    
+    evaluator = SupervisedEvaluator(config)
     
     submission: Submission = {"code": student_code}
     

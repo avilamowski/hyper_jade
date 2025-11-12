@@ -1,0 +1,12 @@
+model_name: "gpt-4o-mini"
+provider: "openai"
+temperature: 0.1
+# Configuration for the supervised evaluator template
+# `template` should point to a Jinja template inside the templates/ folder.
+# An optional `template_es` can be provided for a Spanish-language variant.
+supervised_evaluator:
+  enabled: true
+  template: "supervised_evaluator.es.jinja"
+  # template: "supervised_evaluator.jinja"
+
+  

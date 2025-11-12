@@ -14,7 +14,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from ..config import load_config, get_agent_config
+from ..config import load_config
 from ..models import Correction, Submission, Requirement
 
 logger = logging.getLogger(__name__)
@@ -25,9 +25,15 @@ class SupervisedEvaluator2Step:
         if config is not None:
             self.config = config
         else:
-            self.config = load_config("src/config/assignment_config.yaml")
+            # Load evaluator-specific config
+            self.config = load_config("src/config/evaluator_config.yaml")
 
-        self.evaluator_config = get_agent_config(self.config, "agent_evaluator")
+        # For evaluator config, settings are at the top level, not under agents
+        self.evaluator_config = {
+            'model_name': self.config['model_name'],
+            'provider': self.config['provider'],
+            'temperature': self.config['temperature'],
+        }
 
         # same criteria/weights as the single-step evaluator
         self.criteria = {
@@ -80,13 +86,13 @@ class SupervisedEvaluator2Step:
             import os
             return ChatOpenAI(
                 model=model_name,
-                temperature=self.evaluator_config.get("temperature", 0.0),
+                temperature=self.evaluator_config["temperature"],
                 api_key=os.getenv("OPENAI_API_KEY"),
                 base_url=os.getenv("OPENAI_BASE_URL"),
             )
         elif provider == "ollama":
             from langchain_ollama.llms import OllamaLLM
-            return OllamaLLM(model=model_name, temperature=self.evaluator_config.get("temperature", 0.0))
+            return OllamaLLM(model=model_name, temperature=self.evaluator_config["temperature"])
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -386,8 +392,8 @@ class SupervisedEvaluator2Step:
                 "total_submissions": len(submissions),
                 "total_requirements": len(requirements),
                 "evaluation_timestamp": time.time(),
-                "evaluator_model": self.evaluator_config.get("model_name"),
-                "evaluator_provider": self.evaluator_config.get("provider"),
+                "evaluator_model": self.evaluator_config["model_name"],
+                "evaluator_provider": self.evaluator_config["provider"],
                 "criteria_used": list(self.criteria.keys())
             },
             "extra": aggregated_extra
@@ -399,7 +405,13 @@ def evaluate_supervised_correction_2step(inputs: Dict[str, str], outputs: Dict[s
     reference_correction = inputs.get('reference_correction', '')
     generated_correction = outputs.get('generated_correction', '')
 
-    evaluator = SupervisedEvaluator2Step(config_path and load_config(config_path))
+    # If config_path is provided, use it; otherwise use default evaluator config
+    if config_path:
+        config = load_config(config_path)
+    else:
+        config = load_config("src/config/evaluator_config.yaml")
+
+    evaluator = SupervisedEvaluator2Step(config)
 
     submission: Submission = {'code': student_code}
 

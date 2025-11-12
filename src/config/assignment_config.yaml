@@ -117,11 +117,3 @@ logging:
   level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: "assignment_evaluator.log"
-
-# Configuration for the supervised evaluator template
-# `template` should point to a Jinja template inside the templates/ folder.
-# An optional `template_es` can be provided for a Spanish-language variant.
-supervised_evaluator:
-  enabled: true
-  template: "supervised_evaluator.es.jinja"
-  # template: "supervised_evaluator.jinja"
