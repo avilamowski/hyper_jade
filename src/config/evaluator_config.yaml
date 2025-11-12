@@ -1,6 +1,8 @@
-model_name: "llama3.2:latest"
-provider: "ollama"
-temperature: 0.1
+# model_name: "llama3.2:latest"
+# provider: "ollama"
+model_name: "gpt-4o-mini"
+provider: "openai"
+temperature: 0.2
 # Configuration for the supervised evaluator template
 # `template` should point to a Jinja template inside the templates/ folder.
 # An optional `template_es` can be provided for a Spanish-language variant.
@@ -18,7 +20,12 @@ supervised_evaluator:
     correctness:
       template: "evaluators/individual/eval_correctness.jinja"
     precision: 
-      template: "evaluators/individual/eval_precision.jinja"
+      function: "compute_precision"
+      precision_llm_config:
+        # model_name: "gpt-4o"
+        model_name: "gpt-4o-mini"
+        temperature: 0.2
+        provider: "openai"
     restraint: 
       function: "compute_restraint"
     content_similarity: 

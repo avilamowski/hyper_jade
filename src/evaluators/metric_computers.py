@@ -15,7 +15,12 @@ All functions in this module follow a consistent interface:
 
 import re
 import logging
-from typing import Dict, Any, Tuple
+import os
+from typing import Dict, Any, Tuple, List, Optional
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from langchain_core.messages import SystemMessage, HumanMessage
 
 logger = logging.getLogger(__name__)
 
@@ -242,4 +247,176 @@ def compute_content_similarity(llm_response: str) -> Tuple[float, str]:
     # No valid format found
     return 0.0, "Could not parse item scores from LLM response."
 
+def parse_extra_corrections(extra_text: str) -> List[str]:
+    """
+    Parse the extra auxiliary metric text to extract individual AI corrections.
+    
+    Args:
+        extra_text: The raw text output from aux_extra template
+        
+    Returns:
+        List of AI correction strings
+    """
+    if not extra_text:
+        return []
+    
+    corrections = []
+    seen = set()
+    
+    # Pattern to match numbered items: **N.** ... **AI correction:** "text" or text
+    # Split by numbered items first
+    items = re.split(r'\*\*(\d+)\.\*\*', extra_text)
+    
+    for i in range(1, len(items), 2):  # Skip number, get content
+        if i + 1 < len(items):
+            item_content = items[i + 1]
+            
+            # Look for AI correction field
+            ai_corr_match = re.search(r'\*\*AI correction:\*\*\s*(.+?)(?:\*\*|$)', item_content, re.DOTALL)
+            if ai_corr_match:
+                correction_text = ai_corr_match.group(1).strip()
+                
+                # Remove quotes if present
+                if correction_text.startswith('"') and correction_text.endswith('"'):
+                    correction_text = correction_text[1:-1]
+                
+                # Clean up
+                correction_text = correction_text.strip()
+                
+                if correction_text and correction_text not in seen:
+                    seen.add(correction_text)
+                    corrections.append(correction_text)
+    
+    return corrections
+
+
+def compute_precision(
+    auxiliary_metrics: Dict[str, str],
+    student_code: str,
+    assignment: str = "",
+    requirements: str = "",
+    llm: Optional[Any] = None,
+    precision_llm_config: Optional[Dict[str, Any]] = None
+) -> Tuple[float, str]:
+    """
+    Compute the precision score based on auxiliary metrics.
+    
+    Precision measures how accurate the AI's extra corrections are.
+    It evaluates each "extra" correction individually to determine if it's correct.
+    Score is calculated as: correct_extras / total_extras
+    
+    Args:
+        auxiliary_metrics: Dictionary with key 'extra' containing the text output
+        student_code: The student's code to evaluate corrections against
+        assignment: Optional assignment description
+        requirements: Optional requirements/rubric
+        llm: Optional LLM instance to use (if None, will create one from config)
+        precision_llm_config: Optional config dict with 'model_name', 'provider', 'temperature'
+                            for the precision evaluation LLM (uses more powerful model)
+    
+    Returns:
+        Tuple of (score: float, explanation: str) where score is between 0.0 and 1.0
+    """
+    extra_text = auxiliary_metrics.get('extra', '')
+    
+    # Parse individual corrections from extra text
+    corrections = parse_extra_corrections(extra_text)
+    
+    if not corrections:
+        return 1.0, "No extra corrections found. Precision is perfect (no false positives)."
+    
+    # Setup LLM for precision evaluation (use more powerful model)
+    if llm is None:
+        if precision_llm_config is None:
+            # Default to gpt-4o for precision (more powerful)
+            precision_llm_config = {
+                'model_name': 'gpt-4o',
+                'provider': 'openai',
+                'temperature': 0.1
+            }
+        
+        provider = precision_llm_config.get('provider', 'openai')
+        model_name = precision_llm_config.get('model_name', 'gpt-4o')
+        temperature = precision_llm_config.get('temperature', 0.1)
+        
+        if provider == "openai":
+            from langchain_openai import ChatOpenAI
+            llm = ChatOpenAI(
+                model=model_name,
+                temperature=temperature,
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url=os.getenv("OPENAI_BASE_URL"),
+            )
+        elif provider == "ollama":
+            from langchain_ollama.llms import OllamaLLM
+            llm = OllamaLLM(model=model_name, temperature=temperature)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+    
+    # Setup template for evaluating each correction
+    repo_root = Path(__file__).resolve().parents[2]
+    templates_dir = repo_root / "templates"
+    
+    jinja_env = Environment(
+        loader=FileSystemLoader(str(templates_dir)),
+        autoescape=select_autoescape(["jinja", "html", "txt"]),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    
+    template = jinja_env.get_template("evaluators/individual/eval_precision_item.jinja")
+    
+    # Evaluate each correction
+    correct_count = 0
+    total_count = len(corrections)
+    
+    for correction in corrections:
+        rendered = template.render(
+            assignment=assignment,
+            requirements=requirements,
+            student_code=student_code,
+            ai_correction=correction
+        )
+        
+        parts = rendered.split("---HUMAN---", 1)
+        if len(parts) == 2:
+            system_prompt = parts[0].strip()
+            human_prompt = parts[1].strip()
+        else:
+            system_prompt = "Evaluate precision of AI correction"
+            human_prompt = rendered
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=human_prompt)
+        ]
+        
+        response = llm.invoke(messages)
+        
+        # Extract text
+        if hasattr(response, 'content'):
+            response_text = response.content
+        else:
+            response_text = str(response)
+        
+        # Parse result
+        is_correct_match = re.search(r'<IS_CORRECT>(.*?)</IS_CORRECT>', response_text, re.IGNORECASE | re.DOTALL)
+        if is_correct_match:
+            is_correct = is_correct_match.group(1).strip().upper()
+            if is_correct == "CORRECT":
+                correct_count += 1
+    
+    # Calculate precision score
+    if total_count == 0:
+        score = 1.0
+    else:
+        score = correct_count / total_count
+    
+    explanation = (
+        f"Evaluated {total_count} extra corrections. "
+        f"{correct_count} were correct, {total_count - correct_count} were incorrect. "
+        f"Precision: {correct_count}/{total_count} = {score:.3f} ({score*100:.1f}%)."
+    )
+    
+    return score, explanation
 

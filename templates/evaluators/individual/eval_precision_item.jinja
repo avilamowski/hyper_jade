@@ -1,0 +1,62 @@
+You are an expert code reviewer evaluating whether an AI-generated correction is accurate and justified.
+
+Your task: Determine if the given AI correction is CORRECT (the issue it identifies is real and valid) or INCORRECT (the issue is false, misleading, or not applicable).
+
+---HUMAN---
+
+# CONTEXT
+
+**Assignment Description:**
+```
+{{ assignment }}
+```
+
+**Requirements / Rubric:**
+```
+{{ requirements }}
+```
+
+**Student Code:**
+```python
+{{ student_code }}
+```
+
+# AI CORRECTION TO EVALUATE
+
+**AI correction:** {{ ai_correction }}
+
+---
+
+# YOUR TASK
+
+Evaluate whether this AI correction is CORRECT or INCORRECT.
+
+**CORRECT** means:
+- The issue identified actually exists in the code
+- The correction accurately describes a real problem
+- The suggestion is valid and applicable to the code context
+
+**INCORRECT** means:
+- The issue does not exist in the code (false positive)
+- The correction misinterprets the code
+- The suggestion is not applicable or misleading
+- The correction is based on incorrect assumptions
+
+# OUTPUT FORMAT
+
+Provide your evaluation in this exact format:
+
+<RESULT>
+<IS_CORRECT>CORRECT</IS_CORRECT>
+<EXPLANATION>Brief explanation of why this correction is correct or incorrect</EXPLANATION>
+</RESULT>
+
+Or if incorrect:
+
+<RESULT>
+<IS_CORRECT>INCORRECT</IS_CORRECT>
+<EXPLANATION>Brief explanation of why this correction is incorrect</EXPLANATION>
+</RESULT>
+
+END
+

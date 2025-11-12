@@ -21,7 +21,7 @@ from langgraph.graph import StateGraph, END, START
 from ..config import load_config
 from ..models import Correction, Submission
 from ..agents.utils.reducers import keep_last, merge_dicts
-from .metric_computers import compute_completeness, compute_restraint
+from .metric_computers import compute_completeness, compute_restraint, compute_precision
 
 logger = logging.getLogger(__name__)
 
@@ -269,11 +269,12 @@ class IndividualMetricsEvaluator:
         # Mode 1: Python function only (no template)
         if "function" in config and "template" not in config:
             function_name = config["function"]
-            logger.info(f"Evaluating {metric_name} using Python function: {function_name} (NO LLM CALL)")
+            logger.info(f"Evaluating {metric_name} using Python function: {function_name}")
             
             function_map = {
                 "compute_completeness": compute_completeness,
                 "compute_restraint": compute_restraint,
+                "compute_precision": compute_precision,
             }
             
             if function_name not in function_map:
@@ -283,8 +284,21 @@ class IndividualMetricsEvaluator:
                 )
             
             compute_func = function_map[function_name]
-            score, explanation = compute_func(aux_metrics)
-            logger.info(f"Completed {metric_name} (Python function, NO LLM): score={score}")
+            
+            # Special handling for precision which needs additional parameters
+            if function_name == "compute_precision":
+                precision_llm_config = config.get("precision_llm_config")
+                score, explanation = compute_func(
+                    aux_metrics,
+                    student_code=state.get("student_code", ""),
+                    assignment=state.get("assignment", ""),
+                    requirements=state.get("requirements", ""),
+                    precision_llm_config=precision_llm_config
+                )
+            else:
+                score, explanation = compute_func(aux_metrics)
+            
+            logger.info(f"Completed {metric_name} (Python function): score={score}")
             return score, explanation
         
         # Mode 2 & 3: Template-based (with or without post-processing function)
