@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.evaluators.supervised_evaluator_aux import AuxiliaryMetricsEvaluator
-from src.evaluators.supervised_evaluator_indivudal import IndividualMetricsEvaluator
+from src.evaluators.supervised_evaluator_individual import IndividualMetricsEvaluator
 from src.config import load_config, get_agent_config, load_langsmith_config
 from src.core.mlflow_utils import mlflow_logger
 from src.models import Requirement, GeneratedPrompt, Submission, Correction, PromptType

@@ -13,7 +13,7 @@ repo_root = Path(__file__).resolve().parent
 sys.path.insert(0, str(repo_root))
 
 from src.evaluators.supervised_evaluator_aux import AuxiliaryMetricsEvaluator
-from src.evaluators.supervised_evaluator_indivudal import IndividualMetricsEvaluator
+from src.evaluators.supervised_evaluator_individual import IndividualMetricsEvaluator
 from src.models import Submission
 
 

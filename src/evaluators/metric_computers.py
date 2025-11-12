@@ -10,7 +10,7 @@ The design allows for interchangeable use of:
 
 All functions in this module follow a consistent interface:
 - Input: auxiliary_metrics dict (with keys like 'match', 'missing', 'extra')
-- Output: tuple of (score: int, explanation: str)
+- Output: tuple of (score: float, explanation: str) where score is between 0.0 and 1.0
 """
 
 import re
@@ -59,27 +59,19 @@ def parse_auxiliary_metric_count(text: str, metric_type: str) -> int:
     return 0
 
 
-def compute_completeness(auxiliary_metrics: Dict[str, str]) -> Tuple[int, str]:
+def compute_completeness(auxiliary_metrics: Dict[str, str]) -> Tuple[float, str]:
     """
     Compute the completeness score based on auxiliary metrics.
     
     Completeness measures how completely the AI identified issues from the human reference.
-    It's calculated as: 1 - (MISSING / (MATCH + MISSING))
-    
-    Scoring guide:
-    - 5: Missing ratio = 0 (AI found all human issues, 0% missed)
-    - 4: Missing ratio ≤ 0.15 (AI missed ≤15% of issues, 1 minor issue)
-    - 3: Missing ratio ≤ 0.35 (AI missed ≤35% of issues, 2-3 issues)
-    - 2: Missing ratio ≤ 0.55 (AI missed ≤55% of issues, 4-5 issues)
-    - 1: Missing ratio > 0.55 (AI missed >55% of issues)
-    - 0: Missing ratio ≥ 0.80 or critical functional requirements missed
+    Score is calculated as: 1 - (MISSING / (MATCH + MISSING))
     
     Args:
         auxiliary_metrics: Dictionary with keys 'match' and 'missing' containing
                           the text outputs from auxiliary metric templates
     
     Returns:
-        Tuple of (score: int, explanation: str)
+        Tuple of (score: float, explanation: str) where score is between 0.0 and 1.0
     """
     match_text = auxiliary_metrics.get('match', '')
     missing_text = auxiliary_metrics.get('missing', '')
@@ -92,31 +84,65 @@ def compute_completeness(auxiliary_metrics: Dict[str, str]) -> Tuple[int, str]:
     # Handle edge cases
     if total_human_issues == 0:
         # No human issues identified - perfect completeness (nothing to miss)
-        return 5, "No human-identified issues found. Completeness is perfect (nothing to miss)."
+        return 1.0, "No human-identified issues found. Completeness is perfect (nothing to miss)."
     
     if missing_count == 0:
         # AI found all human issues
-        return 5, f"AI identified all {total_human_issues} human-identified issues (MATCH={match_count}, MISSING={missing_count}). Missing ratio: 0.0 (0%)."
+        return 1.0, f"AI identified all {total_human_issues} human-identified issues (MATCH={match_count}, MISSING={missing_count}). Missing ratio: 0.0 (0%)."
     
-    # Calculate missing ratio
+    # Calculate completeness score: 1 - missing_ratio
     missing_ratio = missing_count / total_human_issues
-    
-    # Determine score based on ratio
-    if missing_ratio >= 0.80:
-        score = 0
-    elif missing_ratio > 0.55:
-        score = 1
-    elif missing_ratio > 0.35:
-        score = 2
-    elif missing_ratio > 0.15:
-        score = 3
-    else:
-        score = 4
+    score = 1.0 - missing_ratio
     
     explanation = (
         f"AI identified {match_count} out of {total_human_issues} human-identified issues "
         f"(MATCH={match_count}, MISSING={missing_count}, Total={total_human_issues}). "
         f"Missing ratio: {missing_count}/{total_human_issues} = {missing_ratio:.3f} ({missing_ratio*100:.1f}%)."
+    )
+    
+    return score, explanation
+
+
+def compute_restraint(auxiliary_metrics: Dict[str, str]) -> Tuple[float, str]:
+    """
+    Compute the restraint score based on auxiliary metrics.
+    
+    Restraint measures how restrained the AI is in reporting extra issues.
+    Score is calculated as: 1 - (extra / (match + extra))
+    
+    Lower extra ratio means better restraint (more restrained).
+    
+    Args:
+        auxiliary_metrics: Dictionary with keys 'match' and 'extra' containing
+                          the text outputs from auxiliary metric templates
+    
+    Returns:
+        Tuple of (score: float, explanation: str) where score is between 0.0 and 1.0
+    """
+    match_text = auxiliary_metrics.get('match', '')
+    extra_text = auxiliary_metrics.get('extra', '')
+    
+    match_count = parse_auxiliary_metric_count(match_text, metric_type='match')
+    extra_count = parse_auxiliary_metric_count(extra_text, metric_type='extra')
+    
+    total_ai_issues = match_count + extra_count
+    
+    # Handle edge cases
+    if total_ai_issues == 0:
+        # No AI issues identified - perfect restraint (nothing extra)
+        return 1.0, "No AI-identified issues found. Restraint is perfect (no extra issues)."
+    
+    if extra_count == 0:
+        # No extra issues
+        return 1.0, f"AI identified {match_count} issues, all matched with human reference (MATCH={match_count}, EXTRA={extra_count}). Extra ratio: 0.0 (0%)."
+    
+    # Calculate restraint score: 1 - extra_ratio
+    extra_ratio = extra_count / total_ai_issues
+    score = 1.0 - extra_ratio
+    
+    explanation = (
+        f"AI identified {total_ai_issues} issues total (MATCH={match_count}, EXTRA={extra_count}). "
+        f"Extra ratio: {extra_count}/{total_ai_issues} = {extra_ratio:.3f} ({extra_ratio*100:.1f}%)."
     )
     
     return score, explanation

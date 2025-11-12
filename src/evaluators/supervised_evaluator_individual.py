@@ -21,7 +21,7 @@ from langgraph.graph import StateGraph, END, START
 from ..config import load_config
 from ..models import Correction, Submission
 from ..agents.utils.reducers import keep_last, merge_dicts
-from .metric_computers import compute_completeness
+from .metric_computers import compute_completeness, compute_restraint
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class IndividualMetricsState(TypedDict):
     auxiliary_metrics: Annotated[Dict[str, str], keep_last]
     
     # Outputs - all scores and explanations stored in dictionaries
-    scores: Annotated[Dict[str, int], merge_dicts]
+    scores: Annotated[Dict[str, float], merge_dicts]
     explanations: Annotated[Dict[str, str], merge_dicts]
     overall_score: Annotated[Optional[float], keep_last]
     
@@ -248,7 +248,7 @@ class IndividualMetricsEvaluator:
             "overall_score": overall_score
         }
     
-    def _evaluate_single_metric(self, metric_name: str, state: IndividualMetricsState) -> tuple[int, str]:
+    def _evaluate_single_metric(self, metric_name: str, state: IndividualMetricsState) -> tuple[float, str]:
         """
         Helper method to evaluate a single metric.
         
@@ -271,6 +271,7 @@ class IndividualMetricsEvaluator:
             
             function_map = {
                 "compute_completeness": compute_completeness,
+                "compute_restraint": compute_restraint,
             }
             
             if function_name not in function_map:
@@ -321,9 +322,14 @@ class IndividualMetricsEvaluator:
         result_text = self._extract_result_text(raw_response)
         parsed = self._parse_metric_response(result_text, metric_name)
         
-        logger.info(f"Completed {metric_name} (LLM): score={parsed['score']}")
+        # Convert score from 0-5 scale to 0-1 scale if needed
+        score = parsed['score']
+        if isinstance(score, int) and score >= 0 and score <= 5:
+            score = score / 5.0
         
-        return parsed['score'], parsed['explanation']
+        logger.info(f"Completed {metric_name} (LLM): score={score}")
+        
+        return score, parsed['explanation']
     
     # -------------------------- Graph Builder ------------------------------- #
     

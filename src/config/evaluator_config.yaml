@@ -20,6 +20,6 @@ supervised_evaluator:
     precision: 
       template: "evaluators/individual/eval_precision.jinja"
     restraint: 
-      template: "evaluators/individual/eval_restraint.jinja"
+      function: "compute_restraint"
     content_similarity: 
       template: "evaluators/individual/eval_content_similarity.jinja"
