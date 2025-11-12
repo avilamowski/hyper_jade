@@ -15,16 +15,11 @@ supervised_evaluator:
   evaluation_metrics:
     completeness:
       template: "evaluators/individual/eval_completeness.jinja"
-      required_aux_metrics: ["match", "missing"]
     correctness:
       template: "evaluators/individual/eval_correctness.jinja"
-      required_aux_metrics: ["match", "missing", "extra"]
     precision: 
       template: "evaluators/individual/eval_precision.jinja"
-      required_aux_metrics: ["extra"]
     restraint: 
       template: "evaluators/individual/eval_restraint.jinja"
-      required_aux_metrics: ["match", "extra"]
     content_similarity: 
       template: "evaluators/individual/eval_content_similarity.jinja"
-      required_aux_metrics: ["match"]

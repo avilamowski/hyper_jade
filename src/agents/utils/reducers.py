@@ -13,3 +13,11 @@ def concat(
     if new is None:
         new = []
     return existing + new
+
+def merge_dicts(existing: dict, new: dict) -> dict:
+    """Reducer that merges dictionaries (new values override existing)"""
+    if existing is None:
+        existing = {}
+    if new is None:
+        new = {}
+    return {**existing, **new}

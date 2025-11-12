@@ -19,7 +19,7 @@ from langgraph.graph import StateGraph, END, START
 
 from ..config import load_config
 from ..models import Correction, Submission
-from ..agents.utils.reducers import keep_last
+from ..agents.utils.reducers import keep_last, merge_dicts
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +34,10 @@ class AuxiliaryMetricsState(TypedDict):
     generated_correction: Annotated[str, keep_last]
     
     # Outputs - all metrics stored in a single dictionary
-    auxiliary_metrics: Annotated[Dict[str, str], keep_last]
+    auxiliary_metrics: Annotated[Dict[str, str], merge_dicts]
     
     # Metadata
-    timings: Annotated[Optional[Dict[str, float]], keep_last]
+    timings: Annotated[Optional[Dict[str, float]], merge_dicts]
 
 
 class AuxiliaryMetricsEvaluator:

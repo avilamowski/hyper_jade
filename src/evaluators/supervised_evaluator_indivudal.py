@@ -20,7 +20,7 @@ from langgraph.graph import StateGraph, END, START
 
 from ..config import load_config
 from ..models import Correction, Submission
-from ..agents.utils.reducers import keep_last
+from ..agents.utils.reducers import keep_last, merge_dicts
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,12 @@ class IndividualMetricsState(TypedDict):
     auxiliary_metrics: Annotated[Dict[str, str], keep_last]
     
     # Outputs - all scores and explanations stored in dictionaries
-    scores: Annotated[Dict[str, int], keep_last]
-    explanations: Annotated[Dict[str, str], keep_last]
+    scores: Annotated[Dict[str, int], merge_dicts]
+    explanations: Annotated[Dict[str, str], merge_dicts]
     overall_score: Annotated[Optional[float], keep_last]
     
     # Metadata
-    timings: Annotated[Optional[Dict[str, float]], keep_last]
+    timings: Annotated[Optional[Dict[str, float]], merge_dicts]
 
 
 class IndividualMetricsEvaluator:
@@ -254,16 +254,9 @@ class IndividualMetricsEvaluator:
         
         config = self.eval_metric_configs[metric_name]
         template_name = config["template"]
-        required_aux = config.get("required_aux_metrics", [])
         
-        # Check that required auxiliary metrics are available
+        # Get auxiliary metrics dictionary
         aux_metrics = state.get("auxiliary_metrics", {})
-        missing_aux = [aux for aux in required_aux if aux not in aux_metrics]
-        if missing_aux:
-            logger.warning(
-                f"Metric {metric_name} requires auxiliary metrics {missing_aux} "
-                f"which are not provided. Available: {list(aux_metrics.keys())}"
-            )
         
         template = self.jinja_env.get_template(template_name)
         
