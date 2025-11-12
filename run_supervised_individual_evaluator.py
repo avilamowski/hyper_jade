@@ -9,7 +9,7 @@ import time
 import logging
 import mlflow
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -19,7 +19,7 @@ from src.evaluators.supervised_evaluator_aux import AuxiliaryMetricsEvaluator
 from src.evaluators.supervised_evaluator_individual import IndividualMetricsEvaluator
 from src.config import load_config, get_agent_config, load_langsmith_config
 from src.core.mlflow_utils import mlflow_logger
-from src.models import Requirement, GeneratedPrompt, Submission, Correction, PromptType
+from src.models import Requirement, GeneratedPrompt, Submission, Correction, PromptType, ReferenceCorrection
 from src.agents.utils.composite_llm import CompositeLLM
 
 # LangSmith tracing: optional, provide no-op fallbacks when not installed
@@ -63,7 +63,7 @@ def process_submission_traced(
     individual_evaluator: IndividualMetricsEvaluator,
     generated_prompts: List[GeneratedPrompt],
     submission: Submission,
-    reference_correction: str,
+    reference_correction: Union[str, ReferenceCorrection],
     requirements: List[Requirement],
     assignment_text: str,
     submission_index: int,
@@ -96,7 +96,7 @@ def process_submission_traced(
                 reference_text=reference_correction,
                 submission=submission,
                 assignment=assignment_text,
-                requirements="\n".join([req["requirement"] for req in requirements])
+                requirements=requirements  # Pass as list of Requirement objects
             )
         
         # Step 3: Evaluate individual metrics
@@ -108,7 +108,7 @@ def process_submission_traced(
                 submission=submission,
                 aux_metrics=aux_metrics,
                 assignment=assignment_text,
-                requirements="\n".join([req["requirement"] for req in requirements])
+                requirements=requirements  # Pass as list of Requirement objects
             )
         
         # Combine auxiliary and individual results
@@ -156,11 +156,28 @@ def load_submissions(submission_paths: List[str]) -> List[Submission]:
     return submissions
 
 
-def load_reference_corrections(correction_paths: List[str]) -> List[str]:
+def load_reference_corrections(correction_paths: List[str]) -> List[Union[str, ReferenceCorrection]]:
+    """Load reference corrections from files (.txt or .json)"""
     corrections = []
     for corr_path in correction_paths:
-        with open(corr_path, 'r', encoding='utf-8') as f:
-            corrections.append(f.read().strip())
+        path = Path(corr_path)
+        if path.suffix == '.json':
+            # Load as ReferenceCorrection
+            with open(corr_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    # Direct list of corrections
+                    corrections.append({"corrections": data})
+                elif isinstance(data, dict) and 'corrections' in data:
+                    # Already in ReferenceCorrection format
+                    corrections.append(data)
+                else:
+                    logger.warning(f"Unknown JSON format in {corr_path}, treating as empty correction list")
+                    corrections.append({"corrections": []})
+        else:
+            # Load as plain text
+            with open(corr_path, 'r', encoding='utf-8') as f:
+                corrections.append(f.read().strip())
     return corrections
 
 
@@ -228,7 +245,7 @@ Example usage:
     --assignment ejemplos/3p/consigna.txt \\
     --requirements ejemplos/3p/requirements/*.json \\
     --submissions ejemplos/3p/alu*.py \\
-    --reference-corrections ejemplos/3p/alu*.txt \\
+    --reference-corrections ejemplos/3p/alu*.json \\
     --output-dir outputs/supervised_individual_evaluation
 
 This will:
@@ -237,13 +254,17 @@ This will:
 3. Compute auxiliary metrics (MATCH, MISSING, EXTRA) using AuxiliaryMetricsEvaluator
 4. Evaluate individual metrics (completeness, restraint, etc.) using IndividualMetricsEvaluator
 5. Save corrections, auxiliary metrics, and evaluation results to the output directory
+
+Note: Reference corrections can be provided as either:
+  - .txt files (plain text corrections)
+  - .json files (structured corrections as a list of strings)
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--assignment", "-a", required=True, help="Path to assignment description file (.txt)")
     parser.add_argument("--requirements", "-r", nargs="+", required=True, help="Paths to requirement files (.json)")
     parser.add_argument("--submissions", "-s", nargs="+", required=True, help="Paths to student submission files (.py)")
-    parser.add_argument("--reference-corrections", "-c", nargs="+", required=True, help="Paths to reference correction files (.txt)")
+    parser.add_argument("--reference-corrections", "-c", nargs="+", required=True, help="Paths to reference correction files (.txt or .json)")
     parser.add_argument("--output-dir", "-o", required=True, help="Output directory for results")
     parser.add_argument("--config", default="src/config/assignment_config.yaml", help="Configuration file path")
     parser.add_argument("--evaluator-config", default="src/config/evaluator_config.yaml", help="Evaluator configuration file path")

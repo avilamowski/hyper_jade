@@ -1,70 +1,176 @@
-You are an expert evaluator for educational feedback systems. Your task is to identify requirements that were mentioned by the human teacher but NOT identified by the AI-generated correction.
+You are an expert evaluator for educational feedback systems. 
+
+# YOUR MISSION
+
+Compare the human teacher's feedback (SECTION D) with the AI's feedback (SECTION E) to find **GAPS** - issues that the human teacher pointed out but the AI completely failed to mention.
+
+**CRITICAL**: You are NOT checking if requirements from SECTION B were violated. You are ONLY checking what the HUMAN SAID versus what the AI SAID.
 
 Follow these rules:
-- Be systematic and precise in identifying gaps
-- Use verbatim quotes - do NOT paraphrase
+- Read SECTION D (human feedback) carefully to see what issues the teacher identified
+- Read SECTION E (AI feedback) to see what issues the AI identified  
+- Find issues mentioned by the HUMAN but NOT mentioned by the AI
 - Only include issues the AI completely missed (not partially covered)
+- Use verbatim quotes from SECTION D
 - Number each missing requirement for easy counting
 
 ---
 
 # INPUT DATA
 
-## 1. Assignment Context
+## SECTION A: Assignment Context
 
 **Assignment Description (if provided):**
 ```
 {{ assignment }}
 ```
 
-**Requirements / Rubric (if provided):**
-```
-{{ requirements }}
-```
+## SECTION B: Requirements / Rubric (Reference Only)
 
-**Student Code:**
+**This section contains possible requirements in XML format:**
+
+{{ requirements }}
+
+**NOTE**: These are POSSIBLE issues to check for. Your job is NOT to report all of these.
+Your job is to find what the HUMAN mentioned in SECTION D that the AI missed in SECTION E.
+
+## SECTION C: Student Code
+
 ```python
 {{ student_code }}
 ```
 
-## 2. Corrections to Compare
+## SECTION D: Human Reference Correction (Teacher's Feedback)
 
-**HUMAN REFERENCE CORRECTION (Teacher):**
+**READ THIS CAREFULLY - This is what the HUMAN TEACHER said about the student's code:**
+
 ```
 {{ reference_correction }}
 ```
 
-**AI-GENERATED CORRECTION:**
+## SECTION E: AI-Generated Correction (AI's Feedback)
+
+**READ THIS CAREFULLY - This is what the AI said about the student's code:**
+
 ```
 {{ generated_correction }}
 ```
 
 ---
 
-# YOUR TASK: Identify MISSING REQUIREMENTS
+# YOUR TASK: Identify MATCHED and MISSING REQUIREMENTS
 
----
+You will output TWO separate lists:
+1. **MATCHED requirements**: Issues mentioned by BOTH human and AI
+2. **MISSING requirements**: Issues mentioned by HUMAN but NOT by AI
 
-# YOUR TASK: Identify MISSING REQUIREMENTS
+**CRITICAL**: These two lists MUST be disjoint (no overlap). Each issue goes in exactly ONE list.
 
-Find all requirements/issues that the human teacher mentioned but the AI correction completely failed to identify.
+## Step-by-Step Process:
 
-## Important Distinctions:
+**STEP 1**: Read SECTION D and identify all issues/problems the HUMAN teacher mentioned
+- Make a mental list of each issue the human pointed out
+- Example: If the human said "No valida la entrada", that's one issue
 
-1. **REQUIREMENTS** = The criteria/rubric items listed in the "Requirements / Rubric" section above
-2. **CORRECTIONS** = The feedback/comments provided in the "Human Reference Correction" and "AI-Generated Correction" sections
+**STEP 2**: For each issue the human mentioned, check if the AI mentioned it in SECTION E
+- Read SECTION E completely
+- Does the AI mention this same issue (even in different words)?
+- If YES → This is a MATCH (include in MATCHED list)
+- If NO → This is MISSING (include in MISSING list)
 
-**IMPORTANT**: Only include issues here if the AI made NO mention of them at all. If the AI mentioned the issue even partially, it should be in MATCH instead.
+**STEP 3**: For each issue (whether MATCHED or MISSING), find the corresponding requirement in SECTION B
+- Look through the XML requirements in SECTION B
+- Find which `<requirement>` tag matches the issue the human mentioned
+- Extract the requirement text and attributes
 
-## Output Format for Each Missing Requirement:
+**CRITICAL**: An issue cannot be in both lists. If the AI mentioned it at all (even partially), it goes in MATCHED, not MISSING.
+
+**IMPORTANT RULES**:
+- ❌ DO NOT list all requirements from SECTION B
+- ❌ DO NOT assume violations - only report what the HUMAN explicitly said
+- ✅ Output BOTH matched and missing issues
+- ✅ Ensure the two lists are DISJOINT (no overlap)
+- ✅ If the AI mentioned the issue even briefly, it's MATCHED (not missing)
+- ✅ Use XML tags to clearly separate the two lists
+
+## Output Format for Each MATCHED Requirement:
 
 **[Number].** 
-**Requirement:** [The requirement label/criterion from the rubric - use verbatim text]
-**Human correction:** [Verbatim quote from the HUMAN REFERENCE CORRECTION that mentions this requirement]
-**Impact severity:** [LOW/MEDIUM/HIGH - how critical this missing issue is relative to program correctness]
+**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag]{{ '</requirement>' }}
+**Function:** [Value of the "function" attribute from the XML tag]
+**Type:** [Value of the "type" attribute from the XML tag]
+**Human correction:** {{ '<human>' }}[EXACT verbatim quote from the teacher's feedback]{{ '</human>' }}
+**AI correction:** {{ '<generated>' }}[EXACT verbatim quote from the AI's feedback]{{ '</generated>' }}
+
+## Output Format for Each MISSING Requirement:
+
+**[Number].** 
+**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag that matches what the human mentioned]{{ '</requirement>' }}
+**Function:** [Value of the "function" attribute from the XML tag]
+**Type:** [Value of the "type" attribute from the XML tag]
+**Human correction:** {{ '<human>' }}[EXACT verbatim quote showing the human mentioned this issue]{{ '</human>' }}
+**Impact severity:** [LOW/MEDIUM/HIGH - how critical this missing issue is]
 **Impact Explanation:** [Brief explanation of why this severity level was assigned]
 
-## Impact Severity Guidelines:
+## Decision Tree for Each Issue:
+
+For each issue you find in SECTION D (human feedback), ask yourself:
+
+```
+1. Did the HUMAN mention this issue in SECTION D?
+   NO → Skip it (don't include)
+   YES → Go to step 2
+
+2. Did the AI mention this same issue in SECTION E?
+   YES → It's a MATCH (include in MATCHED list)
+   NO → It's MISSING (include in MISSING list)
+
+3. Ensure disjoint sets:
+   - Each issue appears in exactly ONE list
+   - If AI mentioned it partially, it goes in MATCHED
+```
+
+## Examples to Understand:
+
+### Example 1: Issue is MISSING (include in MISSING section)
+- **Human (SECTION D)** says: "No valida que la cantidad sea positiva"
+- **AI (SECTION E)** says: "No maneja errores de archivo" (different issue, doesn't mention validation)
+- **Decision**: MISSING - Human mentioned validation, AI didn't → **Use `<human>` tags in MISSING section**
+
+### Example 2: Issue is MATCHED (include in MATCHED section)
+- **Human (SECTION D)** says: "No valida que la cantidad sea positiva"
+- **AI (SECTION E)** says: "Falta validación de entrada para el parámetro cantidad"
+- **Decision**: MATCHED - Both mentioned validation → **Use `<matched>` tags in MATCHED section**
+
+### Example 3: Issue is MATCHED with different wording (include in MATCHED section)
+- **Human (SECTION D)** says: "El archivo no se guarda correctamente"
+- **AI (SECTION E)** says: "Error en la línea 45 al intentar escribir el archivo"
+- **Decision**: MATCHED - Both mentioned file saving issue → **Use `<matched>` tags in MATCHED section**
+
+### Example 4: AI mentioned it partially (include in MATCHED section)
+- **Human (SECTION D)** says: "No valida que la cantidad sea positiva y no actualiza el stock"
+- **AI (SECTION E)** says: "No actualiza el stock correctamente"
+- **Decision**: PARTIAL MATCH - AI mentioned part of it → **Use `<matched>` tags in MATCHED section**
+
+## How to Extract from XML (SECTION B):
+
+Given this XML in SECTION B:
+```xml
+<requirement function="vender_productos" type="error_presence">
+    No agrega a ventas pasadas el stock restado, o resta el número original en vez del stock.
+</requirement>
+```
+
+Extract as:
+- **Requirement:** {{ '<requirement>' }}No agrega a ventas pasadas el stock restado, o resta el número original en vez del stock.{{ '</requirement>' }}
+- **Function:** vender_productos
+- **Type:** error_presence
+
+❌ **NEVER copy text from SECTION D into the Requirement field**
+❌ **NEVER invent requirements - they must exist as <requirement> tags in SECTION B**
+✅ **ALWAYS extract requirement text from inside the XML tags**
+✅ **ALWAYS include the function and type attributes**
+
 ## Impact Severity Guidelines:
 
 - **HIGH**: Critical functional issue that would cause crashes, incorrect results, or major bugs
@@ -75,50 +181,171 @@ Find all requirements/issues that the human teacher mentioned but the AI correct
 
 # OUTPUT INSTRUCTIONS
 
-Provide a numbered list of all missing requirements. If there are no missing requirements (AI found everything the human found), output:
+**IMPORTANT**: You MUST output BOTH lists for transparency and verification:
+1. **MATCHED requirements** - Show what the AI correctly identified
+2. **MISSING requirements** - Show what the AI failed to identify
+
+**CRITICAL**: Only the MISSING section will be stored in the system state. The MATCHED section is for analysis transparency only.
+
+## Your Task:
+
+**STEP 1**: Identify all issues the HUMAN mentioned in SECTION D
+
+**STEP 2**: For each issue, determine if it's MATCHED or MISSING:
+- **MATCHED**: Human mentioned it AND AI mentioned it → Include in MATCHED section
+- **MISSING**: Human mentioned it BUT AI didn't mention it → Include in MISSING section
+
+**STEP 3**: Output BOTH lists, with the MISSING section wrapped in `<OUTPUT>` tags
+
+## Response Structure:
 
 ```
-NO MISSING REQUIREMENTS - AI IDENTIFIED ALL HUMAN ISSUES
+### MATCHED REQUIREMENTS (AI identified these):
+
+[List all matched items here - this section is for transparency only]
+
+<OUTPUT>
+### MISSING REQUIREMENTS (AI failed to identify these):
+
+[List all missing items here - this section will be stored in state]
+
+<AUXILIARY_METRIC_COUNT>
+MATCHED_COUNT: X
+MISSING_COUNT: Y
+</AUXILIARY_METRIC_COUNT>
+</OUTPUT>
 ```
 
-## Example Output:
+## Output Format for MATCHED Requirements:
 
-**1.** 
-**Requirement:** Missing input validation
-**Human correction:** "No valida que los elementos sean números"
-**Impact severity:** MEDIUM
-**Impact Explanation:** Could lead to runtime errors if non-numeric values are passed, but won't cause data corruption
+**[Number].** 
+**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag]{{ '</requirement>' }}
+**Function:** [Value of the "function" attribute from the XML tag]
+**Type:** [Value of the "type" attribute from the XML tag]
+**Human correction:** {{ '<human>' }}[EXACT verbatim quote from the teacher's feedback]{{ '</human>' }}
+**AI correction:** {{ '<generated>' }}[EXACT verbatim quote from the AI's feedback]{{ '</generated>' }}
 
-**2.** 
-**Requirement:** Lack of documentation
-**Human correction:** "Falta documentación de la función"
-**Impact severity:** LOW
-**Impact Explanation:** Affects code maintainability but doesn't impact functionality
+## Output Format for MISSING Requirements:
+
+**[Number].** 
+**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag]{{ '</requirement>' }}
+**Function:** [Value of the "function" attribute from the XML tag]
+**Type:** [Value of the "type" attribute from the XML tag]
+**Human correction:** {{ '<human>' }}[EXACT verbatim quote showing the human mentioned this issue]{{ '</human>' }}
+**Impact severity:** [LOW/MEDIUM/HIGH - how critical this missing issue is]
+**Impact Explanation:** [Brief explanation of why this severity level was assigned]
 
 ---
 
-# CRITICAL REMINDERS:
+## Example Output Structure:
 
-⚠️ **DO NOT quote from the Requirements/Rubric section in the "Human correction" field**
-⚠️ **ONLY quote from the actual HUMAN REFERENCE CORRECTION text**
-⚠️ **The "Requirement" field should reference the rubric criterion, but the correction field must quote the teacher's feedback**
-⚠️ **Only include issues the AI completely missed - not partially covered ones**
+### MATCHED REQUIREMENTS (AI identified these):
+
+**1.** 
+**Requirement:** {{ '<requirement>' }}No valida que la entrada sea un número positivo.{{ '</requirement>' }}
+**Function:** agregar_producto
+**Type:** error_presence
+**Human correction:** {{ '<human>' }}"Falta validación de entrada positiva."{{ '</human>' }}
+**AI correction:** {{ '<generated>' }}"No valida que el parámetro cantidad sea mayor que cero."{{ '</generated>' }}
+
+**2.** 
+**Requirement:** {{ '<requirement>' }}No maneja el caso cuando el archivo no existe.{{ '</requirement>' }}
+**Function:** cargar_inventario
+**Type:** error_presence
+**Human correction:** {{ '<human>' }}"No se valida la existencia del archivo."{{ '</human>' }}
+**AI correction:** {{ '<generated>' }}"Falta try-catch para FileNotFoundError."{{ '</generated>' }}
+
+---
+
+{{ '<OUTPUT>' }}
+### MISSING REQUIREMENTS (AI failed to identify these):
+
+**1.** 
+**Requirement:** {{ '<requirement>' }}No agrega a ventas pasadas el stock restado, o resta el número original en vez del stock.{{ '</requirement>' }}
+**Function:** vender_productos
+**Type:** error_presence
+**Human correction:** {{ '<human>' }}"No agrega a ventas pasadas el stock restado."{{ '</human>' }}
+**Impact severity:** HIGH
+**Impact Explanation:** Critical functional issue that prevents proper sales history tracking
+
+**2.** 
+**Requirement:** {{ '<requirement>' }}No lee correctamente el archivo y lo carga en listas.{{ '</requirement>' }}
+**Function:** vender_productos
+**Type:** error_presence
+**Human correction:** {{ '<human>' }}"El archivo no se lee correctamente, no se parsean los datos como listas."{{ '</human>' }}
+**Impact severity:** HIGH
+**Impact Explanation:** Prevents the program from loading initial inventory data
+
+<AUXILIARY_METRIC_COUNT>
+MATCHED_COUNT: 2
+MISSING_COUNT: 2
+</AUXILIARY_METRIC_COUNT>
+{{ '</OUTPUT>' }}
+
+---
+
+**If there are NO missing requirements**, still output the MATCHED section, then output:
+
+{{ '<OUTPUT>' }}
+### MISSING REQUIREMENTS (AI failed to identify these):
+
+NO MISSING REQUIREMENTS - AI IDENTIFIED ALL HUMAN ISSUES
+
+<AUXILIARY_METRIC_COUNT>
+MATCHED_COUNT: <number_of_matched>
+MISSING_COUNT: 0
+</AUXILIARY_METRIC_COUNT>
+{{ '</OUTPUT>' }}
+
+---
+
+# CRITICAL REMINDERS - READ BEFORE RESPONDING:
+
+⚠️ **YOUR JOB**: Classify each human issue as MATCHED or MISSING, then output BOTH lists
+
+⚠️ **OUTPUT STRUCTURE**: 
+   - Output MATCHED section first (for transparency)
+   - Then wrap the MISSING section in `<OUTPUT>` tags (this will be stored in state)
+   - Include the count summary inside the `<OUTPUT>` tags
+
+⚠️ **DISJOINT SETS**: Each issue can only be in one category (matched OR missing, never both)
+
+⚠️ **WORKFLOW**:
+   1. Read what the HUMAN said in SECTION D
+   2. For each issue, check if the AI mentioned it in SECTION E
+   3. If AI mentioned it (even partially) → MATCHED section (outside OUTPUT tags)
+   4. If AI didn't mention it → MISSING section (inside OUTPUT tags)
+
+⚠️ **SECTION B is just a REFERENCE** - it shows possible requirements, but you should output:
+   - ALL issues the HUMAN mentioned in SECTION D (categorized as matched or missing)
+   - Each with the corresponding requirement from SECTION B
+
+⚠️ **Extract requirement details from SECTION B XML:**
+   ```xml
+   <requirement function="function_name" type="requirement_type">
+       Requirement text goes here
+   </requirement>
+   ```
+
+⚠️ **Quote what the HUMAN said from SECTION D** - not from SECTION B or E
 
 ---
 
 # REQUIRED: COUNT SUMMARY
 
-At the very end of your response, you MUST include the following structured count summary:
+At the very end of your response, **inside the `<OUTPUT>` tags**, you MUST include the following structured count summary:
 
 <AUXILIARY_METRIC_COUNT>
-MISSING_COUNT: <number>
+MATCHED_COUNT: <number_of_matched>
+MISSING_COUNT: <number_of_missing>
 </AUXILIARY_METRIC_COUNT>
 
-Where <number> is the total count of missing requirements you identified above. If there are no missing requirements, use 0.
+Where:
+- `<number_of_matched>` is the total count of MATCHED requirements (issues both human and AI mentioned)
+- `<number_of_missing>` is the total count of MISSING requirements (issues only human mentioned)
 
-Example:
-<AUXILIARY_METRIC_COUNT>
-MISSING_COUNT: 3
-</AUXILIARY_METRIC_COUNT>
+These two counts should sum to the total number of issues the human mentioned in SECTION D.
+
+**IMPORTANT**: This count block MUST be inside the `<OUTPUT>` tags so it gets stored in state.
 
 END

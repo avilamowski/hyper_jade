@@ -1,0 +1,7 @@
+[
+  "No valida correctamente que el parámetro sea un número entero y positivo (if not cantidad_entera==0 or int(cantidad)<= 0: deberia ser cantidad_entera == False y el NOT no deberia ir) (-0.50)",
+  "No carga en listas correctamente los productos 1000-1009 con stock 100. (-0.75)",
+  "No lee el archivo correctamente y los carga en listas. Tiene errores con el formato de lectura ya que deja los saltos de linea. (-0.25)",
+  "No genera la cantidad de ventas pedida o la cantidad por venta (1-5 unidades) (-0.50).",
+  "Errores varios: if vendido <= stock_actual: La variable vendido no existe. (-0.25)"
+]

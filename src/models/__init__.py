@@ -5,4 +5,5 @@ from .models import (
     Submission,
     Correction,
     GroupedCode,
+    ReferenceCorrection,
 )

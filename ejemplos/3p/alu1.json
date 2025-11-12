@@ -1,0 +1,4 @@
+[
+  "No agrega a ventas pasadas el stock restado (-0.75)",
+  "No guarda/actualiza/crea correctamente el archivo. El archivo no se actualiza correctamente ya que en la función actualiza_listas se usa if negativo in lista_productos: cuando debería ser un elif. A veces se genera un index error por indice = randint(0,10) # Deberia ser de 0 a 9 en lugar de 0 a 10. (-0.50)"
+]

@@ -50,3 +50,8 @@ class GroupedCode(TypedDict):
     code: str
     submission_name: str
     line_numbers: List[int]
+
+
+class ReferenceCorrection(TypedDict):
+    """Reference correction containing a list of correction items"""
+    corrections: List[str]

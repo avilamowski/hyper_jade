@@ -1,0 +1,8 @@
+[
+  "No valida que el parámetro sea un número entero (-0.25)",
+  "Error de ejecución en la primera corrida ya que no genera \"contenido\" en la función leer_txt si el archivo no existe. (-0.50)",
+  "No genera la cantidad de ventas pedida. No considera las cantidades pasadas por parametro (-0.50)",
+  "No resta correctamente la venta al stock, no actualiza el stock (-0.75)",
+  "No agrega a ventas pasadas el stock restado. (-0.75)",
+  "No guarda/actualiza/crea correctamente el archivo (-0.75)"
+]

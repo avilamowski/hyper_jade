@@ -1,0 +1,6 @@
+[
+  "Variable no definida cod_disp_neg (Otros, -0,25 ptos.)",
+  "Permite valores float al validar el parámetro cantidad (Err2, -0,25 ptos.)",
+  "No es necesario volver a leer el archivo cuando se lo crea porque no existía, al generarlo se pueden armar también las listas. Estás repitiendo el código de la lectura, mal modularizado (Otros, -0,25 ptos.)",
+  "La lógica para actualizar stock y ventas históricas es incorrecta, esta parte del código tiene múltiples errores, claramente no fue probado: mal tipeado append, suma un entero a una lista, compara una lista con 0, usa el mismo índice para acceder a un producto en cant_disp_posi y cant_disp_neg, cuando no tiene por qué tener el mismo índice en las dos listas, el if/elif tampoco corresponde ya que si hay stock entonces no se actualizan las ventas, castea a int una lista (Err15, -2 ptos.)"
+]

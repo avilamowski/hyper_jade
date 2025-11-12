@@ -1,0 +1,7 @@
+[
+  "No valida que el parámetro sea un número entero y positivo correctamente. (-0.50)",
+  "Problemas con modularización. Las llamadas a validacion_cant, lectura_TXT(ruta) y azar(ruta) dentro de vender_productos() no hacen nada. Lo mismo sucede en actualizacion_TXT (-0.50)",
+  "No genera la cantidad de ventas pedida. No considera las cantidades pasadas por parametro (-0.50)",
+  "No agrega a ventas pasadas el stock restado. Escribe lineas nuevas del stock en lugar de modificar las existentes restando las ventas. - (-0.75)",
+  "No guarda/actualiza/crea correctamente el archivo. No agrega los articulos vendidos como -1000, -1001, etc. (-0.75)"
+]

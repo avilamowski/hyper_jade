@@ -10,7 +10,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, TypedDict, Annotated
+from typing import Any, Dict, List, Optional, TypedDict, Annotated, Union
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -18,7 +18,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, END, START
 
 from ..config import load_config
-from ..models import Correction, Submission
+from ..models.models import Correction, Submission, Requirement, ReferenceCorrection
 from ..agents.utils.reducers import keep_last, merge_dicts
 
 logger = logging.getLogger(__name__)
@@ -28,9 +28,9 @@ class AuxiliaryMetricsState(TypedDict):
     """State for auxiliary metrics computation"""
     # Inputs
     assignment: Annotated[str, keep_last]
-    requirements: Annotated[str, keep_last]
+    requirements: Annotated[List[Requirement], keep_last]
     student_code: Annotated[str, keep_last]
-    reference_correction: Annotated[str, keep_last]
+    reference_correction: Annotated[Union[str, ReferenceCorrection], keep_last]
     generated_correction: Annotated[str, keep_last]
     
     # Outputs - all metrics stored in a single dictionary
@@ -88,6 +88,70 @@ class AuxiliaryMetricsEvaluator:
         # Build the graph
         self.graph = self._build_graph()
     
+    @staticmethod
+    def _format_requirements_as_xml(requirements: List[Requirement]) -> str:
+        """
+        Format a list of requirements as XML tags.
+        
+        Args:
+            requirements: List of Requirement dictionaries with 'requirement', 'function', and 'type' keys
+            
+        Returns:
+            XML-formatted string with requirements using <requirement> tags
+            
+        Example:
+            <requirement function="vender_productos" type="error_presence">
+            No recibe por parámetro la ruta.
+            </requirement>
+            <requirement function="vender_productos" type="error_presence">
+            No valida que el parámetro 'cantidad' sea un entero positivo.
+            </requirement>
+        """
+        if not requirements:
+            return ""
+        
+        xml_parts = []
+        for req in requirements:
+            req_type = req['type'].value if hasattr(req['type'], 'value') else str(req['type'])
+            xml_parts.append(
+                f'<requirement function="{req["function"]}" type="{req_type}">\n'
+                f'{req["requirement"]}\n'
+                f'</requirement>'
+            )
+        
+        return "\n".join(xml_parts)
+    
+    @staticmethod
+    def _format_reference_correction(reference_correction: Union[str, ReferenceCorrection]) -> str:
+        """
+        Convert ReferenceCorrection to XML format using <human> tags.
+        
+        Args:
+            reference_correction: Either a string or ReferenceCorrection dict
+            
+        Returns:
+            XML-formatted string with <human> tags
+        """
+        if isinstance(reference_correction, str):
+            # Wrap plain text in <human> tag
+            if not reference_correction.strip():
+                return ""
+            return f"<human>\n{reference_correction}\n</human>"
+        elif isinstance(reference_correction, dict) and 'corrections' in reference_correction:
+            # Format as XML with individual correction items
+            corrections = reference_correction['corrections']
+            if not corrections:
+                return ""
+            
+            xml_parts = ["<human>"]
+            for correction in corrections:
+                xml_parts.append(f"<correction>{correction}</correction>")
+            xml_parts.append("</human>")
+            
+            return "\n".join(xml_parts)
+        else:
+            return f"<human>\n{str(reference_correction)}\n</human>"
+    
     def _setup_llm(self):
         provider = self.evaluator_config["provider"]
         model_name = self.evaluator_config["model_name"]
@@ -110,7 +174,15 @@ class AuxiliaryMetricsEvaluator:
             raise ValueError(f"Unsupported provider: {provider}")
     
     def _extract_result_text(self, raw_response) -> str:
-        """Extract text content from LLM response."""
+        """
+        Extract text content from LLM response.
+        
+        If the response contains <OUTPUT>...</OUTPUT> tags, only the content
+        within those tags is extracted and stored. This allows the LLM to output
+        additional analysis/context that is visible in logs but not stored in state.
+        
+        If no <OUTPUT> tags are found, the full response is returned.
+        """
         if hasattr(raw_response, 'content'):
             text = raw_response.content
         elif isinstance(raw_response, dict):
@@ -122,7 +194,23 @@ class AuxiliaryMetricsEvaluator:
         else:
             text = str(raw_response)
         
-        return text.strip()
+        text = text.strip()
+        
+        # Check for <OUTPUT> tags and extract only that content
+        output_match = re.search(
+            r'<OUTPUT>(.*?)</OUTPUT>',
+            text,
+            re.DOTALL | re.IGNORECASE
+        )
+        
+        if output_match:
+            # Extract only the content within <OUTPUT> tags
+            extracted = output_match.group(1).strip()
+            logger.debug(f"Extracted OUTPUT section ({len(extracted)} chars) from full response ({len(text)} chars)")
+            return extracted
+        else:
+            # No <OUTPUT> tags found, return full text
+            return text
     
     # -------------------------- LangGraph Nodes ------------------------------ #
     
@@ -169,13 +257,31 @@ class AuxiliaryMetricsEvaluator:
         template_name = self.aux_metric_configs[metric_name]["template"]
         template = self.jinja_env.get_template(template_name)
         
+        # Format requirements as XML
+        requirements_list = state.get("requirements", [])
+        requirements_xml = self._format_requirements_as_xml(requirements_list)
+        
+        # Format reference correction (convert from ReferenceCorrection if needed) with <human> tags
+        reference_correction_raw = state.get("reference_correction", "")
+        human_correction_xml = self._format_reference_correction(reference_correction_raw)
+        
+        # Format generated correction with <generated> tags
+        generated_text = state.get("generated_correction", "")
+        if generated_text.strip():
+            generated_correction_xml = f"<generated>\n{generated_text}\n</generated>"
+        else:
+            generated_correction_xml = ""
+        
         # Render the template
         rendered = template.render(
             assignment=state.get("assignment", ""),
-            requirements=state.get("requirements", ""),
+            requirements=requirements_xml,
             student_code=state.get("student_code", ""),
-            reference_correction=state.get("reference_correction", ""),
-            generated_correction=state.get("generated_correction", "")
+            human=human_correction_xml,
+            generated=generated_correction_xml,
+            # Keep old names for backward compatibility
+            reference_correction=human_correction_xml,
+            generated_correction=generated_correction_xml
         )
         
         # Split system/human if separator exists
@@ -229,10 +335,10 @@ class AuxiliaryMetricsEvaluator:
     def compute_all_auxiliary_metrics(
         self,
         generated_text: str,
-        reference_text: str,
+        reference_text: Union[str, ReferenceCorrection],
         submission: Submission,
         assignment: Optional[str] = None,
-        requirements: Optional[str] = None,
+        requirements: Optional[Union[List[Requirement], str]] = None,
         metrics_to_compute: Optional[List[str]] = None
     ) -> Dict[str, str]:
         """
@@ -240,10 +346,10 @@ class AuxiliaryMetricsEvaluator:
         
         Args:
             generated_text: AI-generated correction text
-            reference_text: Human reference correction text
+            reference_text: Human reference correction (string or ReferenceCorrection)
             submission: Student submission
             assignment: Optional assignment description
-            requirements: Optional requirements/rubric
+            requirements: Optional requirements/rubric as List[Requirement] or string (for backward compatibility)
             metrics_to_compute: Optional list of specific metrics to compute.
                               If None, computes all configured metrics.
         
@@ -252,10 +358,26 @@ class AuxiliaryMetricsEvaluator:
         """
         logger.info("Computing auxiliary metrics via LangGraph")
         
+        # Convert requirements to list if it's a string (backward compatibility)
+        if isinstance(requirements, str):
+            # Parse legacy string format into simple requirements
+            requirements_list = []
+            for line in requirements.strip().split('\n'):
+                if line.strip():
+                    requirements_list.append({
+                        "requirement": line.strip(),
+                        "function": "unknown",
+                        "type": "error_presence"
+                    })
+        elif requirements is None:
+            requirements_list = []
+        else:
+            requirements_list = requirements
+        
         # Prepare initial state
         initial_state: AuxiliaryMetricsState = {
             "assignment": assignment or "",
-            "requirements": requirements or "",
+            "requirements": requirements_list,
             "student_code": submission.get('code', ''),
             "reference_correction": reference_text,
             "generated_correction": generated_text,

@@ -11,31 +11,33 @@ Follow these rules:
 
 # INPUT DATA
 
-## 1. Assignment Context
+## SECTION A: Assignment Context
 
 **Assignment Description (if provided):**
 ```
 {{ assignment }}
 ```
 
-**Requirements / Rubric (if provided):**
-```
-{{ requirements }}
-```
+## SECTION B: Requirements / Rubric (if provided)
 
-**Student Code:**
+**This section contains requirements in XML format:**
+
+{{ requirements }}
+
+## SECTION C: Student Code
+
 ```python
 {{ student_code }}
 ```
 
-## 2. Corrections to Compare
+## SECTION D: Human Reference Correction (Teacher's Feedback)
 
-**HUMAN REFERENCE CORRECTION (Teacher):**
 ```
 {{ reference_correction }}
 ```
 
-**AI-GENERATED CORRECTION:**
+## SECTION E: AI-Generated Correction (AI's Feedback)
+
 ```
 {{ generated_correction }}
 ```
@@ -52,17 +54,58 @@ Find all requirements, issues, or comments that the AI-generated correction ment
 
 ## Important Distinctions:
 
-1. **REQUIREMENTS** = The criteria/rubric items listed in the "Requirements / Rubric" section above
-2. **CORRECTIONS** = The feedback/comments provided in the "Human Reference Correction" and "AI-Generated Correction" sections
+**SECTION B (Requirements/Rubric)** contains:
+- Pre-defined evaluation criteria in XML format
+- Each `<requirement>` tag has attributes: `function` (which function it applies to) and `type` (category of requirement)
+- The text inside the tag is the actual requirement description
+- These are reference criteria - not necessarily what was mentioned in corrections
+- Example:
+  ```xml
+  <requirement function="vender_productos" type="error_presence">
+      No valida que el parámetro 'cantidad' sea un entero positivo.
+  </requirement>
+  ```
+
+**SECTION D (Human Reference Correction)** contains:
+- The teacher's specific observations about THIS student's code
+- This is what the human evaluator actually said
+
+**SECTION E (AI-Generated Correction)** contains:
+- The AI's specific observations about THIS student's code
+- This is what the AI evaluator actually said
+
+## YOUR JOB:
+
+1. **Find extras**: Identify issues that the AI mentioned in SECTION E but the HUMAN did NOT mention in SECTION D
+2. **Quote the AI correction**: Take verbatim quote from SECTION E showing what the AI said
+3. **Assess relevance**: Determine if this extra comment is valuable or off-topic
 
 **IMPORTANT**: Only include items here if they have NO mention in the human feedback at all. If the human mentioned the issue even briefly, it should be in MATCH instead.
 
 ## Output Format for Each Extra Item:
 
 **[Number].** 
-**AI correction:** [Verbatim quote from the AI-GENERATED CORRECTION that mentions this requirement or observation]
-**Relevance:** [RELEVANT/SOMEWHAT_RELEVANT/IRRELEVANT - how relevant this extra comment is to the assignment/code quality]
+**AI correction:** {{ '<generated>' }}[EXACT verbatim quote from the AI's feedback showing what it said about this issue]{{ '</generated>' }}
+**Relevance:** [RELEVANT/SOMEWHAT_RELEVANT/IRRELEVANT - how relevant this extra comment is]
 **Relevance Explanation:** [Brief explanation of why this relevance level was assigned]
+
+### CRITICAL: Quote from SECTION E only
+
+- **AI correction field**: Should be the EXACT quote of what the AI wrote in its feedback (SECTION E)
+- This should be the AI's observation about the student's code
+- DO NOT quote from SECTION B (the XML requirements) - those are just reference criteria
+- DO NOT quote from SECTION D (the human correction)
+
+❌ **WRONG** - Don't quote from the requirements, quote what the AI actually said:
+```
+AI correction: {{ '<requirement>' }}No valida que el parámetro 'cantidad' sea un entero positivo.{{ '</requirement>' }}
+```
+(This is from the requirements, not what the AI actually said)
+
+✅ **CORRECT** - Quote what the AI actually said in SECTION E:
+```
+AI correction: {{ '<generated>' }}El código no valida que el parámetro 'cantidad' sea un entero positivo antes de convertirlo a entero.{{ '</generated>' }}
+```
 
 ## Relevance Guidelines:
 ## Relevance Guidelines:
@@ -84,17 +127,17 @@ NO EXTRA REQUIREMENTS - AI STAYED FOCUSED ON HUMAN ISSUES
 ## Example Output:
 
 **1.** 
-**AI correction:** "La función debería usar type hints para mejor documentación (def calcular(a: int, b: int) -> int)."
+**AI correction:** {{ '<generated>' }}"La función debería usar type hints para mejor documentación (def calcular(a: int, b: int) -> int)."{{ '</generated>' }}
 **Relevance:** SOMEWHAT_RELEVANT
 **Relevance Explanation:** Type hints improve code quality and maintainability, but they were not required in the assignment and the human teacher didn't mention them
 
 **2.** 
-**AI correction:** "Considerar usar una clase en lugar de funciones sueltas para mejor encapsulación."
+**AI correction:** {{ '<generated>' }}"Considerar usar una clase en lugar de funciones sueltas para mejor encapsulación."{{ '</generated>' }}
 **Relevance:** IRRELEVANT
 **Relevance Explanation:** This architectural suggestion goes beyond the scope of the assignment, which explicitly asked for function-based implementation
 
 **3.** 
-**AI correction:** "Falta manejo de excepciones para casos donde el archivo no existe."
+**AI correction:** {{ '<generated>' }}"Falta manejo de excepciones para casos donde el archivo no existe."{{ '</generated>' }}
 **Relevance:** RELEVANT
 **Relevance Explanation:** Error handling is important for robust code, and file operations should handle potential failures even if not explicitly mentioned in the assignment
 
@@ -102,9 +145,24 @@ NO EXTRA REQUIREMENTS - AI STAYED FOCUSED ON HUMAN ISSUES
 
 # CRITICAL REMINDERS:
 
-⚠️ **DO NOT quote from the Requirements/Rubric section in the "AI correction" field**
-⚠️ **ONLY quote from the actual AI-GENERATED CORRECTION text**
-⚠️ **Look for issues mentioned by AI that have NO correspondence in the human teacher's feedback**
+⚠️ **Use SECTION LABELS to know where to pull information from:**
+   - **AI correction field** ← Quote EXACTLY from SECTION E (what the AI said in its feedback)
+
+⚠️ **SECTION B contains XML requirements - these are REFERENCE criteria, not corrections:**
+   ```xml
+   <requirement function="function_name" type="requirement_type">
+       Requirement text goes here
+   </requirement>
+   ```
+   These are what COULD be checked, not what the AI actually said
+
+⚠️ **DO NOT quote from SECTION B XML in the "AI correction" field**
+
+⚠️ **DO NOT quote from SECTION D (human correction) in the "AI correction" field**
+
+⚠️ **ONLY quote from SECTION E - the AI's actual feedback about this student's code**
+
+⚠️ **Look for issues mentioned by AI in SECTION E that have NO correspondence in SECTION D (human feedback)**
 
 ---
 

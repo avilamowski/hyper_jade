@@ -1,0 +1,10 @@
+[
+  "Importa from random import randint pero usa random.randint, eso no funciona y da un error de ejecución (-0.50)",
+  "No valida que el parámetro sea un número entero (-0.25)",
+  "No lee el archivo correctamente y los carga en listas (-0.50)",
+  "No carga en listas correctamente los productos 1000-1009 con stock 100. (-0.75)",
+  "Error de ejecución en la lína if cantidades_chequeadas[i] < h: ya que cantidades_chequeadas debería ser una lista de int (se resta puntos en el comentario 3)",
+  "No resta correctamente la venta al stock, no actualiza el stock (-0.75)",
+  "No agrupa las ventas del mismo item (-0.75)",
+  "Errores de escritura del archivo (-0.25)"
+]

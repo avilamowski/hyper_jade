@@ -1,0 +1,8 @@
+[
+  "No modulariza, hace una única función que realiza todas las tareas (Otros, -1 pto.)",
+  "Genera errores de ejecución varios: si se pasa un valor no entero en cantidad, si se pasa cualquier valor numérico hace un raise que no se captura en el código principal, hace slicing sobre datos int, error por índice fuera de rango al buscar código de productos sin ventas históricas (Err15, -2 ptos.)",
+  "No valida correctamente que el parámetro cantidad sea entero (Err2, -0,25 ptos.)",
+  "Si el archivo no existe no carga las listas, solamente genera el archivo con los productos. Lo hardcodea, no usa ciclos/range (Err3, -0,75 ptos.)",
+  "Al actualizar ventas históricas considera el número original en lugar del stock disponible (Err7, -0,25 ptos.)",
+  "Si no existía el archivo original lo sobreescribe a partir de listas vacías con lo que el archivo queda también vacío (Err8, -0,375 ptos.)"
+]

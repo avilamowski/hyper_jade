@@ -10,31 +10,33 @@ Follow these rules:
 
 # INPUT DATA
 
-## 1. Assignment Context
+## SECTION A: Assignment Context
 
 **Assignment Description (if provided):**
 ```
 {{ assignment }}
 ```
 
-**Requirements / Rubric (if provided):**
-```
+## SECTION B: Requirements / Rubric (if provided)
+
+**This section contains requirements in XML format:**
+
 {{ requirements }}
-```
 
-**Student Code:**
+## SECTION C: Student Code
+
 ```python
-{{ student_code }}
++{{ student_code }}
 ```
 
-## 2. Corrections to Compare
+## SECTION D: Human Reference Correction (Teacher's Feedback)
 
-**HUMAN REFERENCE CORRECTION (Teacher):**
 ```
 {{ reference_correction }}
 ```
 
-**AI-GENERATED CORRECTION:**
+## SECTION E: AI-Generated Correction (AI's Feedback)
+
 ```
 {{ generated_correction }}
 ```
@@ -47,20 +49,59 @@ Find all requirements/issues that BOTH the human teacher and AI mentioned in the
 
 ## Important Distinctions:
 
-1. **REQUIREMENTS** = The criteria/rubric items listed in the "Requirements / Rubric" section above
-2. **CORRECTIONS** = The feedback/comments provided in the "Human Reference Correction" and "AI-Generated Correction" sections
+**SECTION B (Requirements/Rubric)** contains:
+- Pre-defined evaluation criteria in XML format
+- Each `<requirement>` tag has attributes: `function` (which function it applies to) and `type` (category of requirement)
+- The text inside the tag is the actual requirement description
+- Example:
+  ```xml
+  <requirement function="vender_productos" type="error_presence">
+      No valida que el parámetro 'cantidad' sea un entero positivo.
+  </requirement>
+  ```
 
-Your job is to:
-- Identify which requirements were addressed in BOTH corrections
-- Quote the actual correction text (NOT the requirements text) from each evaluator
+**SECTION D (Human Reference Correction)** contains:
+- The teacher's specific observations about THIS student's code
+- This is what the human evaluator actually said
+
+**SECTION E (AI-Generated Correction)** contains:
+- The AI's specific observations about THIS student's code
+- This is what the AI evaluator actually said
+
+## YOUR JOB:
+
+1. **Identify matches**: Find issues that BOTH evaluators (human AND AI) mentioned in their feedback
+2. **Reference the requirement**: Extract the requirement text from the XML tags in SECTION B
+3. **Quote both corrections**: Take verbatim quotes from SECTION D (human) and SECTION E (AI)
 
 ## Output Format for Each Match:
 
 **[Number].** 
-**Requirement:** [The requirement label/criterion from the rubric - use verbatim text]
-**Human correction:** [Verbatim quote from the HUMAN REFERENCE CORRECTION that addresses this requirement]
-**AI correction:** [Verbatim quote from the AI-GENERATED CORRECTION that addresses this requirement]
+**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag]{{ '</requirement>' }}
+**Function:** [Value of the "function" attribute from the XML tag]
+**Type:** [Value of the "type" attribute from the XML tag]
+**Human correction:** {{ '<human>' }}[EXACT verbatim quote from the teacher's feedback]{{ '</human>' }}
+**AI correction:** {{ '<generated>' }}[EXACT verbatim quote from the AI's feedback]{{ '</generated>' }}
 **Match quality:** [FULL/HIGH/PARTIAL/POOR - assess how well the AI captured the human's concern]
+
+## How to Extract from XML (SECTION B):
+
+Given this XML in SECTION B:
+```xml
+<requirement function="vender_productos" type="error_presence">
+    No valida que el parámetro 'cantidad' sea un entero positivo.
+</requirement>
+```
+
+Extract as:
+- **Requirement:** {{ '<requirement>' }}No valida que el parámetro 'cantidad' sea un entero positivo.{{ '</requirement>' }}
+- **Function:** vender_productos
+- **Type:** error_presence
+
+❌ **NEVER copy text from SECTION D or E into the Requirement field**
+❌ **NEVER invent requirements - they must exist as <requirement> tags in SECTION B**
+✅ **ALWAYS extract requirement text from inside the XML tags**
+✅ **ALWAYS include the function and type attributes**
 
 ## Match Quality Guidelines:
 
@@ -82,24 +123,50 @@ NO MATCHED REQUIREMENTS FOUND
 ## Example Output:
 
 **1.** 
-**Requirement:** Incorrect stock update
-**Human correction:** "No resta correctamente la venta al stock, no actualiza el stock."
-**AI correction:** "La función modificar_stock resta la cantidad sin verificar stock suficiente."
+**Requirement:** {{ '<requirement>' }}No valida que el parámetro 'cantidad' sea un entero positivo.{{ '</requirement>' }}
+**Function:** vender_productos
+**Type:** error_presence
+**Human correction:** {{ '<human>' }}"No valida que el parámetro 'cantidad' sea un entero positivo."{{ '</human>' }}
+**AI correction:** {{ '<generated>' }}"El código no valida que el parámetro 'cantidad' sea un entero positivo antes de convertirlo a entero."{{ '</generated>' }}
 **Match quality:** FULL
 
 **2.** 
-**Requirement:** Missing input validation
-**Human correction:** "No valida que la cantidad sea positiva antes de procesar."
-**AI correction:** "Falta validación de entrada."
-**Match quality:** PARTIAL
+**Requirement:** {{ '<requirement>' }}No resta correctamente la venta del stock.{{ '</requirement>' }}
+**Function:** vender_productos
+**Type:** error_presence
+**Human correction:** {{ '<human>' }}"No resta correctamente la venta al stock, no actualiza el stock."{{ '</human>' }}
+**AI correction:** {{ '<generated>' }}"El código contiene un comportamiento prohibido en la función `modificar_stock`. Aunque se intenta restar la cantidad vendida del stock, no hay una verificación previa."{{ '</generated>' }}
+**Match quality:** HIGH
+
+**3.**
+**Requirement:** {{ '<requirement>' }}No guarda/actualiza/crea correctamente el archivo.{{ '</requirement>' }}
+**Function:** vender_productos
+**Type:** error_presence
+**Human correction:** {{ '<human>' }}"No guarda/actualiza/crea correctamente el archivo. Tiene un error de ejecución (w en lugar de 'w')."{{ '</human>' }}
+**AI correction:** {{ '<generated>' }}"En la línea `with open(ruta, w) as archivo:`, el modo de apertura del archivo está mal especificado; debe estar entre comillas como 'w'."{{ '</generated>' }}
+**Match quality:** HIGH
 
 ---
 
 # CRITICAL REMINDERS:
 
-⚠️ **DO NOT quote from the Requirements/Rubric section in the "Human correction" or "AI correction" fields**
-⚠️ **ONLY quote from the actual correction text provided by the teacher and AI**
-⚠️ **The "Requirement" field should reference the rubric criterion, but the correction fields must quote the feedback comments**
+⚠️ **Use SECTION LABELS and XML STRUCTURE to know where to pull information from:**
+   - **Requirement field** ← Extract text from INSIDE the `<requirement>` tag in SECTION B
+   - **Function field** ← Extract from the `function` attribute of the `<requirement>` tag
+   - **Type field** ← Extract from the `type` attribute of the `<requirement>` tag
+   - **Human correction field** ← Quote EXACTLY from SECTION D
+   - **AI correction field** ← Quote EXACTLY from SECTION E
+
+⚠️ **Requirements are in XML format - parse them correctly:**
+   ```xml
+   <requirement function="function_name" type="requirement_type">
+       Requirement text goes here
+   </requirement>
+   ```
+
+⚠️ **NEVER copy text from SECTION D or E into the Requirement/Function/Type fields**
+
+⚠️ **The Requirement/Function/Type come from SECTION B XML, corrections come from SECTION D/E**
 
 ---
 
