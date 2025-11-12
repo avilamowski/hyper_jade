@@ -147,3 +147,99 @@ def compute_restraint(auxiliary_metrics: Dict[str, str]) -> Tuple[float, str]:
     
     return score, explanation
 
+
+def compute_content_similarity(llm_response: str) -> Tuple[float, str]:
+    """
+    Compute the content similarity score by parsing individual item scores from LLM response
+    and calculating the mean in Python (not by the LLM).
+    
+    This is a hybrid approach:
+    - LLM evaluates each matched item individually and assigns scores (0.0-1.0)
+    - Python parses those scores and computes the average
+    
+    Expected XML format from LLM:
+    <RESULT>
+    <ITEM>
+    <ID>1</ID>
+    <REQUIREMENT>label</REQUIREMENT>
+    <SCORE>0.85</SCORE>
+    <JUSTIFICATION>justification</JUSTIFICATION>
+    </ITEM>
+    <ITEM>
+    <ID>2</ID>
+    <REQUIREMENT>label</REQUIREMENT>
+    <SCORE>0.60</SCORE>
+    <JUSTIFICATION>justification</JUSTIFICATION>
+    </ITEM>
+    </RESULT>
+    
+    Args:
+        llm_response: The raw text output from the content_similarity template,
+                     which should contain individual item scores in XML format
+    
+    Returns:
+        Tuple of (score: float, explanation: str) where score is the mean of item scores
+    """
+    from xml.etree import ElementTree as ET
+    
+    if not llm_response:
+        return 0.0, "No LLM response provided for content similarity evaluation."
+    
+    # Try to parse XML format first
+    try:
+        # Extract RESULT block
+        result_match = re.search(r'<RESULT>(.*?)</RESULT>', llm_response, re.DOTALL | re.IGNORECASE)
+        if result_match:
+            result_content = result_match.group(1).strip()
+            
+            # Check if RESULT says no matches INSIDE the result block
+            if "NO MATCHED REQUIREMENTS FOUND" in result_content.upper():
+                return 0.0, "No matched requirements found. Content similarity cannot be calculated."
+            
+            result_xml = f"<RESULT>{result_match.group(1)}</RESULT>"
+            root = ET.fromstring(result_xml)
+            
+            # Extract all ITEM scores
+            items = root.findall('.//ITEM')
+            if items:
+                item_scores = []
+                for item in items:
+                    score_elem = item.find('SCORE')
+                    if score_elem is not None and score_elem.text:
+                        score_val = float(score_elem.text)
+                        item_scores.append(score_val)
+                
+                if item_scores:
+                    mean_score = sum(item_scores) / len(item_scores)
+                    
+                    # Build explanation with Python-computed mean
+                    explanation = (
+                        f"Evaluated {len(item_scores)} matched items. "
+                        f"Individual scores: {', '.join(f'{s:.2f}' for s in item_scores)}. "
+                        f"Mean (computed in Python): {mean_score:.3f}."
+                    )
+                    
+                    return mean_score, explanation
+    except Exception as e:
+        logger.warning(f"XML parsing failed for content_similarity: {e}")
+    
+    # Fallback: try old text format "Item N (labfel): score -"
+    item_pattern = r'Item \d+ \([^)]+\):\s*(\d+\.?\d*)\s*-'
+    matches = re.findall(item_pattern, llm_response)
+    
+    if matches:
+        item_scores = [float(score) for score in matches]
+        mean_score = sum(item_scores) / len(item_scores)
+        
+        explanation = (
+            f"Evaluated {len(item_scores)} matched items. "
+            f"Individual scores: {', '.join(f'{s:.2f}' for s in item_scores)}. "
+            f"Mean (computed in Python): {mean_score:.3f}."
+        )
+        
+        return mean_score, explanation
+    
+    # No valid format found
+    return 0.0, "Could not parse item scores from LLM response."
+
+

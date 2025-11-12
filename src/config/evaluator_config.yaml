@@ -1,5 +1,5 @@
-model_name: "gpt-4o-mini"
-provider: "openai"
+model_name: "llama3.2:latest"
+provider: "ollama"
 temperature: 0.1
 # Configuration for the supervised evaluator template
 # `template` should point to a Jinja template inside the templates/ folder.
@@ -23,3 +23,4 @@ supervised_evaluator:
       function: "compute_restraint"
     content_similarity: 
       template: "evaluators/individual/eval_content_similarity.jinja"
+      function: "compute_content_similarity"

@@ -66,7 +66,8 @@ def process_submission_traced(
     reference_correction: str,
     requirements: List[Requirement],
     assignment_text: str,
-    submission_index: int
+    submission_index: int,
+    shared_llm: Any = None
 ) -> tuple[List[Correction], Dict[str, Any]]:
     """Process one submission: correct code and evaluate using auxiliary + individual metrics"""
     with trace(name=f"submission_{submission_index+1}_processing", run_type="chain") as run_context:
@@ -82,6 +83,10 @@ def process_submission_traced(
             f"## {corr['requirement']['function']}\n{corr['result']}"
             for corr in submission_corrections
         ])
+        
+        # Switch to evaluation stage for the evaluators
+        if shared_llm is not None:
+            shared_llm.stage = 'evaluation'
         
         # Step 2: Compute auxiliary metrics
         with trace(name="compute_auxiliary_metrics", run_type="llm") as aux_context:
@@ -354,7 +359,8 @@ This will:
                     reference_correction=reference_corrections[i],
                     requirements=requirements,
                     assignment_text=assignment_text,
-                    submission_index=i
+                    submission_index=i,
+                    shared_llm=shared
                 )
 
                 submission_output_dir = Path(args.output_dir) / f"submission_{i+1}"

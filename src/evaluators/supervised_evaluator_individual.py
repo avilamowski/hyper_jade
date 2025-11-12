@@ -252,9 +252,11 @@ class IndividualMetricsEvaluator:
         """
         Helper method to evaluate a single metric.
         
-        Supports two modes:
-        1. Python function: if config has "function" key, calls the function directly
-        2. LLM template: if config has "template" key, uses LLM with template (existing behavior)
+        Supports three modes:
+        1. Python function only: if config has "function" key but no "template", calls the function directly
+        2. LLM template only: if config has "template" key but no "function", uses LLM with template
+        3. Hybrid (template + function): if config has both "template" AND "function", 
+           uses LLM to generate response, then calls function to post-process it
         """
         if metric_name not in self.eval_metric_configs:
             raise ValueError(f"Unknown evaluation metric: {metric_name}")
@@ -264,8 +266,8 @@ class IndividualMetricsEvaluator:
         # Get auxiliary metrics dictionary
         aux_metrics = state.get("auxiliary_metrics", {})
         
-        # Check if this metric uses a Python function instead of a template
-        if "function" in config:
+        # Mode 1: Python function only (no template)
+        if "function" in config and "template" not in config:
             function_name = config["function"]
             logger.info(f"Evaluating {metric_name} using Python function: {function_name} (NO LLM CALL)")
             
@@ -285,7 +287,7 @@ class IndividualMetricsEvaluator:
             logger.info(f"Completed {metric_name} (Python function, NO LLM): score={score}")
             return score, explanation
         
-        # Fallback to template-based evaluation (existing behavior)
+        # Mode 2 & 3: Template-based (with or without post-processing function)
         if "template" not in config:
             raise ValueError(
                 f"Metric '{metric_name}' must have either 'template' or 'function' in config"
@@ -320,6 +322,31 @@ class IndividualMetricsEvaluator:
         
         raw_response = self.llm.invoke(messages)
         result_text = self._extract_result_text(raw_response)
+        
+        # Mode 3: Hybrid - if config has both template AND function, 
+        # use function to post-process the LLM response
+        if "function" in config:
+            function_name = config["function"]
+            logger.info(f"Post-processing {metric_name} LLM response with function: {function_name}")
+            
+            from .metric_computers import compute_content_similarity
+            
+            function_map = {
+                "compute_content_similarity": compute_content_similarity,
+            }
+            
+            if function_name not in function_map:
+                raise ValueError(
+                    f"Unknown post-processing function '{function_name}' for metric '{metric_name}'. "
+                    f"Available functions: {list(function_map.keys())}"
+                )
+            
+            post_process_func = function_map[function_name]
+            score, explanation = post_process_func(result_text)
+            logger.info(f"Completed {metric_name} (Hybrid: LLM + Python post-processing): score={score}")
+            return score, explanation
+        
+        # Mode 2: Template only - parse the LLM response normally
         parsed = self._parse_metric_response(result_text, metric_name)
         
         # Convert score from 0-5 scale to 0-1 scale if needed
@@ -327,7 +354,7 @@ class IndividualMetricsEvaluator:
         if isinstance(score, int) and score >= 0 and score <= 5:
             score = score / 5.0
         
-        logger.info(f"Completed {metric_name} (LLM): score={score}")
+        logger.info(f"Completed {metric_name} (LLM only): score={score}")
         
         return score, parsed['explanation']
     
