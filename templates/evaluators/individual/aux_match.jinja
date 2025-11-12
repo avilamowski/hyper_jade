@@ -101,4 +101,21 @@ NO MATCHED REQUIREMENTS FOUND
 ⚠️ **ONLY quote from the actual correction text provided by the teacher and AI**
 ⚠️ **The "Requirement" field should reference the rubric criterion, but the correction fields must quote the feedback comments**
 
+---
+
+# REQUIRED: COUNT SUMMARY
+
+At the very end of your response, you MUST include the following structured count summary:
+
+<AUXILIARY_METRIC_COUNT>
+MATCH_COUNT: <number>
+</AUXILIARY_METRIC_COUNT>
+
+Where <number> is the total count of matched requirements you identified above. If there are no matches, use 0.
+
+Example:
+<AUXILIARY_METRIC_COUNT>
+MATCH_COUNT: 5
+</AUXILIARY_METRIC_COUNT>
+
 END

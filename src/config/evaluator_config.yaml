@@ -14,7 +14,7 @@ supervised_evaluator:
       template: "evaluators/individual/aux_extra.jinja"
   evaluation_metrics:
     completeness:
-      template: "evaluators/individual/eval_completeness.jinja"
+      function: "compute_completeness"
     correctness:
       template: "evaluators/individual/eval_correctness.jinja"
     precision: 

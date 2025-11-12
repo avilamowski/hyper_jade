@@ -104,4 +104,21 @@ NO MISSING REQUIREMENTS - AI IDENTIFIED ALL HUMAN ISSUES
 ⚠️ **The "Requirement" field should reference the rubric criterion, but the correction field must quote the teacher's feedback**
 ⚠️ **Only include issues the AI completely missed - not partially covered ones**
 
+---
+
+# REQUIRED: COUNT SUMMARY
+
+At the very end of your response, you MUST include the following structured count summary:
+
+<AUXILIARY_METRIC_COUNT>
+MISSING_COUNT: <number>
+</AUXILIARY_METRIC_COUNT>
+
+Where <number> is the total count of missing requirements you identified above. If there are no missing requirements, use 0.
+
+Example:
+<AUXILIARY_METRIC_COUNT>
+MISSING_COUNT: 3
+</AUXILIARY_METRIC_COUNT>
+
 END

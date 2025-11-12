@@ -21,6 +21,7 @@ from langgraph.graph import StateGraph, END, START
 from ..config import load_config
 from ..models import Correction, Submission
 from ..agents.utils.reducers import keep_last, merge_dicts
+from .metric_computers import compute_completeness
 
 logger = logging.getLogger(__name__)
 
@@ -248,16 +249,48 @@ class IndividualMetricsEvaluator:
         }
     
     def _evaluate_single_metric(self, metric_name: str, state: IndividualMetricsState) -> tuple[int, str]:
-        """Helper method to evaluate a single metric using its template"""
+        """
+        Helper method to evaluate a single metric.
+        
+        Supports two modes:
+        1. Python function: if config has "function" key, calls the function directly
+        2. LLM template: if config has "template" key, uses LLM with template (existing behavior)
+        """
         if metric_name not in self.eval_metric_configs:
             raise ValueError(f"Unknown evaluation metric: {metric_name}")
         
         config = self.eval_metric_configs[metric_name]
-        template_name = config["template"]
         
         # Get auxiliary metrics dictionary
         aux_metrics = state.get("auxiliary_metrics", {})
         
+        # Check if this metric uses a Python function instead of a template
+        if "function" in config:
+            function_name = config["function"]
+            logger.info(f"Evaluating {metric_name} using Python function: {function_name} (NO LLM CALL)")
+            
+            function_map = {
+                "compute_completeness": compute_completeness,
+            }
+            
+            if function_name not in function_map:
+                raise ValueError(
+                    f"Unknown function '{function_name}' for metric '{metric_name}'. "
+                    f"Available functions: {list(function_map.keys())}"
+                )
+            
+            compute_func = function_map[function_name]
+            score, explanation = compute_func(aux_metrics)
+            logger.info(f"Completed {metric_name} (Python function, NO LLM): score={score}")
+            return score, explanation
+        
+        # Fallback to template-based evaluation (existing behavior)
+        if "template" not in config:
+            raise ValueError(
+                f"Metric '{metric_name}' must have either 'template' or 'function' in config"
+            )
+        
+        template_name = config["template"]
         template = self.jinja_env.get_template(template_name)
         
         # Render the template with all inputs
@@ -288,7 +321,7 @@ class IndividualMetricsEvaluator:
         result_text = self._extract_result_text(raw_response)
         parsed = self._parse_metric_response(result_text, metric_name)
         
-        logger.info(f"Completed {metric_name}: score={parsed['score']}")
+        logger.info(f"Completed {metric_name} (LLM): score={parsed['score']}")
         
         return parsed['score'], parsed['explanation']
     
