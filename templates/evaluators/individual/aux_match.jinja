@@ -2,46 +2,68 @@ You are an expert evaluator for educational feedback systems. Your task is to id
 
 Follow these rules:
 - Be systematic and precise in matching issues
-- Use verbatim quotes - do NOT paraphrase requirement labels
+- Use verbatim quotes - do NOT paraphrase
 - Consider semantic equivalence, not just exact wording
 - Number each matched requirement for easy counting
 
----HUMAN---
+---
 
-=== Inputs ===
+# INPUT DATA
 
-Assignment (if provided):
+## 1. Assignment Context
+
+**Assignment Description (if provided):**
+```
 {{ assignment }}
+```
 
-Requirements / rubric (if provided):
+**Requirements / Rubric (if provided):**
+```
 {{ requirements }}
+```
 
-Student code:
+**Student Code:**
 ```python
 {{ student_code }}
 ```
 
-Human reference correction (teacher):
-{{ reference_correction }}
+## 2. Corrections to Compare
 
-AI-generated correction:
+**HUMAN REFERENCE CORRECTION (Teacher):**
+```
+{{ reference_correction }}
+```
+
+**AI-GENERATED CORRECTION:**
+```
 {{ generated_correction }}
+```
 
 ---
 
-## Task: Identify MATCHED REQUIREMENTS
+# YOUR TASK: Identify MATCHED REQUIREMENTS
 
 Find all requirements/issues that BOTH the human teacher and AI mentioned in their corrections.
 
-For each matched requirement, provide:
+## Important Distinctions:
+
+1. **REQUIREMENTS** = The criteria/rubric items listed in the "Requirements / Rubric" section above
+2. **CORRECTIONS** = The feedback/comments provided in the "Human Reference Correction" and "AI-Generated Correction" sections
+
+Your job is to:
+- Identify which requirements were addressed in BOTH corrections
+- Quote the actual correction text (NOT the requirements text) from each evaluator
+
+## Output Format for Each Match:
 
 **[Number].** 
-**Requirement:** [Verbatim requirement label or exact quoted sentence - do NOT paraphrase]
-**Human comment:** [Verbatim quote from the reference correction that mentions this requirement]
-**AI comment:** [Verbatim quote from the AI correction that mentions this requirement]
+**Requirement:** [The requirement label/criterion from the rubric - use verbatim text]
+**Human correction:** [Verbatim quote from the HUMAN REFERENCE CORRECTION that addresses this requirement]
+**AI correction:** [Verbatim quote from the AI-GENERATED CORRECTION that addresses this requirement]
 **Match quality:** [FULL/HIGH/PARTIAL/POOR - assess how well the AI captured the human's concern]
 
-**Match quality guidelines:**
+## Match Quality Guidelines:
+
 - **FULL**: AI captured the exact same issue with similar depth and specificity
 - **HIGH**: AI identified the same core issue, minor differences in emphasis or detail
 - **PARTIAL**: AI mentioned the issue but missed important details or nuances
@@ -49,24 +71,34 @@ For each matched requirement, provide:
 
 ---
 
-Output format:
+# OUTPUT INSTRUCTIONS
 
 Provide a numbered list of all matched requirements. If there are no matches, output:
 
+```
 NO MATCHED REQUIREMENTS FOUND
+```
 
-Example output:
+## Example Output:
 
 **1.** 
 **Requirement:** Incorrect stock update
-**Human comment:** "No resta correctamente la venta al stock, no actualiza el stock."
-**AI comment:** "La función modificar_stock resta la cantidad sin verificar stock suficiente."
+**Human correction:** "No resta correctamente la venta al stock, no actualiza el stock."
+**AI correction:** "La función modificar_stock resta la cantidad sin verificar stock suficiente."
 **Match quality:** FULL
 
 **2.** 
 **Requirement:** Missing input validation
-**Human comment:** "No valida que la cantidad sea positiva antes de procesar."
-**AI comment:** "Falta validación de entrada."
+**Human correction:** "No valida que la cantidad sea positiva antes de procesar."
+**AI correction:** "Falta validación de entrada."
 **Match quality:** PARTIAL
+
+---
+
+# CRITICAL REMINDERS:
+
+⚠️ **DO NOT quote from the Requirements/Rubric section in the "Human correction" or "AI correction" fields**
+⚠️ **ONLY quote from the actual correction text provided by the teacher and AI**
+⚠️ **The "Requirement" field should reference the rubric criterion, but the correction fields must quote the feedback comments**
 
 END
