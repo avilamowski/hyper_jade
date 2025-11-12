@@ -2,7 +2,7 @@
 Individual Evaluation Metrics Evaluator (LangGraph Version)
 
 Computes individual evaluation metrics (completeness, restraint, precision, 
-content_similarity, correctness) using auxiliary metrics as inputs.
+content_similarity) using auxiliary metrics as inputs.
 Each metric runs as a separate LangGraph node and can execute in parallel.
 """
 
@@ -114,6 +114,42 @@ class IndividualMetricsEvaluator:
             )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
+    
+    def _get_llm_for_metric(self, metric_name: str, metric_config: Dict[str, Any]):
+        """
+        Get the LLM instance for a specific metric.
+        
+        If the metric config has 'model_name' and 'provider', use those.
+        Otherwise, fall back to the default evaluator LLM.
+        """
+        # Check if metric has custom LLM config
+        if "model_name" in metric_config and "provider" in metric_config:
+            provider = metric_config["provider"]
+            model_name = metric_config["model_name"]
+            temperature = metric_config.get("temperature", self.evaluator_config["temperature"])
+            
+            logger.info(f"Using custom LLM for {metric_name}: {provider}/{model_name} (temp={temperature})")
+            
+            if provider == "openai":
+                from langchain_openai import ChatOpenAI
+                return ChatOpenAI(
+                    model=model_name,
+                    temperature=temperature,
+                    api_key=os.getenv("OPENAI_API_KEY"),
+                    base_url=os.getenv("OPENAI_BASE_URL"),
+                )
+            elif provider == "ollama":
+                from langchain_ollama.llms import OllamaLLM
+                return OllamaLLM(
+                    model=model_name,
+                    temperature=temperature
+                )
+            else:
+                raise ValueError(f"Unsupported provider for {metric_name}: {provider}")
+        
+        # Use default LLM
+        logger.info(f"Using default LLM for {metric_name}: {self.evaluator_config['provider']}/{self.evaluator_config['model_name']}")
+        return self.llm
     
     def _extract_result_text(self, raw_response) -> str:
         """Extract text content from LLM response."""
@@ -257,6 +293,9 @@ class IndividualMetricsEvaluator:
         2. LLM template only: if config has "template" key but no "function", uses LLM with template
         3. Hybrid (template + function): if config has both "template" AND "function", 
            uses LLM to generate response, then calls function to post-process it
+        
+        Each metric can optionally specify its own LLM configuration (model_name, provider, temperature)
+        which overrides the default evaluator config.
         """
         if metric_name not in self.eval_metric_configs:
             raise ValueError(f"Unknown evaluation metric: {metric_name}")
@@ -307,6 +346,9 @@ class IndividualMetricsEvaluator:
                 f"Metric '{metric_name}' must have either 'template' or 'function' in config"
             )
         
+        # Check if this metric has custom LLM config
+        metric_llm = self._get_llm_for_metric(metric_name, config)
+        
         template_name = config["template"]
         template = self.jinja_env.get_template(template_name)
         
@@ -334,7 +376,7 @@ class IndividualMetricsEvaluator:
             HumanMessage(content=human_prompt)
         ]
         
-        raw_response = self.llm.invoke(messages)
+        raw_response = metric_llm.invoke(messages)
         result_text = self._extract_result_text(raw_response)
         
         # Mode 3: Hybrid - if config has both template AND function, 
