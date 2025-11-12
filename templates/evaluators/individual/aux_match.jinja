@@ -1,0 +1,72 @@
+You are an expert evaluator for educational feedback systems. Your task is to identify requirements that were mentioned by BOTH the human teacher and the AI-generated correction.
+
+Follow these rules:
+- Be systematic and precise in matching issues
+- Use verbatim quotes - do NOT paraphrase requirement labels
+- Consider semantic equivalence, not just exact wording
+- Number each matched requirement for easy counting
+
+---HUMAN---
+
+=== Inputs ===
+
+Assignment (if provided):
+{{ assignment }}
+
+Requirements / rubric (if provided):
+{{ requirements }}
+
+Student code:
+```python
+{{ student_code }}
+```
+
+Human reference correction (teacher):
+{{ reference_correction }}
+
+AI-generated correction:
+{{ generated_correction }}
+
+---
+
+## Task: Identify MATCHED REQUIREMENTS
+
+Find all requirements/issues that BOTH the human teacher and AI mentioned in their corrections.
+
+For each matched requirement, provide:
+
+**[Number].** 
+**Requirement:** [Verbatim requirement label or exact quoted sentence - do NOT paraphrase]
+**Human comment:** [Verbatim quote from the reference correction that mentions this requirement]
+**AI comment:** [Verbatim quote from the AI correction that mentions this requirement]
+**Match quality:** [FULL/HIGH/PARTIAL/POOR - assess how well the AI captured the human's concern]
+
+**Match quality guidelines:**
+- **FULL**: AI captured the exact same issue with similar depth and specificity
+- **HIGH**: AI identified the same core issue, minor differences in emphasis or detail
+- **PARTIAL**: AI mentioned the issue but missed important details or nuances
+- **POOR**: AI barely touched on the issue, major gaps in understanding
+
+---
+
+Output format:
+
+Provide a numbered list of all matched requirements. If there are no matches, output:
+
+NO MATCHED REQUIREMENTS FOUND
+
+Example output:
+
+**1.** 
+**Requirement:** Incorrect stock update
+**Human comment:** "No resta correctamente la venta al stock, no actualiza el stock."
+**AI comment:** "La función modificar_stock resta la cantidad sin verificar stock suficiente."
+**Match quality:** FULL
+
+**2.** 
+**Requirement:** Missing input validation
+**Human comment:** "No valida que la cantidad sea positiva antes de procesar."
+**AI comment:** "Falta validación de entrada."
+**Match quality:** PARTIAL
+
+END
