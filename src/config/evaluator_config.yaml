@@ -34,7 +34,6 @@ supervised_evaluator:
     restraint: 
       function: "compute_restraint"
     content_similarity: 
-      template: "evaluators/individual/eval_content_similarity.jinja"
       function: "compute_content_similarity"
       # Use Ollama for content_similarity specifically
       model_name: "llama3.2:latest"

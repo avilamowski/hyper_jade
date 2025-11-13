@@ -16,7 +16,7 @@ All functions in this module follow a consistent interface:
 import re
 import logging
 import os
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any, Tuple, List, Optional, Union
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -153,99 +153,182 @@ def compute_restraint(auxiliary_metrics: Dict[str, str]) -> Tuple[float, str]:
     return score, explanation
 
 
-def compute_content_similarity(llm_response: str) -> Tuple[float, str]:
+def compute_content_similarity(
+    auxiliary_metrics: Dict[str, str],
+    student_code: str,
+    assignment: str = "",
+    requirements: Union[List[Dict[str, Any]], str] = "",
+    llm: Optional[Any] = None,
+    content_similarity_llm_config: Optional[Dict[str, Any]] = None
+) -> Tuple[float, str]:
     """
-    Compute the content similarity score by parsing individual item scores from LLM response
-    and calculating the mean in Python (not by the LLM).
+    Compute the content similarity score by making individual LLM calls for each matched item.
     
-    This is a hybrid approach:
-    - LLM evaluates each matched item individually and assigns scores (0.0-1.0)
-    - Python parses those scores and computes the average
-    
-    Expected XML format from LLM:
-    <RESULT>
-    <ITEM>
-    <ID>1</ID>
-    <REQUIREMENT>label</REQUIREMENT>
-    <SCORE>0.85</SCORE>
-    <JUSTIFICATION>justification</JUSTIFICATION>
-    </ITEM>
-    <ITEM>
-    <ID>2</ID>
-    <REQUIREMENT>label</REQUIREMENT>
-    <SCORE>0.60</SCORE>
-    <JUSTIFICATION>justification</JUSTIFICATION>
-    </ITEM>
-    </RESULT>
+    This function:
+    1. Parses matched items from the aux_match output
+    2. Makes a separate LLM call for each matched item
+    3. Calculates the mean score in Python
     
     Args:
-        llm_response: The raw text output from the content_similarity template,
-                     which should contain individual item scores in XML format
+        auxiliary_metrics: Dictionary with key 'match' containing the text output from aux_match template
+        student_code: The student's code to evaluate corrections against
+        assignment: Optional assignment description
+        requirements: Optional requirements/rubric as List[Requirement] or string
+        llm: Optional LLM instance to use (if None, will create one from config)
+        content_similarity_llm_config: Optional config dict with 'model_name', 'provider', 'temperature'
     
     Returns:
-        Tuple of (score: float, explanation: str) where score is the mean of item scores
+        Tuple of (score: float, explanation: str) where score is the mean of individual item scores
     """
     from xml.etree import ElementTree as ET
     
-    if not llm_response:
-        return 0.0, "No LLM response provided for content similarity evaluation."
+    match_text = auxiliary_metrics.get('match', '')
     
-    # Try to parse XML format first
-    try:
-        # Extract RESULT block
-        result_match = re.search(r'<RESULT>(.*?)</RESULT>', llm_response, re.DOTALL | re.IGNORECASE)
-        if result_match:
-            result_content = result_match.group(1).strip()
-            
-            # Check if RESULT says no matches INSIDE the result block
-            if "NO MATCHED REQUIREMENTS FOUND" in result_content.upper():
-                return 0.0, "No matched requirements found. Content similarity cannot be calculated."
-            
-            result_xml = f"<RESULT>{result_match.group(1)}</RESULT>"
-            root = ET.fromstring(result_xml)
-            
-            # Extract all ITEM scores
-            items = root.findall('.//ITEM')
-            if items:
-                item_scores = []
-                for item in items:
-                    score_elem = item.find('SCORE')
-                    if score_elem is not None and score_elem.text:
-                        score_val = float(score_elem.text)
-                        item_scores.append(score_val)
-                
-                if item_scores:
-                    mean_score = sum(item_scores) / len(item_scores)
-                    
-                    # Build explanation with Python-computed mean
-                    explanation = (
-                        f"Evaluated {len(item_scores)} matched items. "
-                        f"Individual scores: {', '.join(f'{s:.2f}' for s in item_scores)}. "
-                        f"Mean (computed in Python): {mean_score:.3f}."
-                    )
-                    
-                    return mean_score, explanation
-    except Exception as e:
-        logger.warning(f"XML parsing failed for content_similarity: {e}")
+    # Parse matched items
+    matched_items = parse_matched_items(match_text)
     
-    # Fallback: try old text format "Item N (labfel): score -"
-    item_pattern = r'Item \d+ \([^)]+\):\s*(\d+\.?\d*)\s*-'
-    matches = re.findall(item_pattern, llm_response)
+    if not matched_items:
+        return 0.0, "No matched requirements found. Content similarity cannot be calculated."
     
-    if matches:
-        item_scores = [float(score) for score in matches]
-        mean_score = sum(item_scores) / len(item_scores)
+    # Setup LLM for content similarity evaluation
+    if llm is None:
+        if content_similarity_llm_config is None:
+            # Default to llama3.2:latest for content_similarity
+            content_similarity_llm_config = {
+                'model_name': 'llama3.2:latest',
+                'provider': 'ollama',
+                'temperature': 0.1
+            }
         
-        explanation = (
-            f"Evaluated {len(item_scores)} matched items. "
-            f"Individual scores: {', '.join(f'{s:.2f}' for s in item_scores)}. "
-            f"Mean (computed in Python): {mean_score:.3f}."
+        provider = content_similarity_llm_config.get('provider', 'ollama')
+        model_name = content_similarity_llm_config.get('model_name', 'llama3.2:latest')
+        temperature = content_similarity_llm_config.get('temperature', 0.1)
+        
+        if provider == "openai":
+            from langchain_openai import ChatOpenAI
+            api_key = os.getenv("OPENAI_API_KEY")
+            base_url = os.getenv("OPENAI_BASE_URL")
+            llm_kwargs = {
+                "model": model_name,
+                "temperature": temperature,
+            }
+            if api_key:
+                llm_kwargs["api_key"] = api_key
+            if base_url:
+                llm_kwargs["base_url"] = base_url
+            llm = ChatOpenAI(**llm_kwargs)
+        elif provider == "ollama":
+            from langchain_ollama.llms import OllamaLLM
+            llm = OllamaLLM(model=model_name, temperature=temperature)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+    
+    # Setup template for evaluating each match
+    repo_root = Path(__file__).resolve().parents[2]
+    templates_dir = repo_root / "templates"
+    
+    jinja_env = Environment(
+        loader=FileSystemLoader(str(templates_dir)),
+        autoescape=select_autoescape(["jinja", "html", "txt"]),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    
+    template = jinja_env.get_template("evaluators/individual/eval_content_similarity_item.jinja")
+    
+    # Evaluate each matched item individually
+    item_scores = []
+    item_explanations = []
+    
+    for idx, match_item in enumerate(matched_items, 1):
+        requirement_text = match_item.get('requirement', '')
+        function = match_item.get('function', 'unknown')
+        req_type = match_item.get('type', 'unknown')
+        human_correction = match_item.get('human_correction', '')
+        ai_correction = match_item.get('ai_correction', '')
+        
+        if not requirement_text:
+            logger.warning(f"Skipping match {idx}: missing requirement text")
+            continue
+        
+        # Render template for this individual match
+        rendered = template.render(
+            assignment=assignment,
+            requirement=requirement_text,
+            function=function,
+            type=req_type,
+            student_code=student_code,
+            human_correction=human_correction,
+            ai_correction=ai_correction
         )
         
-        return mean_score, explanation
+        # Split system/human if separator exists
+        parts = rendered.split("---HUMAN---", 1)
+        if len(parts) == 2:
+            system_prompt = parts[0].strip()
+            human_prompt = parts[1].strip()
+        else:
+            system_prompt = "Evaluate content similarity for matched requirement"
+            human_prompt = rendered
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=human_prompt)
+        ]
+        
+        response = llm.invoke(messages)
+        
+        # Extract text
+        if hasattr(response, 'content'):
+            response_text = response.content
+        else:
+            response_text = str(response)
+        
+        # Parse result
+        try:
+            result_match = re.search(r'<RESULT>(.*?)</RESULT>', response_text, re.DOTALL | re.IGNORECASE)
+            if result_match:
+                result_xml = f"<RESULT>{result_match.group(1)}</RESULT>"
+                root = ET.fromstring(result_xml)
+                
+                score_elem = root.find('SCORE')
+                justif_elem = root.find('JUSTIFICATION')
+                
+                if score_elem is not None and score_elem.text:
+                    # Score comes as integer 1-5, store it as-is for now
+                    score_val = int(float(score_elem.text.strip()))
+                    if score_val < 1 or score_val > 5:
+                        logger.warning(f"Score {score_val} out of range [1-5] for match {idx}, clamping")
+                        score_val = max(1, min(5, score_val))
+                    
+                    item_scores.append(score_val)
+                    
+                    justification = justif_elem.text.strip() if justif_elem is not None and justif_elem.text else ""
+                    item_explanations.append(f"Item {idx} (score: {score_val}/5): {justification}")
+                else:
+                    logger.warning(f"Could not parse score for match {idx}")
+            else:
+                logger.warning(f"Could not find RESULT block for match {idx}")
+        except Exception as e:
+            logger.warning(f"Failed to parse response for match {idx}: {e}")
     
-    # No valid format found
-    return 0.0, "Could not parse item scores from LLM response."
+    # Calculate mean score
+    if not item_scores:
+        return 0.0, "Could not evaluate any matched items. Content similarity cannot be calculated."
+    
+    # Scores are in range 1-5, normalize to 0-1
+    # Formula: (score - 1) / 4 maps [1,5] to [0,1]
+    normalized_scores = [(s - 1) / 4.0 for s in item_scores]
+    mean_score = sum(normalized_scores) / len(normalized_scores)
+    
+    # Build explanation with both raw scores (1-5) and normalized mean
+    explanation = (
+        f"Evaluated {len(item_scores)} matched items individually. "
+        f"Individual scores (1-5 scale): {', '.join(f'{s}/5' for s in item_scores)}. "
+        f"Normalized mean (0-1 scale): {mean_score:.3f}."
+    )
+    
+    return mean_score, explanation
 
 def parse_extra_corrections(extra_text: str) -> List[str]:
     """
@@ -288,6 +371,94 @@ def parse_extra_corrections(extra_text: str) -> List[str]:
                     corrections.append(correction_text)
     
     return corrections
+
+
+def parse_matched_items(match_text: str) -> List[Dict[str, str]]:
+    """
+    Parse the match auxiliary metric text to extract individual matched items.
+    
+    Each match contains:
+    - requirement: The requirement text (from XML tag)
+    - function: The function attribute
+    - type: The type attribute
+    - human_correction: What the human teacher said
+    - ai_correction: What the AI said
+    - match_quality: FULL/HIGH/PARTIAL/POOR
+    
+    Args:
+        match_text: The raw text output from aux_match template
+        
+    Returns:
+        List of dictionaries, each containing the match information
+    """
+    if not match_text:
+        return []
+    
+    # Check for "NO MATCHED REQUIREMENTS FOUND"
+    if "NO MATCHED REQUIREMENTS FOUND" in match_text.upper():
+        return []
+    
+    matches = []
+    
+    # Split by numbered items: **N.**
+    items = re.split(r'\*\*(\d+)\.\*\*', match_text)
+    
+    for i in range(1, len(items), 2):  # Skip number, get content
+        if i + 1 < len(items):
+            item_content = items[i + 1]
+            
+            match_dict = {}
+            
+            # Extract requirement (from <requirement> tag)
+            req_match = re.search(r'\*\*Requirement:\*\*\s*<requirement>(.*?)</requirement>', item_content, re.DOTALL | re.IGNORECASE)
+            if req_match:
+                match_dict['requirement'] = req_match.group(1).strip()
+            else:
+                # Fallback: try without tags
+                req_match = re.search(r'\*\*Requirement:\*\*\s*(.+?)(?:\*\*|$)', item_content, re.DOTALL)
+                if req_match:
+                    match_dict['requirement'] = req_match.group(1).strip()
+            
+            # Extract function
+            func_match = re.search(r'\*\*Function:\*\*\s*(.+?)(?:\*\*|$)', item_content, re.DOTALL)
+            if func_match:
+                match_dict['function'] = func_match.group(1).strip()
+            
+            # Extract type
+            type_match = re.search(r'\*\*Type:\*\*\s*(.+?)(?:\*\*|$)', item_content, re.DOTALL)
+            if type_match:
+                match_dict['type'] = type_match.group(1).strip()
+            
+            # Extract human correction (from <human> tag)
+            human_match = re.search(r'\*\*Human correction:\*\*\s*<human>(.*?)</human>', item_content, re.DOTALL | re.IGNORECASE)
+            if human_match:
+                match_dict['human_correction'] = human_match.group(1).strip()
+            else:
+                # Fallback: try without tags
+                human_match = re.search(r'\*\*Human correction:\*\*\s*(.+?)(?:\*\*|$)', item_content, re.DOTALL)
+                if human_match:
+                    match_dict['human_correction'] = human_match.group(1).strip()
+            
+            # Extract AI correction (from <generated> tag)
+            ai_match = re.search(r'\*\*AI correction:\*\*\s*<generated>(.*?)</generated>', item_content, re.DOTALL | re.IGNORECASE)
+            if ai_match:
+                match_dict['ai_correction'] = ai_match.group(1).strip()
+            else:
+                # Fallback: try without tags
+                ai_match = re.search(r'\*\*AI correction:\*\*\s*(.+?)(?:\*\*|$)', item_content, re.DOTALL)
+                if ai_match:
+                    match_dict['ai_correction'] = ai_match.group(1).strip()
+            
+            # Extract match quality
+            quality_match = re.search(r'\*\*Match quality:\*\*\s*(.+?)(?:\*\*|$)', item_content, re.DOTALL)
+            if quality_match:
+                match_dict['match_quality'] = quality_match.group(1).strip()
+            
+            # Only add if we have at least requirement and corrections
+            if match_dict.get('requirement') and (match_dict.get('human_correction') or match_dict.get('ai_correction')):
+                matches.append(match_dict)
+    
+    return matches
 
 
 def compute_precision(
@@ -341,12 +512,17 @@ def compute_precision(
         
         if provider == "openai":
             from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(
-                model=model_name,
-                temperature=temperature,
-                api_key=os.getenv("OPENAI_API_KEY"),
-                base_url=os.getenv("OPENAI_BASE_URL"),
-            )
+            api_key = os.getenv("OPENAI_API_KEY")
+            base_url = os.getenv("OPENAI_BASE_URL")
+            llm_kwargs = {
+                "model": model_name,
+                "temperature": temperature,
+            }
+            if api_key:
+                llm_kwargs["api_key"] = api_key
+            if base_url:
+                llm_kwargs["base_url"] = base_url
+            llm = ChatOpenAI(**llm_kwargs)
         elif provider == "ollama":
             from langchain_ollama.llms import OllamaLLM
             llm = OllamaLLM(model=model_name, temperature=temperature)

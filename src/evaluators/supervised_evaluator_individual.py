@@ -372,6 +372,43 @@ class IndividualMetricsEvaluator:
         # Get auxiliary metrics dictionary
         aux_metrics = state.get("auxiliary_metrics", {})
         
+        # Special handling for content_similarity: it computes directly from auxiliary_metrics
+        # even if template is specified (template is ignored)
+        if metric_name == "content_similarity" and "function" in config:
+            function_name = config["function"]
+            logger.info(f"Evaluating {metric_name} directly using function: {function_name}")
+            
+            from .metric_computers import compute_content_similarity
+            
+            if function_name != "compute_content_similarity":
+                raise ValueError(
+                    f"Function '{function_name}' is not supported for content_similarity. "
+                    f"Must be 'compute_content_similarity'"
+                )
+            
+            # Get LLM for this metric (may have custom config)
+            metric_llm = self._get_llm_for_metric(metric_name, config)
+            
+            # Get content_similarity LLM config from metric config
+            content_similarity_llm_config = {
+                'model_name': config.get('model_name', self.evaluator_config['model_name']),
+                'provider': config.get('provider', self.evaluator_config['provider']),
+                'temperature': config.get('temperature', self.evaluator_config['temperature'])
+            }
+            
+            requirements_list = state.get("requirements", [])
+            
+            score, explanation = compute_content_similarity(
+                aux_metrics,
+                student_code=state.get("student_code", ""),
+                assignment=state.get("assignment", ""),
+                requirements=requirements_list,
+                llm=metric_llm,
+                content_similarity_llm_config=content_similarity_llm_config
+            )
+            logger.info(f"Completed {metric_name} (Direct computation): score={score}")
+            return score, explanation
+        
         # Mode 1: Python function only (no template)
         if "function" in config and "template" not in config:
             function_name = config["function"]
@@ -466,26 +503,17 @@ class IndividualMetricsEvaluator:
         
         # Mode 3: Hybrid - if config has both template AND function, 
         # use function to post-process the LLM response
+        # Note: content_similarity is handled earlier and won't reach here
         if "function" in config:
             function_name = config["function"]
             logger.info(f"Post-processing {metric_name} LLM response with function: {function_name}")
             
-            from .metric_computers import compute_content_similarity
-            
-            function_map = {
-                "compute_content_similarity": compute_content_similarity,
-            }
-            
-            if function_name not in function_map:
-                raise ValueError(
-                    f"Unknown post-processing function '{function_name}' for metric '{metric_name}'. "
-                    f"Available functions: {list(function_map.keys())}"
-                )
-            
-            post_process_func = function_map[function_name]
-            score, explanation = post_process_func(result_text)
-            logger.info(f"Completed {metric_name} (Hybrid: LLM + Python post-processing): score={score}")
-            return score, explanation
+            # This is for other hybrid functions that post-process LLM responses
+            # content_similarity is handled earlier and returns before reaching here
+            raise ValueError(
+                f"Hybrid mode (template + function) is not currently supported for '{metric_name}'. "
+                f"Use either template-only or function-only mode."
+            )
         
         # Mode 2: Template only - parse the LLM response normally
         parsed = self._parse_metric_response(result_text, metric_name)

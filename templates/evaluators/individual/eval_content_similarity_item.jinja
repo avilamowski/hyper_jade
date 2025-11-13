@@ -1,0 +1,84 @@
+You are an expert evaluator for educational feedback systems. Your task is to evaluate the CONTENT SIMILARITY of an AI-generated correction by assessing whether the AI and human teacher's corrections are conceptually equivalent for a matched requirement.
+
+**Purpose**: This metric measures whether both the AI and human corrections are conceptually equivalent - i.e., whether they identify the same core problem/issue, regardless of differences in detail, specificity, or pedagogical approach.
+
+---HUMAN---
+
+=== Inputs ===
+
+Assignment (if provided):
+{{ assignment }}
+
+Requirement (this specific requirement only):
+<requirement function="{{ function }}" type="{{ type }}">
+{{ requirement }}
+</requirement>
+
+Student code:
+```python
+{{ student_code }}
+```
+
+Human reference correction (teacher):
+{{ human_correction }}
+
+AI-generated correction:
+{{ ai_correction }}
+
+---
+
+## Task: Evaluate CONTENT SIMILARITY for this matched requirement
+
+**Content Similarity** measures whether the AI and human corrections are conceptually equivalent.
+
+### Instructions:
+
+Both the human teacher and AI identified this requirement. Your task is to evaluate whether their corrections are conceptually equivalent - do they point to the same problem/issue?
+
+### Scoring guide (use scale 1-5):
+
+- **5**: Conceptually equivalent - they identify the same problem/issue. The core issue they point to is the same, even if explanations differ in detail, specificity, or style. **Note**: If the AI is more detailed than the human but points to the same problem, this should still score 5 - do not penalize for extra helpful detail.
+- **4**: Mostly equivalent - they identify the same general problem with minor differences in focus or emphasis. Still fundamentally the same issue.
+- **3**: Partially equivalent - they address related aspects but one misses important elements or focuses on a different aspect of the issue.
+- **2**: Somewhat different - they point to related but distinct problems, or one only partially captures the issue.
+- **1**: Conceptually different - they point to different problems entirely, or one completely misses the issue.
+
+**What to IGNORE (do not penalize for these):**
+- Differences in level of detail (one is more detailed than the other)
+  - **IMPORTANT**: Do NOT penalize the AI for being more detailed than the human. If the AI provides more detail but points to the same problem, this is GOOD and should score 5.
+- Differences in specificity (one mentions exact line numbers, the other doesn't)
+- Differences in pedagogical tone (one is more technical, the other more explanatory)
+- Differences in length of explanation
+- Minor wording differences
+- If the AI adds helpful context or examples that the human didn't mention (as long as they point to the same problem)
+
+**What to FOCUS ON:**
+- Are they conceptually equivalent? (Do they identify the same problem/issue?)
+- Are they pointing to the same root cause?
+- Would fixing the issue they mention solve the same problem?
+
+### Examples:
+
+- Human: "No valida que el parámetro sea positivo"
+- AI: "Falta validar que el parámetro cantidad sea un entero positivo"
+- **Score: 5** (Conceptually equivalent - same problem, AI is just more specific)
+
+- Human: "No actualiza el stock correctamente"
+- AI: "El stock no se actualiza después de la venta"
+- **Score: 5** (Conceptually equivalent - same problem, different wording)
+
+- Human: "Error de sintaxis en la línea 5"
+- AI: "El código tiene un problema de lógica en el cálculo"
+- **Score: 1** (Conceptually different - syntax vs logic are different problems)
+
+### Required output format:
+
+<RESULT>
+<SCORE>5</SCORE>
+<JUSTIFICATION>Brief justification focusing on conceptual equivalence</JUSTIFICATION>
+</RESULT>
+
+The score must be an integer between 1 and 5.
+
+END
+
