@@ -125,6 +125,7 @@ class AuxiliaryMetricsEvaluator:
     def _format_reference_correction(reference_correction: Union[str, ReferenceCorrection]) -> str:
         """
         Convert ReferenceCorrection to XML format using <human> tags.
+        Each correction is wrapped in its own <human> tag.
         
         Args:
             reference_correction: Either a string or ReferenceCorrection dict
@@ -138,17 +139,17 @@ class AuxiliaryMetricsEvaluator:
                 return ""
             return f"<human>\n{reference_correction}\n</human>"
         elif isinstance(reference_correction, dict) and 'corrections' in reference_correction:
-            # Format as XML with individual correction items
+            # Format as XML with each correction in its own <human> tag
             corrections = reference_correction['corrections']
             if not corrections:
                 return ""
             
-            xml_parts = ["<human>"]
+            wrapped_corrections = []
             for correction in corrections:
-                xml_parts.append(f"<correction>{correction}</correction>")
-            xml_parts.append("</human>")
+                if correction.strip():
+                    wrapped_corrections.append(f"<human>\n{correction.strip()}\n</human>")
             
-            return "\n".join(xml_parts)
+            return "\n\n".join(wrapped_corrections)
         else:
             return f"<human>\n{str(reference_correction)}\n</human>"
     
@@ -266,9 +267,17 @@ class AuxiliaryMetricsEvaluator:
         human_correction_xml = self._format_reference_correction(reference_correction_raw)
         
         # Format generated correction with <generated> tags
+        # Each correction should be wrapped in its own <generated> tag
         generated_text = state.get("generated_correction", "")
         if generated_text.strip():
-            generated_correction_xml = f"<generated>\n{generated_text}\n</generated>"
+            # Split by double newlines to separate individual corrections
+            # Format: "## function_name\n<RESULT>...</RESULT>"
+            corrections = generated_text.strip().split("\n\n")
+            wrapped_corrections = []
+            for correction in corrections:
+                if correction.strip():
+                    wrapped_corrections.append(f"<generated>\n{correction.strip()}\n</generated>")
+            generated_correction_xml = "\n\n".join(wrapped_corrections)
         else:
             generated_correction_xml = ""
         
