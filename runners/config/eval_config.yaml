@@ -1,0 +1,41 @@
+# Default LLM configuration for all metrics (unless overridden per metric)
+# model_name: "llama3.2:latest"
+# provider: "ollama"
+model_name: "gpt-4o-mini"
+provider: "openai"
+temperature: 0.2
+
+# Configuration for the supervised evaluator template
+# `template` should point to a Jinja template inside the templates/ folder.
+# An optional `template_es` can be provided for a Spanish-language variant.
+#
+# Each metric can optionally override the default LLM by specifying:
+# - model_name: the model to use (e.g., "gpt-4o-mini", "llama3.2:latest")
+# - provider: the provider ("openai" or "ollama")
+# - temperature: optional, defaults to the global temperature
+supervised_evaluator:
+  auxiliary_metrics:
+    match: 
+      template: "evaluators/individual/aux_match.jinja"
+    missing: 
+      template: "evaluators/individual/aux_missing.jinja"
+    extra: 
+      template: "evaluators/individual/aux_extra.jinja"
+  evaluation_metrics:
+    completeness:
+      function: "compute_completeness"
+    # precision: 
+    #   function: "compute_precision"
+    #   precision_llm_config:
+    #     # model_name: "gpt-4o"
+    #     model_name: "gpt-4o-mini"
+    #     temperature: 0.2
+    #     provider: "openai"
+    restraint: 
+      function: "compute_restraint"
+    content_similarity: 
+      function: "compute_content_similarity"
+      # Use Ollama for content_similarity specifically
+      model_name: "llama3.2:latest"
+      provider: "ollama"
+      temperature: 0.1

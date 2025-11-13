@@ -13,8 +13,9 @@ SUBMISSIONS="ejemplos/3p/alu1.py"
 REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json"
 # Add a timestamp so multiple runs don't overwrite each other. Format: YYYYMMDDTHHMMSS
 TIMESTAMP=$(date +"%Y%m%dT%H%M%S")
-OUTPUT_DIR="outputs/supervised_individual_evaluation/${TIMESTAMP}"
-EVALUATOR_CONFIG="runners/config/without_rag.yaml"
+OUTPUT_DIR="outputs/evaluation/without_rag/${TIMESTAMP}"
+SYSTEM_CONFIG="runners/config/without_rag.yaml"
+EVALUATOR_CONFIG="runners/config/eval_config.yaml"
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
@@ -25,5 +26,6 @@ python3 runners/run_supervised_individual_evaluator.py \
     --submissions $SUBMISSIONS \
     --reference-corrections $REFERENCE_CORRECTIONS \
     --output-dir "$OUTPUT_DIR" \
+    --config "$SYSTEM_CONFIG" \
     --evaluator-config "$EVALUATOR_CONFIG" \
     --verbose

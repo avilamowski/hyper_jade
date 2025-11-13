@@ -57,8 +57,7 @@ def get_global_config(config: Dict[str, Any]) -> Dict[str, Any]:
         'enable_rag': config.get('enable_rag', False),
         'rag_knowledge_base': config.get('rag_knowledge_base'),
         'output': config.get('output', {}),
-        'logging': config.get('logging', {}),
-        'languages': config.get('languages', {})
+        'logging': config.get('logging', {})
     }
 
 
