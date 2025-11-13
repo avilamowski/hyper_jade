@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 
 # Add src to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.evaluators.prompt_evaluator import PromptEvaluator, evaluate_prompt
 from src.config import get_agent_config, load_config, load_langsmith_config

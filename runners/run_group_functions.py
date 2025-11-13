@@ -20,7 +20,7 @@ import yaml
 
 # Add src to Python path
 current_dir = Path(__file__).parent
-src_dir = current_dir / "src"
+src_dir = current_dir.parent / "src"
 sys.path.insert(0, str(src_dir))
 
 from src.agents.group_functions import GroupFunctionsAgent

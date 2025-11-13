@@ -110,12 +110,12 @@ python main.py --assignment ejemplos/consigna.txt --code ejemplos/alu1.py --outp
 
 #### 1. Generar Requerimientos
 ```bash
-python run_requirement_generator.py --assignment ejemplos/consigna.txt --output-dir outputs/requirements
+python runners/run_requirement_generator.py --assignment ejemplos/consigna.txt --output-dir outputs/requirements
 ```
 
 #### 2. Generar Prompts
 ```bash
-python run_prompt_generator.py --requirement outputs/requirements/requirement_01.txt --output outputs/prompts/prompt_01.jinja
+python runners/run_prompt_generator.py --requirement outputs/requirements/requirement_01.txt --output outputs/prompts/prompt_01.jinja
 ```
 
 #### 3. Analizar Código
@@ -124,12 +124,12 @@ python run_prompt_generator.py --requirement outputs/requirements/requirement_01
 
 #### Generación de Requerimientos (Independiente)
 ```bash
-python run_requirement_generator.py --assignment ejemplos/2p/consigna_2p.txt --output-dir outputs/2p --verbose
+python runners/run_requirement_generator.py --assignment ejemplos/2p/consigna_2p.txt --output-dir outputs/2p --verbose
 ```
 
 #### Evaluación de Agentes (Independiente)
 ```bash
-python run_agent_evaluation.py --assignment ejemplos/2p/consigna_2p.txt --requirements-dir outputs/2p --output-dir outputs/2p --verbose
+python runners/run_agent_evaluation.py --assignment ejemplos/2p/consigna_2p.txt --requirements-dir outputs/2p --output-dir outputs/2p --verbose
 ```
 
 #### Ejemplo de Workflow Completo
@@ -144,12 +144,12 @@ Este script demuestra el flujo completo de generación y evaluación independien
 Para ejecutar el sistema de evaluación de agentes:
 
 ```bash
-python run_agent_evaluation.py
+python runners/run_agent_evaluation.py
 ```
 
 Este script ejecuta una evaluación completa de todos los agentes y muestra los resultados de calidad.
 ```bash
-python run_code_corrector.py --prompt outputs/prompts/prompt_01.jinja --code ejemplos/alu1.py --output outputs/analyses/analysis_01.txt
+python runners/run_code_corrector.py --prompt outputs/prompts/prompt_01.jinja --code ejemplos/alu1.py --output outputs/analyses/analysis_01.txt
 ```
 
 ### Modo Batch
@@ -157,7 +157,7 @@ python run_code_corrector.py --prompt outputs/prompts/prompt_01.jinja --code eje
 Para analizar múltiples archivos de código:
 
 ```bash
-python run_code_corrector.py --prompt outputs/prompts/prompt_01.jinja --batch --code-dir ejemplos --output-dir outputs/analyses
+python runners/run_code_corrector.py --prompt outputs/prompts/prompt_01.jinja --batch --code-dir ejemplos --output-dir outputs/analyses
 ```
 
 ## Estructura de Archivos
@@ -184,10 +184,12 @@ hyper_jade/
 │   └── analyses/
 │       ├── analysis_01.txt
 │       └── ...
+├── runners/
+│   ├── run_requirement_generator.py
+│   ├── run_prompt_generator.py
+│   ├── run_code_corrector.py
+│   └── ...
 ├── main.py
-├── run_requirement_generator.py
-├── run_prompt_generator.py
-├── run_code_corrector.py
 └── requirements.txt
 ```
 
@@ -275,7 +277,7 @@ python main.py \
 ### Ejemplo 2: Solo Generar Requerimientos
 ```bash
 # Generar requerimientos para reutilizar después
-python run_requirement_generator.py \
+python runners/run_requirement_generator.py \
   --assignment ejemplos/consigna.txt \
   --output-dir outputs/requirements \
   --verbose
@@ -284,7 +286,7 @@ python run_requirement_generator.py \
 ### Ejemplo 3: Analizar Múltiples Códigos
 ```bash
 # Analizar todos los archivos en el directorio ejemplos
-python run_code_corrector.py \
+python runners/run_code_corrector.py \
   --prompt outputs/prompts/prompt_01.jinja \
   --batch \
   --code-dir ejemplos \

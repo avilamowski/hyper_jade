@@ -15,7 +15,7 @@ import asyncio
 from pathlib import Path
 
 # Add src to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.agents.rag_prompt_generator.config import USE_RAG
 
