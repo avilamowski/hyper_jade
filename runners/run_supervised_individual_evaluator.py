@@ -11,7 +11,9 @@ import mlflow
 from pathlib import Path
 from typing import List, Dict, Any, Union
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add project root to path so we can import src modules
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent

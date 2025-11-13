@@ -13,8 +13,8 @@ REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json ejemplos/3p/alu2.json ejemplos/3p/a
 # REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json"
 # Add a timestamp so multiple runs don't overwrite each other. Format: YYYYMMDDTHHMMSS
 TIMESTAMP=$(date +"%Y%m%dT%H%M%S")
-OUTPUT_DIR="outputs/evaluation/without_rag/${TIMESTAMP}"
-SYSTEM_CONFIG="runners/config/without_rag.yaml"
+OUTPUT_DIR="outputs/evaluation/with_rag/${TIMESTAMP}"
+SYSTEM_CONFIG="runners/config/with_rag.yaml"
 EVALUATOR_CONFIG="runners/config/eval_config.yaml"
 # Create output directory
 mkdir -p "$OUTPUT_DIR"

@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../jade_server"
+		}
+	],
+	"settings": {
+		"terminal.integrated.env.linux": {
+			"PYTHONPATH": "./.venv/lib/python3.13/site-packages:${env:PYTHONPATH}"
+		}
+	}
+}
