@@ -430,8 +430,20 @@ Note: Reference corrections can be provided as either:
             for e in all_evals 
             if isinstance(e.get('evaluation'), dict) and 'overall_score' in e['evaluation']
         ]
+        
+        # Compute aggregate metrics
+        aggregate_metrics = {
+            "total_submissions": len(all_evals),
+            "total_corrections": total_corrections,
+            "average_overall_score": None,
+            "metric_averages": {},
+            "timestamp": time.time()
+        }
+        
         if overall_scores:
-            logger.info(f"Average overall evaluation score: {sum(overall_scores)/len(overall_scores):.3f}")
+            avg_overall = sum(overall_scores) / len(overall_scores)
+            aggregate_metrics["average_overall_score"] = avg_overall
+            logger.info(f"Average overall evaluation score: {avg_overall:.3f}")
         
         # Print metric averages
         all_scores = {}
@@ -446,7 +458,14 @@ Note: Reference corrections can be provided as either:
             logger.info("\nMetric Averages:")
             for metric_name, scores_list in sorted(all_scores.items()):
                 avg = sum(scores_list) / len(scores_list)
+                aggregate_metrics["metric_averages"][metric_name] = avg
                 logger.info(f"  {metric_name}: {avg:.3f}")
+        
+        # Save aggregate metrics to JSON
+        aggregate_path = Path(args.output_dir) / "aggregate_metrics.json"
+        with open(aggregate_path, 'w', encoding='utf-8') as f:
+            json.dump(aggregate_metrics, f, indent=2, ensure_ascii=False)
+        logger.info(f"✓ Aggregate metrics saved to: {aggregate_path}")
         
         logger.info("=" * 60)
         logger.info("✓ Pipeline completed successfully")

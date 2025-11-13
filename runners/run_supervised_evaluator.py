@@ -322,8 +322,44 @@ This will:
         total_corrections = sum(len(e.get('evaluation', {}).get('corrections', [])) for e in all_evals)
         logger.info(f"Total corrections generated (approx): {total_corrections}")
         overall_scores = [e['evaluation'].get('overall_score') for e in all_evals if isinstance(e.get('evaluation'), dict) and 'overall_score' in e['evaluation']]
+        
+        # Compute aggregate metrics
+        aggregate_metrics = {
+            "total_submissions": len(all_evals),
+            "total_corrections": total_corrections,
+            "average_overall_score": None,
+            "criterion_averages": {},
+            "timestamp": time.time()
+        }
+        
         if overall_scores:
-            logger.info(f"Average overall evaluation score: {sum(overall_scores)/len(overall_scores):.3f}")
+            avg_overall = sum(overall_scores) / len(overall_scores)
+            aggregate_metrics["average_overall_score"] = avg_overall
+            logger.info(f"Average overall evaluation score: {avg_overall:.3f}")
+        
+        # Calculate average for each criterion across all submissions
+        all_criterion_scores = {}
+        for eval_data in all_evals:
+            evaluation = eval_data.get('evaluation', {})
+            if isinstance(evaluation, dict):
+                criterion_avgs = evaluation.get('criterion_averages', {})
+                if isinstance(criterion_avgs, dict):
+                    for criterion, score in criterion_avgs.items():
+                        if criterion not in all_criterion_scores:
+                            all_criterion_scores[criterion] = []
+                        all_criterion_scores[criterion].append(score)
+        
+        for criterion, scores in all_criterion_scores.items():
+            if scores:
+                avg_score = sum(scores) / len(scores)
+                aggregate_metrics["criterion_averages"][criterion] = avg_score
+                logger.info(f"Average {criterion}: {avg_score:.3f}")
+        
+        # Save aggregate metrics to JSON
+        aggregate_path = Path(args.output_dir) / "aggregate_metrics.json"
+        with open(aggregate_path, 'w', encoding='utf-8') as f:
+            json.dump(aggregate_metrics, f, indent=2, ensure_ascii=False)
+        logger.info(f"✓ Aggregate metrics saved to: {aggregate_path}")
         
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
