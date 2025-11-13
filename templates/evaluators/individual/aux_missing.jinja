@@ -100,22 +100,26 @@ You will output TWO separate lists:
 
 ## Output Format for Each MATCHED Requirement:
 
+{% raw %}
 **[Number].** 
-**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag]{{ '</requirement>' }}
+**Requirement:** <requirement>[EXACT text from inside the <requirement> tag]</requirement>
 **Function:** [Value of the "function" attribute from the XML tag]
 **Type:** [Value of the "type" attribute from the XML tag]
-**Human correction:** {{ '<human>' }}[EXACT verbatim quote from the teacher's feedback]{{ '</human>' }}
-**AI correction:** {{ '<generated>' }}[EXACT verbatim quote from the AI's feedback]{{ '</generated>' }}
+**Human correction:** <human>[EXACT verbatim quote from the teacher's feedback]</human>
+**AI correction:** <generated>[EXACT verbatim quote from the AI's feedback]</generated>
+{% endraw %}
 
 ## Output Format for Each MISSING Requirement:
 
+{% raw %}
 **[Number].** 
-**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag that matches what the human mentioned]{{ '</requirement>' }}
+**Requirement:** <requirement>[EXACT text from inside the <requirement> tag that matches what the human mentioned]</requirement>
 **Function:** [Value of the "function" attribute from the XML tag]
 **Type:** [Value of the "type" attribute from the XML tag]
-**Human correction:** {{ '<human>' }}[EXACT verbatim quote showing the human mentioned this issue]{{ '</human>' }}
+**Human correction:** <human>[EXACT verbatim quote showing the human mentioned this issue]</human>
 **Impact severity:** [LOW/MEDIUM/HIGH - how critical this missing issue is]
 **Impact Explanation:** [Brief explanation of why this severity level was assigned]
+{% endraw %}
 
 ## Decision Tree for Each Issue:
 
@@ -167,7 +171,9 @@ Given this XML in SECTION B:
 ```
 
 Extract as:
-- **Requirement:** {{ '<requirement>' }}No agrega a ventas pasadas el stock restado, o resta el número original en vez del stock.{{ '</requirement>' }}
+{% raw %}
+- **Requirement:** <requirement>No agrega a ventas pasadas el stock restado, o resta el número original en vez del stock.</requirement>
+{% endraw %}
 - **Function:** vender_productos
 - **Type:** error_presence
 
@@ -223,20 +229,24 @@ MISSING_COUNT: Y
 
 ## Output Format for MATCHED Requirements:
 
+{% raw %}
 **[Number].** 
-**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag]{{ '</requirement>' }}
+**Requirement:** <requirement>[EXACT text from inside the <requirement> tag]</requirement>
 **Function:** [Value of the "function" attribute from the XML tag]
 **Type:** [Value of the "type" attribute from the XML tag]
-**Human correction:** {{ '<human>' }}[EXACT verbatim quote from the teacher's feedback]{{ '</human>' }}
-**AI correction:** {{ '<generated>' }}[EXACT verbatim quote from the AI's feedback]{{ '</generated>' }}
+**Human correction:** <human>[EXACT verbatim quote from the teacher's feedback]</human>
+**AI correction:** <generated>[EXACT verbatim quote from the AI's feedback]</generated>
+{% endraw %}
 
 ## Output Format for MISSING Requirements:
 
+{% raw %}
 **[Number].** 
-**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag]{{ '</requirement>' }}
+**Requirement:** <requirement>[EXACT text from inside the <requirement> tag]</requirement>
 **Function:** [Value of the "function" attribute from the XML tag]
 **Type:** [Value of the "type" attribute from the XML tag]
-**Human correction:** {{ '<human>' }}[EXACT verbatim quote showing the human mentioned this issue]{{ '</human>' }}
+**Human correction:** <human>[EXACT verbatim quote showing the human mentioned this issue]</human>
+{% endraw %}
 **Impact severity:** [LOW/MEDIUM/HIGH - how critical this missing issue is]
 **Impact Explanation:** [Brief explanation of why this severity level was assigned]
 
@@ -246,38 +256,39 @@ MISSING_COUNT: Y
 
 ### MATCHED REQUIREMENTS (AI identified these):
 
+{% raw %}
 **1.** 
-**Requirement:** {{ '<requirement>' }}No valida que la entrada sea un número positivo.{{ '</requirement>' }}
+**Requirement:** <requirement>No valida que la entrada sea un número positivo.</requirement>
 **Function:** agregar_producto
 **Type:** error_presence
-**Human correction:** {{ '<human>' }}"Falta validación de entrada positiva."{{ '</human>' }}
-**AI correction:** {{ '<generated>' }}"No valida que el parámetro cantidad sea mayor que cero."{{ '</generated>' }}
+**Human correction:** <human>"Falta validación de entrada positiva."</human>
+**AI correction:** <generated>"No valida que el parámetro cantidad sea mayor que cero."</generated>
 
 **2.** 
-**Requirement:** {{ '<requirement>' }}No maneja el caso cuando el archivo no existe.{{ '</requirement>' }}
+**Requirement:** <requirement>No maneja el caso cuando el archivo no existe.</requirement>
 **Function:** cargar_inventario
 **Type:** error_presence
-**Human correction:** {{ '<human>' }}"No se valida la existencia del archivo."{{ '</human>' }}
-**AI correction:** {{ '<generated>' }}"Falta try-catch para FileNotFoundError."{{ '</generated>' }}
+**Human correction:** <human>"No se valida la existencia del archivo."</human>
+**AI correction:** <generated>"Falta try-catch para FileNotFoundError."</generated>
 
 ---
 
-{{ '<OUTPUT>' }}
+<OUTPUT>
 ### MISSING REQUIREMENTS (AI failed to identify these):
 
 **1.** 
-**Requirement:** {{ '<requirement>' }}No agrega a ventas pasadas el stock restado, o resta el número original en vez del stock.{{ '</requirement>' }}
+**Requirement:** <requirement>No agrega a ventas pasadas el stock restado, o resta el número original en vez del stock.</requirement>
 **Function:** vender_productos
 **Type:** error_presence
-**Human correction:** {{ '<human>' }}"No agrega a ventas pasadas el stock restado."{{ '</human>' }}
+**Human correction:** <human>"No agrega a ventas pasadas el stock restado."</human>
 **Impact severity:** HIGH
 **Impact Explanation:** Critical functional issue that prevents proper sales history tracking
 
 **2.** 
-**Requirement:** {{ '<requirement>' }}No lee correctamente el archivo y lo carga en listas.{{ '</requirement>' }}
+**Requirement:** <requirement>No lee correctamente el archivo y lo carga en listas.</requirement>
 **Function:** vender_productos
 **Type:** error_presence
-**Human correction:** {{ '<human>' }}"El archivo no se lee correctamente, no se parsean los datos como listas."{{ '</human>' }}
+**Human correction:** <human>"El archivo no se lee correctamente, no se parsean los datos como listas."</human>
 **Impact severity:** HIGH
 **Impact Explanation:** Prevents the program from loading initial inventory data
 
@@ -285,13 +296,15 @@ MISSING_COUNT: Y
 MATCHED_COUNT: 2
 MISSING_COUNT: 2
 </AUXILIARY_METRIC_COUNT>
-{{ '</OUTPUT>' }}
+</OUTPUT>
+{% endraw %}
 
 ---
 
 **If there are NO missing requirements**, still output the MATCHED section, then output:
 
-{{ '<OUTPUT>' }}
+{% raw %}
+<OUTPUT>
 ### MISSING REQUIREMENTS (AI failed to identify these):
 
 NO MISSING REQUIREMENTS - AI IDENTIFIED ALL HUMAN ISSUES
@@ -300,7 +313,8 @@ NO MISSING REQUIREMENTS - AI IDENTIFIED ALL HUMAN ISSUES
 MATCHED_COUNT: <number_of_matched>
 MISSING_COUNT: 0
 </AUXILIARY_METRIC_COUNT>
-{{ '</OUTPUT>' }}
+</OUTPUT>
+{% endraw %}
 
 ---
 

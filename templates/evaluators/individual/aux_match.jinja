@@ -64,13 +64,15 @@ Find all requirements/issues that BOTH the human teacher and AI mentioned in the
 
 ## Output Format for Each Match:
 
+{% raw %}
 **[Number].** 
-**Requirement:** {{ '<requirement>' }}[EXACT text from inside the <requirement> tag]{{ '</requirement>' }}
+**Requirement:** <requirement>[EXACT text from inside the <requirement> tag]</requirement>
 **Function:** [Value of the "function" attribute from the XML tag]
 **Type:** [Value of the "type" attribute from the XML tag]
-**Human correction:** {{ '<human>' }}[EXACT verbatim quote from the teacher's feedback]{{ '</human>' }}
-**AI correction:** {{ '<generated>' }}[EXACT verbatim quote from the AI's feedback]{{ '</generated>' }}
+**Human correction:** <human>[EXACT verbatim quote from the teacher's feedback]</human>
+**AI correction:** <generated>[EXACT verbatim quote from the AI's feedback]</generated>
 **Match quality:** [FULL/HIGH/PARTIAL/POOR - assess how well the AI captured the human's concern]
+{% endraw %}
 
 ## How to Extract from XML (SECTION B):
 
@@ -82,7 +84,9 @@ Given this XML in SECTION B:
 ```
 
 Extract as:
-- **Requirement:** {{ '<requirement>' }}No valida que el parámetro 'cantidad' sea un entero positivo.{{ '</requirement>' }}
+{% raw %}
+- **Requirement:** <requirement>No valida que el parámetro 'cantidad' sea un entero positivo.</requirement>
+{% endraw %}
 - **Function:** vender_productos
 - **Type:** error_presence
 
@@ -110,29 +114,31 @@ NO MATCHED REQUIREMENTS FOUND
 
 ## Example Output:
 
+{% raw %}
 **1.** 
-**Requirement:** {{ '<requirement>' }}No valida que el parámetro 'cantidad' sea un entero positivo.{{ '</requirement>' }}
+**Requirement:** <requirement>No valida que el parámetro 'cantidad' sea un entero positivo.</requirement>
 **Function:** vender_productos
 **Type:** error_presence
-**Human correction:** {{ '<human>' }}"No valida que el parámetro 'cantidad' sea un entero positivo."{{ '</human>' }}
-**AI correction:** {{ '<generated>' }}"El código no valida que el parámetro 'cantidad' sea un entero positivo antes de convertirlo a entero."{{ '</generated>' }}
+**Human correction:** <human>"No valida que el parámetro 'cantidad' sea un entero positivo."</human>
+**AI correction:** <generated>"El código no valida que el parámetro 'cantidad' sea un entero positivo antes de convertirlo a entero."</generated>
 **Match quality:** FULL
 
 **2.** 
-**Requirement:** {{ '<requirement>' }}No resta correctamente la venta del stock.{{ '</requirement>' }}
+**Requirement:** <requirement>No resta correctamente la venta del stock.</requirement>
 **Function:** vender_productos
 **Type:** error_presence
-**Human correction:** {{ '<human>' }}"No resta correctamente la venta al stock, no actualiza el stock."{{ '</human>' }}
-**AI correction:** {{ '<generated>' }}"El código contiene un comportamiento prohibido en la función `modificar_stock`. Aunque se intenta restar la cantidad vendida del stock, no hay una verificación previa."{{ '</generated>' }}
+**Human correction:** <human>"No resta correctamente la venta al stock, no actualiza el stock."</human>
+**AI correction:** <generated>"El código contiene un comportamiento prohibido en la función `modificar_stock`. Aunque se intenta restar la cantidad vendida del stock, no hay una verificación previa."</generated>
 **Match quality:** HIGH
 
 **3.**
-**Requirement:** {{ '<requirement>' }}No guarda/actualiza/crea correctamente el archivo.{{ '</requirement>' }}
+**Requirement:** <requirement>No guarda/actualiza/crea correctamente el archivo.</requirement>
 **Function:** vender_productos
 **Type:** error_presence
-**Human correction:** {{ '<human>' }}"No guarda/actualiza/crea correctamente el archivo. Tiene un error de ejecución (w en lugar de 'w')."{{ '</human>' }}
-**AI correction:** {{ '<generated>' }}"En la línea `with open(ruta, w) as archivo:`, el modo de apertura del archivo está mal especificado; debe estar entre comillas como 'w'."{{ '</generated>' }}
+**Human correction:** <human>"No guarda/actualiza/crea correctamente el archivo. Tiene un error de ejecución (w en lugar de 'w')."</human>
+**AI correction:** <generated>"En la línea `with open(ruta, w) as archivo:`, el modo de apertura del archivo está mal especificado; debe estar entre comillas como 'w'."</generated>
 **Match quality:** HIGH
+{% endraw %}
 
 ---
 

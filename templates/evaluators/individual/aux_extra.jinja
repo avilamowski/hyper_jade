@@ -89,10 +89,12 @@ Find all requirements, issues, or comments that the AI-generated correction ment
 
 ## Output Format for Each Extra Item:
 
+{% raw %}
 **[Number].** 
-**AI correction:** {{ '<generated>' }}[EXACT verbatim quote from the AI's feedback showing what it said about this issue]{{ '</generated>' }}
+**AI correction:** <generated>[EXACT verbatim quote from the AI's feedback showing what it said about this issue]</generated>
 **Relevance:** [RELEVANT/SOMEWHAT_RELEVANT/IRRELEVANT - how relevant this extra comment is]
 **Relevance Explanation:** [Brief explanation of why this relevance level was assigned]
+{% endraw %}
 
 ### CRITICAL: Quote from SECTION E only
 
@@ -102,17 +104,20 @@ Find all requirements, issues, or comments that the AI-generated correction ment
 - DO NOT quote from SECTION D (the human correction)
 
 ❌ **WRONG** - Don't quote from the requirements, quote what the AI actually said:
+{% raw %}
 ```
-AI correction: {{ '<requirement>' }}No valida que el parámetro 'cantidad' sea un entero positivo.{{ '</requirement>' }}
+AI correction: <requirement>No valida que el parámetro 'cantidad' sea un entero positivo.</requirement>
 ```
+{% endraw %}
 (This is from the requirements, not what the AI actually said)
 
 ✅ **CORRECT** - Quote what the AI actually said in SECTION E:
+{% raw %}
 ```
-AI correction: {{ '<generated>' }}El código no valida que el parámetro 'cantidad' sea un entero positivo antes de convertirlo a entero.{{ '</generated>' }}
+AI correction: <generated>El código no valida que el parámetro 'cantidad' sea un entero positivo antes de convertirlo a entero.</generated>
 ```
+{% endraw %}
 
-## Relevance Guidelines:
 ## Relevance Guidelines:
 
 - **RELEVANT**: The extra comment addresses a legitimate issue or improvement related to the assignment goals, even if the human didn't mention it
@@ -131,20 +136,22 @@ NO EXTRA REQUIREMENTS - AI STAYED FOCUSED ON HUMAN ISSUES
 
 ## Example Output:
 
+{% raw %}
 **1.** 
-**AI correction:** {{ '<generated>' }}"La función debería usar type hints para mejor documentación (def calcular(a: int, b: int) -> int)."{{ '</generated>' }}
+**AI correction:** <generated>"La función debería usar type hints para mejor documentación (def calcular(a: int, b: int) -> int)."</generated>
 **Relevance:** SOMEWHAT_RELEVANT
 **Relevance Explanation:** Type hints improve code quality and maintainability, but they were not required in the assignment and the human teacher didn't mention them
 
 **2.** 
-**AI correction:** {{ '<generated>' }}"Considerar usar una clase en lugar de funciones sueltas para mejor encapsulación."{{ '</generated>' }}
+**AI correction:** <generated>"Considerar usar una clase en lugar de funciones sueltas para mejor encapsulación."</generated>
 **Relevance:** IRRELEVANT
 **Relevance Explanation:** This architectural suggestion goes beyond the scope of the assignment, which explicitly asked for function-based implementation
 
 **3.** 
-**AI correction:** {{ '<generated>' }}"Falta manejo de excepciones para casos donde el archivo no existe."{{ '</generated>' }}
+**AI correction:** <generated>"Falta manejo de excepciones para casos donde el archivo no existe."</generated>
 **Relevance:** RELEVANT
 **Relevance Explanation:** Error handling is important for robust code, and file operations should handle potential failures even if not explicitly mentioned in the assignment
+{% endraw %}
 
 ---
 

@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, TypedDict, Annotated, Union
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markupsafe import Markup
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, END, START
 
@@ -284,13 +285,13 @@ class AuxiliaryMetricsEvaluator:
         # Render the template
         rendered = template.render(
             assignment=state.get("assignment", ""),
-            requirements=requirements_xml,
+            requirements=Markup(requirements_xml),
             student_code=state.get("student_code", ""),
-            human=human_correction_xml,
-            generated=generated_correction_xml,
+            human=Markup(human_correction_xml),
+            generated=Markup(generated_correction_xml),
             # Keep old names for backward compatibility
-            reference_correction=human_correction_xml,
-            generated_correction=generated_correction_xml
+            reference_correction=Markup(human_correction_xml),
+            generated_correction=Markup(generated_correction_xml)
         )
         
         # Split system/human if separator exists
