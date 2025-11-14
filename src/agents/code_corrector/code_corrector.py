@@ -14,6 +14,7 @@ All I/O operations (file reading/writing) are handled by the caller (run_code_co
 from __future__ import annotations
 from typing import Dict, Any, TypedDict, List, Optional, Annotated
 import re
+import logging
 
 from dotenv import load_dotenv, dotenv_values
 from jinja2 import Template
@@ -28,11 +29,18 @@ from src.config import get_agent_config
 from src.agents.utils.reducers import keep_last, concat
 from src.models import Requirement, GeneratedPrompt, Submission, Correction
 
+logger = logging.getLogger(__name__)
+
 # --------------------------------------------------------------------------- #
 # Load .env ASAP and keep values in-memory
 # --------------------------------------------------------------------------- #
 load_dotenv(override=True)
 DOTENV = dotenv_values()
+
+# Import GroupFunctionsAgent lazily to avoid circular imports
+def _get_group_functions_agent():
+    from src.agents.group_functions import GroupFunctionsAgent
+    return GroupFunctionsAgent
     # --------------------------------------------------------------------------- #
 # LangGraph State
 # --------------------------------------------------------------------------- #
@@ -42,6 +50,7 @@ class CodeCorrectorState(TypedDict):
     requirements: Annotated[List[Requirement], keep_last]  
     generated_prompts: Annotated[List[GeneratedPrompt], keep_last] 
     submission: Annotated[Submission, keep_last]
+    grouped_code: Annotated[Optional[List[Dict[str, Any]]], keep_last]  # Optional grouped functions
     
     # Output - use Annotated to allow multiple concurrent writes
     corrections: Annotated[List[Correction], concat]
@@ -63,6 +72,16 @@ class CodeCorrectorAgent:
         self.config = config or {}
         self.agent_config = get_agent_config(self.config, "code_corrector")
         self.llm = self._setup_llm()
+        
+        # Initialize group_functions if enabled
+        group_functions_config = get_agent_config(self.config, 'group_functions')
+        self.group_functions_enabled = group_functions_config.get('enabled', False)
+        self.group_functions_agent = None
+        
+        if self.group_functions_enabled:
+            GroupFunctionsAgent = _get_group_functions_agent()
+            self.group_functions_agent = GroupFunctionsAgent(self.config)
+        
         self.graph = self._build_graph()
 
     def _setup_llm(self):
@@ -123,7 +142,28 @@ class CodeCorrectorAgent:
         def process_correction_node(state: CodeCorrectorState) -> CodeCorrectorState:
             """Process a single correction - render template and invoke LLM"""
             submission = state["submission"]
-            student_code = submission["code"]
+            grouped_code = state.get("grouped_code", [])
+            
+            # Determine which code to use
+            if grouped_code:
+                # Try to find grouped code for this requirement's function
+                requirement_function = generated_prompt["requirement"].get("function", "")
+                # Clean function name: "validar(texto)" -> "validar"
+                requirement_function_clean = requirement_function.split('(')[0].strip() if requirement_function else ""
+                matched_group = None
+                
+                for group in grouped_code:
+                    if group.get("function_name") == requirement_function_clean:
+                        matched_group = group
+                        break
+                
+                if matched_group:
+                    student_code = matched_group["code"]
+                else:
+                    # Fallback to full code if no match found
+                    student_code = submission["code"]
+            else:
+                student_code = submission["code"]
 
             # Render the Jinja template with the student code
             rendered_prompt = Template(generated_prompt["jinja_template"]).render(
@@ -212,7 +252,8 @@ class CodeCorrectorAgent:
         self, 
         generated_prompts: List[GeneratedPrompt], 
         submission: Submission,
-        assignment_description: str = ""
+        assignment_description: str = "",
+        submission_name: Optional[str] = None
     ) -> List[Correction]:
         """
         Generate multiple corrections in parallel from a list of generated prompts.
@@ -222,7 +263,37 @@ class CodeCorrectorAgent:
             generated_prompts: List of GeneratedPrompt objects
             submission: The Submission object with student code
             assignment_description: Optional assignment description
+            submission_name: Optional submission name for grouping (e.g., "alu1")
         """
+        # Apply function grouping if enabled
+        grouped_code = None
+        if self.group_functions_enabled and self.group_functions_agent:
+            # Extract unique function names from requirements
+            function_names = set()
+            for gp in generated_prompts:
+                func_name = gp["requirement"].get("function", "")
+                # Parse function name from "function_name(params)" format
+                if func_name:
+                    # Extract just the function name, removing parameters
+                    func_name_clean = func_name.split('(')[0].strip()
+                    if func_name_clean:
+                        function_names.add(func_name_clean)
+            
+            # Only group if we have function names
+            if function_names:
+                submissions_for_grouping = [{
+                    "name": submission_name or "submission",
+                    "code": submission["code"]
+                }]
+                
+                # Use group_code_by_functions (already @traceable)
+                grouped_code = self.group_functions_agent.group_code_by_functions(
+                    function_names=list(function_names),
+                    submissions=submissions_for_grouping
+                )
+                
+                logger.info(f"Grouped {len(grouped_code)} function segments for {len(function_names)} functions")
+        
         # Create dynamic graph for this batch
         self._create_dynamic_graph(generated_prompts)
 
@@ -232,6 +303,7 @@ class CodeCorrectorAgent:
             "requirements": [gp["requirement"] for gp in generated_prompts],
             "generated_prompts": generated_prompts,
             "submission": submission,
+            "grouped_code": grouped_code,
             "corrections": [],
             "extra": {},
         }

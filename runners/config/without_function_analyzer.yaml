@@ -1,0 +1,98 @@
+# Configuration for Assignment Evaluation System
+# This system coordinates three specialized agents for automated code evaluation
+# WITHOUT FUNCTION ANALYZER: Disables AST-based function grouping in code corrector
+
+# Global LLM Configuration (used as fallback if agent-specific config is not provided)
+# model_name: "gpt-oss:latest"  # Default model for all agents
+# provider: "ollama"
+model_name: "gpt-4o-mini"
+provider: "openai"
+temperature: 0.1
+
+# Agent Configuration
+# Each agent can have its own model configuration
+# If not specified, the agent will use the global configuration above
+agents:
+  requirement_generator:
+    enabled: true
+    # Agent-specific model configuration (optional)
+    # Uncomment and modify these lines to use a different model for this agent
+    # model_name: "deepseek-r1:14b"  # Different model for requirement generation
+    # provider: "ollama"   # Different provider for requirement generation
+    # temperature: 0.2     # Different temperature for requirement generation
+    template: "requirement_generator_tags.jinja"  # Jinja template for requirement generation
+    max_requirements: 10  # Maximum number of requirements to generate
+    
+  prompt_generator:
+    enabled: true
+    # Agent-specific model configuration (optional)
+    # Uncomment and modify these lines to use a different model for this agent
+    # model_name: "qwen2.5:7b"  # Different model for prompt generation
+    # provider: "ollama"        # Different provider for prompt generation
+    # temperature: 0.15         # Different temperature for prompt generation
+    example_quantity: 3
+    templates:
+      examples: "examples.jinja"
+      default: "prompt_generators/requirement_presence.jinja"
+      requirement_presence: "prompt_generators/requirement_presence.jinja"
+      error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
+      conceptual: "prompt_generators/conceptual/conceptual.es2es.jinja"
+    
+  code_corrector:
+    enabled: true
+    detailed_feedback: true
+    include_suggestions: true
+    include_learning_resources: true
+    # Agent-specific model configuration (optional)
+    # Uncomment and modify these lines to use a different model for this agent
+    # model_name: "gpt-4-turbo"  # Different model for code correction
+    # provider: "openai"         # Different provider for code correction
+    # temperature: 0.05          # Different temperature for code correction
+    
+  group_functions:
+    enabled: false  # DISABLED: Do NOT use AST-based function grouping
+    # Agent-specific model configuration (optional)
+    # Uncomment and modify these lines to use a different model for this agent
+    # model_name: "gpt-4"  # Different model for function grouping
+    # provider: "openai"   # Different provider for function grouping
+    # temperature: 0.1     # Different temperature for function grouping
+
+  # Agent Evaluator Configuration
+  agent_evaluator:
+    enabled: false
+    # Agent-specific model configuration for the evaluator
+    # model_name: "deepseek-r1:14b"  # Model for evaluation (should be high quality)
+    # provider: "ollama"         # Provider for evaluation
+    temperature: 0.1           # Low temperature for consistent evaluation
+    enable_teacher_comparison: true  # Enable comparison with teacher examples
+    teacher_comparison_criteria:
+      coverage: 1.0           # Do generated requirements cover the same key aspects?
+      specificity: 1.0        # Are requirements as specific and actionable?
+      clarity: 1.0            # Are requirements as clear and unambiguous?
+      completeness: 1.0       # Do requirements address all important points?
+      format: 1.0             # Do requirements follow similar format/structure?
+    evaluation_criteria:
+      requirement_generator:
+        completeness: 1.0
+        clarity: 1.0
+        specificity: 1.0
+        coherence: 1.0
+        independence: 1.0
+      prompt_generator:
+        template_completeness: 1.0
+        clarity: 1.0
+        specificity: 1.0
+        code_analysis_focus: 1.0
+        jinja2_syntax: 1.0
+      code_corrector:
+        requirement_coverage: 1.0
+        analysis_depth: 1.0
+        clarity: 1.0
+        accuracy: 1.0
+        actionability: 1.0
+  
+# Logging Configuration
+logging:
+  level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "assignment_evaluator.log"

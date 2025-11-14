@@ -16,18 +16,25 @@ from typing import Dict, Any, TypedDict, List, Optional, Annotated
 import logging
 import re
 import ast
-from pathlib import Path
-
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from langchain_core.messages import HumanMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END, START
-from langgraph.graph.message import add_messages
 from src.config import get_agent_config
 from src.agents.utils.reducers import keep_last, concat
 from src.models import GroupedCode
+
+# LangSmith tracing: optional
+try:
+    from langsmith import traceable
+    LANGSMITH_AVAILABLE = True
+except Exception:
+    LANGSMITH_AVAILABLE = False
+    def traceable(name: str = None, run_type: str = None):
+        def decorator(func):
+            return func
+        return decorator
 
 logger = logging.getLogger(__name__)
 
@@ -51,49 +58,17 @@ class GroupFunctionsState(TypedDict):
     extra: Annotated[Optional[Dict[str, Any]], keep_last]
 
 
-def extract_functions_from_response(response: str) -> Dict[str, str]:
+@traceable(name="parse_and_extract_functions", run_type="parser")
+def parse_code_and_extract_functions(code: str, include_line_numbers: bool = False) -> Dict[str, str]:
     """
-    Extract functions and their code from the LLM response.
-    The response should be in the format:
-    <FUNCTION name="function_name">
-    def function_name():
-        # function code
-    </FUNCTION>
-    """
-    functions = {}
-    lines = response.splitlines()
-    current_function = None
-    current_code = []
-
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("<FUNCTION name="):
-            # Save previous function if it was left unclosed
-            if current_function is not None:
-                functions[current_function] = "\n".join(current_code)
-            match = re.search(r'name="([^"]+)"', stripped)
-            if match:
-                current_function = match.group(1)
-                current_code = []
-        elif stripped.startswith("</FUNCTION>"):
-            if current_function is not None:
-                functions[current_function] = "\n".join(current_code)
-                current_function = None
-                current_code = []
-        elif current_function is not None:
-            current_code.append(line)
-
-    # Handle case where last function doesn't have closing tag
-    if current_function is not None and current_code:
-        functions[current_function] = "\n".join(current_code)
-
-    return functions
-
-
-def parse_code_and_extract_functions(code: str) -> Dict[str, str]:
-    """
-    Parse Python code and extract all function definitions WITH line numbers.
-    Returns a dictionary with function_name -> function_code_with_line_numbers.
+    Parse Python code and extract all function definitions.
+    
+    Args:
+        code: The Python code to parse
+        include_line_numbers: If True, prefix each line with "line_number: ". Default is False.
+    
+    Returns:
+        Dictionary with function_name -> function_code (with or without line numbers)
     """
     functions = {}
 
@@ -101,47 +76,75 @@ def parse_code_and_extract_functions(code: str) -> Dict[str, str]:
         tree = ast.parse(code)
         lines = code.splitlines()
 
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef):
-                # Extract function code based on line numbers
-                start_line = node.lineno - 1  # ast uses 1-based indexing
+        # Get all function nodes sorted by line number
+        function_nodes = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+        function_nodes.sort(key=lambda n: n.lineno)
 
-                # Find the end line by looking for the next function or end of file
-                end_line = len(lines)
-                for other_node in ast.walk(tree):
-                    if (
-                        isinstance(other_node, ast.FunctionDef)
-                        and other_node != node
-                        and other_node.lineno > node.lineno
-                    ):
-                        end_line = min(end_line, other_node.lineno - 1)
+        for node in function_nodes:
+            start_line = node.lineno - 1  # ast uses 1-based indexing
+            
+            # Get the indentation level of the function definition
+            func_indent = len(lines[start_line]) - len(lines[start_line].lstrip())
+            
+            # Find the end line by looking for code at same or lower indentation level
+            end_line = start_line + 1
+            
+            # Skip through the function body
+            for i in range(start_line + 1, len(lines)):
+                line = lines[i]
+                
+                # Skip empty lines and comments within the function
+                if not line.strip() or line.strip().startswith('#'):
+                    end_line = i + 1
+                    continue
+                
+                # Get indentation of current line
+                current_indent = len(line) - len(line.lstrip())
+                
+                # If we find a line at same or lower indentation than the function def, stop
+                if current_indent <= func_indent:
+                    break
+                    
+                end_line = i + 1
 
-                # Extract function code WITH original line numbers
-                function_lines = []
-                for i in range(start_line, min(end_line, len(lines))):
+            # Extract function code
+            function_lines = []
+            for i in range(start_line, end_line):
+                if include_line_numbers:
                     # Add line number prefix: "line_number: code"
                     function_lines.append(f"{i + 1}: {lines[i]}")
+                else:
+                    function_lines.append(lines[i])
 
-                # Remove trailing empty lines
-                while (
-                    function_lines and not function_lines[-1].split(":", 1)[1].strip()
-                ):
+            # Remove trailing empty lines
+            if include_line_numbers:
+                while function_lines and not function_lines[-1].split(":", 1)[1].strip():
+                    function_lines.pop()
+            else:
+                while function_lines and not function_lines[-1].strip():
                     function_lines.pop()
 
-                if function_lines:
-                    functions[node.name] = "\n".join(function_lines)
+            if function_lines:
+                functions[node.name] = "\n".join(function_lines)
 
     except SyntaxError as e:
         logger.warning(f"Syntax error in code, falling back to regex parsing: {e}")
         # Fallback to regex-based parsing
-        functions = parse_functions_with_regex(code)
+        functions = parse_functions_with_regex(code, include_line_numbers)
 
     return functions
 
 
-def parse_functions_with_regex(code: str) -> Dict[str, str]:
+def parse_functions_with_regex(code: str, include_line_numbers: bool = False) -> Dict[str, str]:
     """
-    Fallback function to parse functions using regex when AST fails, WITH line numbers.
+    Fallback function to parse functions using regex when AST fails.
+    
+    Args:
+        code: The Python code to parse
+        include_line_numbers: If True, prefix each line with "line_number: ". Default is False.
+    
+    Returns:
+        Dictionary with function_name -> function_code (with or without line numbers)
     """
     functions = {}
     lines = code.splitlines()
@@ -153,27 +156,44 @@ def parse_functions_with_regex(code: str) -> Dict[str, str]:
             if match:
                 func_name = match.group(1)
 
-                # Find the end of the function (next function or end of file)
-                indent_level = len(line) - len(line.lstrip())
-                func_lines = [f"{i + 1}: {line}"]  # Add line number
+                # Get the indentation level of the function definition
+                func_indent = len(line) - len(line.lstrip())
+                if include_line_numbers:
+                    func_lines = [f"{i + 1}: {line}"]
+                else:
+                    func_lines = [line]
 
+                # Find the end of the function by checking indentation
                 for j in range(i + 1, len(lines)):
                     current_line = lines[j]
 
-                    # If we hit another function at the same or lower indent level, stop
-                    if (
-                        current_line.strip()
-                        and not current_line.startswith(" " * (indent_level + 1))
-                        and not current_line.startswith("\t")
-                        and re.match(r"^\s*def\s+", current_line)
-                    ):
+                    # Skip empty lines and comments
+                    if not current_line.strip() or current_line.strip().startswith('#'):
+                        if include_line_numbers:
+                            func_lines.append(f"{j + 1}: {current_line}")
+                        else:
+                            func_lines.append(current_line)
+                        continue
+
+                    # Get indentation of current line
+                    current_indent = len(current_line) - len(current_line.lstrip())
+
+                    # If we hit a line at same or lower indentation than the function def, stop
+                    if current_indent <= func_indent:
                         break
 
-                    func_lines.append(f"{j + 1}: {current_line}")  # Add line number
+                    if include_line_numbers:
+                        func_lines.append(f"{j + 1}: {current_line}")
+                    else:
+                        func_lines.append(current_line)
 
                 # Remove trailing empty lines
-                while func_lines and not func_lines[-1].split(":", 1)[1].strip():
-                    func_lines.pop()
+                if include_line_numbers:
+                    while func_lines and not func_lines[-1].split(":", 1)[1].strip():
+                        func_lines.pop()
+                else:
+                    while func_lines and not func_lines[-1].strip():
+                        func_lines.pop()
 
                 if func_lines:
                     functions[func_name] = "\n".join(func_lines)
@@ -181,10 +201,17 @@ def parse_functions_with_regex(code: str) -> Dict[str, str]:
     return functions
 
 
-def find_function_calls(function_code: str) -> set:
+def find_function_calls(function_code: str, available_functions: set = None) -> set:
     """
     Find all function calls within a function's code.
-    Returns a set of function names that are called.
+    Only returns functions that are defined in available_functions (user-defined functions).
+    
+    Args:
+        function_code: The code of the function to analyze
+        available_functions: Set of user-defined function names. If None, returns all calls.
+    
+    Returns:
+        Set of function names that are called and defined by the user
     """
     called_functions = set()
 
@@ -207,47 +234,14 @@ def find_function_calls(function_code: str) -> set:
         matches = re.findall(pattern, function_code)
         called_functions.update(matches)
 
-    # Filter out built-in functions and common keywords
-    builtin_functions = {
-        "print",
-        "len",
-        "range",
-        "str",
-        "int",
-        "float",
-        "bool",
-        "list",
-        "dict",
-        "set",
-        "tuple",
-        "type",
-        "isinstance",
-        "hasattr",
-        "getattr",
-        "setattr",
-        "max",
-        "min",
-        "sum",
-        "abs",
-        "round",
-        "sorted",
-        "reversed",
-        "enumerate",
-        "zip",
-        "map",
-        "filter",
-        "any",
-        "all",
-        "ord",
-        "chr",
-        "bin",
-        "hex",
-        "oct",
-    }
+    # If available_functions is provided, only keep calls to user-defined functions
+    if available_functions is not None:
+        called_functions = called_functions & available_functions
 
-    return called_functions - builtin_functions
+    return called_functions
 
 
+@traceable(name="find_function_dependencies", run_type="chain")
 def get_function_dependencies_recursive(
     target_function: str, all_functions: Dict[str, str]
 ) -> Dict[str, str]:
@@ -261,6 +255,7 @@ def get_function_dependencies_recursive(
 
     dependencies = {}
     visited = set()
+    available_function_names = set(all_functions.keys())
 
     def collect_dependencies(func_name: str):
         if func_name in visited or func_name not in all_functions:
@@ -269,8 +264,8 @@ def get_function_dependencies_recursive(
         visited.add(func_name)
         dependencies[func_name] = all_functions[func_name]
 
-        # Find what functions this function calls
-        called_functions = find_function_calls(all_functions[func_name])
+        # Find what user-defined functions this function calls
+        called_functions = find_function_calls(all_functions[func_name], available_function_names)
 
         # Recursively collect dependencies
         for called_func in called_functions:
@@ -279,20 +274,6 @@ def get_function_dependencies_recursive(
 
     collect_dependencies(target_function)
     return dependencies
-
-
-def add_line_numbers_to_text(text: str) -> str:
-    """
-    Add line numbers to each line of text.
-    Returns text with format: "1: line content"
-    """
-    lines = text.splitlines()
-    numbered_lines = []
-
-    for i, line in enumerate(lines, 1):
-        numbered_lines.append(f"{i}: {line}")
-
-    return "\n".join(numbered_lines)
 
 
 class GroupFunctionsAgent:
@@ -320,127 +301,52 @@ class GroupFunctionsAgent:
             )
 
     # -------------------------- LangGraph Nodes ------------------------------ #
-
-    def extract_function_names_node(
-        self, state: GroupFunctionsState
-    ) -> GroupFunctionsState:
+    def _extract_line_numbers(self, code_with_line_numbers: str) -> List[int]:
         """
-        Node for extracting function names from assignment description.
-        Returns the identified function names.
+        Extract line numbers from code formatted as "line_number: code".
+        Returns a list of integer line numbers.
         """
-        assignment_description = state["assignment_description"]
+        line_numbers = []
+        for line in code_with_line_numbers.split('\n'):
+            # Match pattern "number: code"
+            match = re.match(r'^(\d+):\s', line)
+            if match:
+                line_numbers.append(int(match.group(1)))
+        return line_numbers
 
-        logger.info("[Node] Extracting function names from assignment description")
-
-        # Extract function names using both LLM and regex patterns
-        detected_functions_llm = self._extract_functions_with_llm(
-            assignment_description
-        )
-        detected_functions_regex = self._extract_function_names_with_regex(
-            assignment_description
-        )
-
-        # Combine results
-        combined_functions = set()
-
-        # Add regex results
-        for func_name in detected_functions_regex:
-            combined_functions.add(func_name)
-
-        # Add LLM results
-        for func_name in detected_functions_llm:
-            combined_functions.add(func_name)
-
-        # Store as simple list of function names
-        function_names = list(combined_functions)
-        state["function_names"] = function_names
-
-        logger.info(
-            f"[Node] Extracted {len(function_names)} function names: {function_names}"
-        )
-
-        return state
-
-    def _extract_functions_with_llm(self, assignment: str) -> List[str]:
+    def _convert_to_ranges(self, line_numbers: List[int]) -> List[str]:
         """
-        Use LLM to extract function names from assignment description.
+        Convert a list of line numbers to ranges.
+        Example: [4, 5, 6, 7, 19, 20, 21, 58, 59] -> ["4-7", "19-21", "58-59"]
         """
-        prompt = f"""
-        # Instructions
-        You are an autonomous agent responsible for identifying function names mentioned explicitly in an assignment description.
-        You MUST analyze the assignment description and identify function names that are explicitly mentioned.
-        You MUST return ONLY the function names, one per line.
+        if not line_numbers:
+            return []
         
-        Function names are typically identified by:
-        - Text like "Create a function called function_name"
-        - Text like "def function_name():"
-        - Text like "The function_name function should..."
-        - Backquoted function names like `function_name`
+        sorted_lines = sorted(set(line_numbers))
+        ranges = []
+        start = sorted_lines[0]
+        end = sorted_lines[0]
         
-        Return only the function names, nothing else. If no function names are found, return an empty response.
+        for i in range(1, len(sorted_lines)):
+            if sorted_lines[i] == end + 1:
+                # Continue the current range
+                end = sorted_lines[i]
+            else:
+                # End current range and start a new one
+                if start == end:
+                    ranges.append(str(start))
+                else:
+                    ranges.append(f"{start}-{end}")
+                start = sorted_lines[i]
+                end = sorted_lines[i]
         
-        # Assignment Description
-        {assignment}
-        """
-
-        logger.info("[Node] Using LLM to extract function names...")
-        response = self.llm.invoke([HumanMessage(content=prompt)])
-
-        # Extract content properly based on LLM type
-        if hasattr(response, "content"):
-            content = response.content.strip()
+        # Add the last range
+        if start == end:
+            ranges.append(str(start))
         else:
-            content = str(response).strip()
-
-        # Parse LLM response
-        function_names = []
-        if content:
-            lines = content.splitlines()
-            for line in lines:
-                func_name = line.strip()
-                if func_name and func_name.isidentifier():
-                    function_names.append(func_name)
-
-        return function_names
-
-    def _extract_function_names_with_regex(self, assignment: str) -> List[str]:
-        """
-        Extract function names from assignment description using regex patterns.
-        """
-        function_names = set()
-
-        # Look for function names in various patterns
-        function_patterns = [
-            r"`([a-zA-Z_][a-zA-Z0-9_]*)\s*\(",  # `function_name(`
-            r"`([a-zA-Z_][a-zA-Z0-9_]*)`",  # `function_name`
-            r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(",  # def function_name(
-            r"function\s+called\s+([a-zA-Z_][a-zA-Z0-9_]*)",  # function called function_name
-            r"función\s+([a-zA-Z_][a-zA-Z0-9_]*)",  # función function_name
-            r"The\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+function",  # The function_name function
-            r"La\s+función\s+([a-zA-Z_][a-zA-Z0-9_]*)",  # La función function_name
-            r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(\s*\)",  # function_name()
-        ]
-
-        for pattern in function_patterns:
-            matches = re.findall(pattern, assignment, re.IGNORECASE)
-            for match in matches:
-                func_name = match.strip()
-                # Filter out common words that aren't functions
-                if func_name.lower() not in {
-                    "the",
-                    "la",
-                    "function",
-                    "función",
-                    "def",
-                    "called",
-                    "text",
-                    "texto",
-                    "string",
-                    "input",
-                }:
-                    function_names.add(func_name)
-
-        return list(function_names)
+            ranges.append(f"{start}-{end}")
+        
+        return ranges
 
     def group_code_by_functions_node(
         self, state: GroupFunctionsState
@@ -470,7 +376,8 @@ class GroupFunctionsAgent:
             logger.info(f"[Node] Processing submission: {submission_name}")
 
             # Parse all functions from the submission code
-            all_functions = parse_code_and_extract_functions(submission_code)
+            include_line_numbers = state.get("extra", {}).get("include_line_numbers", False)
+            all_functions = parse_code_and_extract_functions(submission_code, include_line_numbers)
             logger.info(
                 f"[Node] Found {len(all_functions)} functions in {submission_name}: {list(all_functions.keys())}"
             )
@@ -491,13 +398,24 @@ class GroupFunctionsAgent:
                         # Combine all dependency code in a logical order
                         # Put the target function last
                         ordered_functions = []
+                        function_line_ranges = []
+                        
                         for func_name, func_code in dependencies.items():
                             if func_name != target_function:
                                 ordered_functions.append(func_code)
+                                # Extract line numbers and convert to ranges with function name
+                                line_nums = self._extract_line_numbers(func_code)
+                                ranges = self._convert_to_ranges(line_nums)
+                                for range_str in ranges:
+                                    function_line_ranges.append(f"{func_name}: {range_str}")
 
                         # Add target function last
                         if target_function in dependencies:
                             ordered_functions.append(dependencies[target_function])
+                            line_nums = self._extract_line_numbers(dependencies[target_function])
+                            ranges = self._convert_to_ranges(line_nums)
+                            for range_str in ranges:
+                                function_line_ranges.append(f"{target_function}: {range_str}")
 
                         combined_code = "\n\n".join(ordered_functions)
 
@@ -505,12 +423,12 @@ class GroupFunctionsAgent:
                             "function_name": target_function,
                             "code": combined_code,
                             "submission_name": submission_name,
-                            "line_numbers": [],  # Line numbers will come from the student code
+                            "line_numbers": function_line_ranges,  # Function names with line ranges
                         }
                         grouped_results.append(grouped_result)
 
                         logger.info(
-                            f"[Node] Grouped function '{target_function}' with {len(dependencies)} dependencies"
+                            f"[Node] Grouped function '{target_function}' with {len(dependencies)} dependencies in {len(function_line_ranges)} line ranges"
                         )
                     else:
                         logger.warning(
@@ -533,80 +451,21 @@ class GroupFunctionsAgent:
         graph = StateGraph(GroupFunctionsState)
 
         # Add nodes
-        graph.add_node("extract_function_names", self.extract_function_names_node)
         graph.add_node("group_code_by_functions", self.group_code_by_functions_node)
 
         # Define flow
-        graph.add_edge(START, "extract_function_names")
-        graph.add_edge("extract_function_names", "group_code_by_functions")
+        graph.add_edge(START, "group_code_by_functions")
         graph.add_edge("group_code_by_functions", END)
 
         return graph.compile()
 
     # -------------------------- Public API ---------------------------------- #
-
-    def process_submissions(
-        self, assignment_description: str, submissions: List[Dict[str, str]]
-    ) -> Dict[str, Any]:
-        """
-        Process multiple submissions to extract function names and group code.
-
-        Args:
-            assignment_description: The assignment description text
-            submissions: List of dictionaries with 'name' and 'code' keys
-
-        Returns:
-            Dictionary with function_names and grouped_code results
-        """
-        logger.info(f"Processing {len(submissions)} submissions for function grouping")
-
-        # Create state
-        state: GroupFunctionsState = {
-            "assignment_description": assignment_description,
-            "submissions": submissions,
-            "function_names": [],
-            "grouped_code": [],
-            "extra": {},
-        }
-
-        # Run the graph
-        result_state = self.graph.invoke(state)
-
-        return {
-            "function_names": result_state["function_names"],
-            "grouped_code": result_state["grouped_code"],
-        }
-
-    def extract_function_names(self, assignment_description: str) -> List[str]:
-        """
-        Extract function names from assignment description only.
-
-        Args:
-            assignment_description: The assignment description text
-
-        Returns:
-            List of function names (strings)
-        """
-        logger.info("Extracting function names from assignment description")
-
-        # Create minimal state
-        state: GroupFunctionsState = {
-            "assignment_description": assignment_description,
-            "submissions": [],
-            "function_names": [],
-            "grouped_code": [],
-            "extra": {},
-        }
-
-        # Run only the extraction node
-        result_state = self.extract_function_names_node(state)
-
-        return result_state["function_names"]
-
+    @traceable(name="group_code_by_functions_execution", run_type="chain")
     def group_code_by_functions(
         self,
         function_names: List[str],
         submissions: List[Dict[str, str]],
+        include_line_numbers: bool = False,
     ) -> List[GroupedCode]:
         """
         Group code by specified function names.
@@ -614,6 +473,7 @@ class GroupFunctionsAgent:
         Args:
             function_names: List of function names (strings)
             submissions: List of dictionaries with 'name' and 'code' keys
+            include_line_numbers: If True, prefix each line with "line_number: ". Default is False.
 
         Returns:
             List of GroupedCode objects
@@ -628,7 +488,7 @@ class GroupFunctionsAgent:
             "submissions": submissions,
             "function_names": function_names,
             "grouped_code": [],
-            "extra": {},
+            "extra": {"include_line_numbers": include_line_numbers},
         }
 
         # Run only the grouping node
@@ -636,24 +496,4 @@ class GroupFunctionsAgent:
 
         return result_state["grouped_code"]
 
-    def as_graph_node(self):
-        """
-        Expose the agent as a LangGraph node for use in external graphs.
-        Returns a function that takes a state dict and returns a state dict with the results.
-        """
 
-        def node(state):
-            # Extract required fields from state
-            assignment_description = state.get("assignment_description", "")
-            submissions = state.get("submissions", [])
-
-            # Process submissions
-            results = self.process_submissions(assignment_description, submissions)
-
-            # Update state with results
-            state["function_names"] = results["function_names"]
-            state["grouped_code"] = results["grouped_code"]
-
-            return state
-
-        return node

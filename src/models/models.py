@@ -49,7 +49,7 @@ class GroupedCode(TypedDict):
     function_name: str
     code: str
     submission_name: str
-    line_numbers: List[int]
+    line_numbers: List[str]
 
 
 class ReferenceCorrection(TypedDict):

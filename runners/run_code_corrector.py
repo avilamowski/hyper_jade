@@ -14,6 +14,7 @@ import argparse
 import time
 import logging
 from pathlib import Path
+from typing import List
 
 # Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -21,6 +22,26 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.config import get_agent_config, load_config, load_langsmith_config
 from src.models import GeneratedPrompt, Submission, Correction, PromptType
+
+# LangSmith tracing: optional, provide no-op fallbacks when not installed
+try:
+    from langsmith import trace, traceable
+    LANGSMITH_AVAILABLE = True
+except Exception:
+    LANGSMITH_AVAILABLE = False
+    def traceable(name: str = None, run_type: str = None):
+        def decorator(func):
+            return func
+        return decorator
+    class NoOpContext:
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def add_tags(self, tags):
+            pass
+    def trace(name: str = None, run_type: str = None):
+        return NoOpContext()
 
 # Import MLflow logger lazily to avoid circular imports
 def get_mlflow_logger():
@@ -105,6 +126,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@traceable(name="code_correction_batch", run_type="chain")
+def process_code_correction_traced(
+    agent: CodeCorrectorAgent,
+    generated_prompts: List[GeneratedPrompt],
+    submission: Submission,
+    assignment_description: str,
+    num_prompts: int,
+    submission_name: str = None
+) -> List[Correction]:
+    """Process code correction with unified LangSmith trace"""
+    with trace(name="code_correction_processing", run_type="chain") as run_context:
+        run_context.add_tags(["code_correction", f"prompts_count:{num_prompts}"])
+        
+        # Generate corrections (grouping happens inside if enabled)
+        with trace(name="generate_corrections", run_type="llm") as correction_context:
+            correction_context.add_tags([
+                "batch_correction",
+                f"num_prompts:{num_prompts}",
+                f"function_grouping_enabled:{agent.group_functions_enabled}"
+            ])
+            
+            # Always use correct_code_batch to ensure grouping trace is captured
+            corrections = agent.correct_code_batch(
+                generated_prompts,
+                submission,
+                assignment_description,
+                submission_name=submission_name
+            )
+        
+        return corrections
+
+
 def main():
     """Main entry point for code corrector"""
     parser = argparse.ArgumentParser(description="Code Corrector Agent")
@@ -124,6 +178,15 @@ def main():
         print("Error: Could not load configuration")
         sys.exit(1)
     load_langsmith_config()
+    
+    # LangSmith configuration: warn but don't fail
+    if LANGSMITH_AVAILABLE:
+        if not os.environ.get("LANGSMITH_API_KEY") or not os.environ.get("LANGSMITH_PROJECT"):
+            logger.warning("LangSmith available but not fully configured; traces may be incomplete")
+        else:
+            logger.info(f"🔗 LangSmith tracing enabled for project: {os.environ.get('LANGSMITH_PROJECT')}")
+    else:
+        logger.info("LangSmith library not installed; running without LangSmith tracing")
     
     # Print model information
     agent_config = get_agent_config(config, 'code_corrector')
@@ -249,12 +312,21 @@ def main():
             "code_length": len(student_code)
         }, step_number=0)
         
-        # Generate corrections using the core logic
+        # Generate corrections using unified traced function
+        logger.info(f"Generating {'single correction' if num_prompts == 1 else f'{num_prompts} corrections in parallel'} with unified LangSmith trace...")
+        submission_name = Path(args.code).stem  # Extract filename without extension (e.g., "alumn_27")
+        corrections = process_code_correction_traced(
+            agent=agent,
+            generated_prompts=generated_prompts,
+            submission=submission,
+            assignment_description=assignment_description,
+            num_prompts=num_prompts,
+            submission_name=submission_name
+        )
+        
+        # Save the corrections
         if num_prompts == 1:
-            logger.info("Generating single correction using core logic...")
-            correction = agent.correct_code(generated_prompts[0], submission, assignment_description)
-            
-            # Save the correction
+            correction = corrections[0]
             metadata = {
                 "prompt_file": args.prompt[0],
                 "code_file": args.code,
@@ -276,9 +348,6 @@ def main():
             
             output_files = [args.output]
         else:
-            logger.info(f"Generating {num_prompts} corrections in parallel using core logic...")
-            corrections = agent.correct_code_batch(generated_prompts, submission, assignment_description)
-            
             # Save all corrections
             output_files = []
             output_dir = Path(args.output_dir)
