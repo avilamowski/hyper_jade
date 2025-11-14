@@ -9,7 +9,7 @@ provider: "openai"
 temperature: 0.1
 
 # RAG Configuration
-enable_rag: false
+enable_rag: true
 rag_knowledge_base: null
 
 # Agent Configuration
