@@ -352,123 +352,132 @@ Note: Reference corrections can be provided as either:
         logger.info("✓ Initialized auxiliary metrics evaluator")
         logger.info("✓ Initialized individual metrics evaluator")
         
-        # Step 1: Generate prompts for all requirements
-        logger.info("Step 1: Generating prompts (one dedicated MLflow run)...")
-        with mlflow_logger.run(run_name="prompt_generation", tags={
-            "agent": "prompt_generator",
-            "phase": "prompt_generation",
-            "assignment_file": Path(args.assignment).name
-        }):
-            shared.stage = 'prompt_generation'
-            generated_prompts = generate_prompts_traced(prompt_generator, requirements, assignment_text)
-            logger.info(f"✓ Generated {len(generated_prompts)} prompts")
-
-        logger.info("Step 2: Processing submissions with unified LangSmith traces...")
-        all_evals = []
-        for i, submission in enumerate(submissions):
-            with mlflow_logger.run(run_name=f"supervised_individual_evaluation_{i+1}", tags={
-                "agent": "supervised_individual_evaluator",
-                "submission_index": str(i),
+        # Wrap entire pipeline in a single LangSmith trace
+        with trace(name="supervised_individual_evaluation_pipeline", run_type="chain") as pipeline_context:
+            pipeline_context.add_tags([
+                f"num_submissions:{len(submissions)}", 
+                f"num_requirements:{len(requirements)}",
+                "full_pipeline",
+                f"assignment:{Path(args.assignment).name}"
+            ])
+            
+            # Step 1: Generate prompts for all requirements
+            logger.info("Step 1: Generating prompts (one dedicated MLflow run)...")
+            with mlflow_logger.run(run_name="prompt_generation", tags={
+                "agent": "prompt_generator",
+                "phase": "prompt_generation",
                 "assignment_file": Path(args.assignment).name
             }):
-                logger.info(f"Processing submission {i+1}/{len(submissions)}")
-                shared.stage = 'code_correction'
-                submission_corrections, evaluation_results = process_submission_traced(
-                    code_corrector=code_corrector,
-                    aux_evaluator=aux_evaluator,
-                    individual_evaluator=individual_evaluator,
-                    generated_prompts=generated_prompts,
-                    submission=submission,
-                    reference_correction=reference_corrections[i],
-                    requirements=requirements,
-                    assignment_text=assignment_text,
-                    submission_index=i,
-                    shared_llm=shared
-                )
+                shared.stage = 'prompt_generation'
+                generated_prompts = generate_prompts_traced(prompt_generator, requirements, assignment_text)
+                logger.info(f"✓ Generated {len(generated_prompts)} prompts")
 
-                submission_output_dir = Path(args.output_dir) / f"submission_{i+1}"
-                submission_output_dir.mkdir(parents=True, exist_ok=True)
-                
-                save_results(str(submission_output_dir), submission_corrections, evaluation_results)
+            logger.info("Step 2: Processing submissions with unified LangSmith traces...")
+            all_evals = []
+            for i, submission in enumerate(submissions):
+                with mlflow_logger.run(run_name=f"supervised_individual_evaluation_{i+1}", tags={
+                    "agent": "supervised_individual_evaluator",
+                    "submission_index": str(i),
+                    "assignment_file": Path(args.assignment).name
+                }):
+                    logger.info(f"Processing submission {i+1}/{len(submissions)}")
+                    shared.stage = 'code_correction'
+                    submission_corrections, evaluation_results = process_submission_traced(
+                        code_corrector=code_corrector,
+                        aux_evaluator=aux_evaluator,
+                        individual_evaluator=individual_evaluator,
+                        generated_prompts=generated_prompts,
+                        submission=submission,
+                        reference_correction=reference_corrections[i],
+                        requirements=requirements,
+                        assignment_text=assignment_text,
+                        submission_index=i,
+                        shared_llm=shared
+                    )
 
-                # Log MLflow artifacts and metrics
-                mlflow_logger.log_artifacts(str(submission_output_dir), artifact_path=submission_output_dir.name)
-                
-                # Log overall score
-                overall_score = evaluation_results.get('overall_score')
-                if overall_score is not None:
-                    mlflow_logger.log_metric('overall_score', float(overall_score))
-                
-                # Log individual metric scores
-                scores = evaluation_results.get('scores', {})
+                    submission_output_dir = Path(args.output_dir) / f"submission_{i+1}"
+                    submission_output_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    save_results(str(submission_output_dir), submission_corrections, evaluation_results)
+
+                    # Log MLflow artifacts and metrics
+                    mlflow_logger.log_artifacts(str(submission_output_dir), artifact_path=submission_output_dir.name)
+                    
+                    # Log overall score
+                    overall_score = evaluation_results.get('overall_score')
+                    if overall_score is not None:
+                        mlflow_logger.log_metric('overall_score', float(overall_score))
+                    
+                    # Log individual metric scores
+                    scores = evaluation_results.get('scores', {})
+                    for metric_name, score in scores.items():
+                        mlflow_logger.log_metric(f"metric_{metric_name}", float(score))
+                    
+                    # Log auxiliary metrics as parameters (they are text, not numbers)
+                    aux_metrics = evaluation_results.get('auxiliary_metrics', {})
+                    for aux_name, aux_value in aux_metrics.items():
+                        # Log length as a metric instead of the full text
+                        mlflow_logger.log_metric(f"aux_{aux_name}_length", len(aux_value))
+                    
+                    mlflow_logger.log_metric('num_generated_corrections', len(submission_corrections))
+
+                    all_evals.append({
+                        "submission": submission_output_dir.name,
+                        "evaluation": evaluation_results
+                    })
+
+            # Print aggregate summary
+            logger.info("=" * 60)
+            logger.info("SUMMARY")
+            logger.info("=" * 60)
+            logger.info(f"Total submissions processed: {len(all_evals)}")
+            total_corrections = sum(len(e.get('evaluation', {}).get('corrections', [])) for e in all_evals)
+            logger.info(f"Total corrections generated: {total_corrections}")
+            
+            overall_scores = [
+                e['evaluation'].get('overall_score') 
+                for e in all_evals 
+                if isinstance(e.get('evaluation'), dict) and 'overall_score' in e['evaluation']
+            ]
+            
+            # Compute aggregate metrics
+            aggregate_metrics = {
+                "total_submissions": len(all_evals),
+                "total_corrections": total_corrections,
+                "average_overall_score": None,
+                "metric_averages": {},
+                "timestamp": time.time()
+            }
+            
+            if overall_scores:
+                avg_overall = sum(overall_scores) / len(overall_scores)
+                aggregate_metrics["average_overall_score"] = avg_overall
+                logger.info(f"Average overall evaluation score: {avg_overall:.3f}")
+            
+            # Print metric averages
+            all_scores = {}
+            for e in all_evals:
+                scores = e.get('evaluation', {}).get('scores', {})
                 for metric_name, score in scores.items():
-                    mlflow_logger.log_metric(f"metric_{metric_name}", float(score))
-                
-                # Log auxiliary metrics as parameters (they are text, not numbers)
-                aux_metrics = evaluation_results.get('auxiliary_metrics', {})
-                for aux_name, aux_value in aux_metrics.items():
-                    # Log length as a metric instead of the full text
-                    mlflow_logger.log_metric(f"aux_{aux_name}_length", len(aux_value))
-                
-                mlflow_logger.log_metric('num_generated_corrections', len(submission_corrections))
-
-                all_evals.append({
-                    "submission": submission_output_dir.name,
-                    "evaluation": evaluation_results
-                })
-
-        # Print aggregate summary
-        logger.info("=" * 60)
-        logger.info("SUMMARY")
-        logger.info("=" * 60)
-        logger.info(f"Total submissions processed: {len(all_evals)}")
-        total_corrections = sum(len(e.get('evaluation', {}).get('corrections', [])) for e in all_evals)
-        logger.info(f"Total corrections generated: {total_corrections}")
-        
-        overall_scores = [
-            e['evaluation'].get('overall_score') 
-            for e in all_evals 
-            if isinstance(e.get('evaluation'), dict) and 'overall_score' in e['evaluation']
-        ]
-        
-        # Compute aggregate metrics
-        aggregate_metrics = {
-            "total_submissions": len(all_evals),
-            "total_corrections": total_corrections,
-            "average_overall_score": None,
-            "metric_averages": {},
-            "timestamp": time.time()
-        }
-        
-        if overall_scores:
-            avg_overall = sum(overall_scores) / len(overall_scores)
-            aggregate_metrics["average_overall_score"] = avg_overall
-            logger.info(f"Average overall evaluation score: {avg_overall:.3f}")
-        
-        # Print metric averages
-        all_scores = {}
-        for e in all_evals:
-            scores = e.get('evaluation', {}).get('scores', {})
-            for metric_name, score in scores.items():
-                if metric_name not in all_scores:
-                    all_scores[metric_name] = []
-                all_scores[metric_name].append(score)
-        
-        if all_scores:
-            logger.info("\nMetric Averages:")
-            for metric_name, scores_list in sorted(all_scores.items()):
-                avg = sum(scores_list) / len(scores_list)
-                aggregate_metrics["metric_averages"][metric_name] = avg
-                logger.info(f"  {metric_name}: {avg:.3f}")
-        
-        # Save aggregate metrics to JSON
-        aggregate_path = Path(args.output_dir) / "aggregate_metrics.json"
-        with open(aggregate_path, 'w', encoding='utf-8') as f:
-            json.dump(aggregate_metrics, f, indent=2, ensure_ascii=False)
-        logger.info(f"✓ Aggregate metrics saved to: {aggregate_path}")
-        
-        logger.info("=" * 60)
-        logger.info("✓ Pipeline completed successfully")
+                    if metric_name not in all_scores:
+                        all_scores[metric_name] = []
+                    all_scores[metric_name].append(score)
+            
+            if all_scores:
+                logger.info("\nMetric Averages:")
+                for metric_name, scores_list in sorted(all_scores.items()):
+                    avg = sum(scores_list) / len(scores_list)
+                    aggregate_metrics["metric_averages"][metric_name] = avg
+                    logger.info(f"  {metric_name}: {avg:.3f}")
+            
+            # Save aggregate metrics to JSON
+            aggregate_path = Path(args.output_dir) / "aggregate_metrics.json"
+            with open(aggregate_path, 'w', encoding='utf-8') as f:
+                json.dump(aggregate_metrics, f, indent=2, ensure_ascii=False)
+            logger.info(f"✓ Aggregate metrics saved to: {aggregate_path}")
+            
+            logger.info("=" * 60)
+            logger.info("✓ Pipeline completed successfully")
         
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
