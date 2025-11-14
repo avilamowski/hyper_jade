@@ -248,7 +248,8 @@ Example usage:
     --requirements ejemplos/3p/requirements/*.json \\
     --submissions ejemplos/3p/alu*.py \\
     --reference-corrections ejemplos/3p/alu*.json \\
-    --output-dir outputs/supervised_individual_evaluation
+    --output-dir outputs/supervised_individual_evaluation \\
+    --experiment-name "baseline_v1"
 
 This will:
 1. Generate prompts from requirements using the PromptGeneratorAgent
@@ -256,6 +257,7 @@ This will:
 3. Compute auxiliary metrics (MATCH, MISSING, EXTRA) using AuxiliaryMetricsEvaluator
 4. Evaluate individual metrics (completeness, restraint, etc.) using IndividualMetricsEvaluator
 5. Save corrections, auxiliary metrics, and evaluation results to the output directory
+6. Tag LangSmith and MLflow runs with the experiment name for easier tracking
 
 Note: Reference corrections can be provided as either:
   - .txt files (plain text corrections)
@@ -270,6 +272,7 @@ Note: Reference corrections can be provided as either:
     parser.add_argument("--output-dir", "-o", required=True, help="Output directory for results")
     parser.add_argument("--config", default="src/config/assignment_config.yaml", help="Configuration file path")
     parser.add_argument("--evaluator-config", default="src/config/evaluator_config.yaml", help="Evaluator configuration file path")
+    parser.add_argument("--experiment-name", "-e", help="Experiment name for LangSmith tracking (optional)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     
     args = parser.parse_args()
@@ -351,23 +354,34 @@ Note: Reference corrections can be provided as either:
         
         logger.info("✓ Initialized auxiliary metrics evaluator")
         logger.info("✓ Initialized individual metrics evaluator")
+        pipeline_tags = []
+        if args.experiment_name:
+            pipeline_tags.append(f"experiment:{args.experiment_name}")
+            logger.info(f"🏷️  Experiment name: {args.experiment_name}")
+            
+        # Build tags list for LangSmith
+        pipeline_tags += [
+            f"num_submissions:{len(submissions)}", 
+            f"num_requirements:{len(requirements)}",
+            "full_pipeline",
+            f"assignment:{Path(args.assignment).name}"
+        ]
         
         # Wrap entire pipeline in a single LangSmith trace
         with trace(name="supervised_individual_evaluation_pipeline", run_type="chain") as pipeline_context:
-            pipeline_context.add_tags([
-                f"num_submissions:{len(submissions)}", 
-                f"num_requirements:{len(requirements)}",
-                "full_pipeline",
-                f"assignment:{Path(args.assignment).name}"
-            ])
+            pipeline_context.add_tags(pipeline_tags)
             
             # Step 1: Generate prompts for all requirements
             logger.info("Step 1: Generating prompts (one dedicated MLflow run)...")
-            with mlflow_logger.run(run_name="prompt_generation", tags={
+            mlflow_tags = {
                 "agent": "prompt_generator",
                 "phase": "prompt_generation",
                 "assignment_file": Path(args.assignment).name
-            }):
+            }
+            if args.experiment_name:
+                mlflow_tags["experiment_name"] = args.experiment_name
+            
+            with mlflow_logger.run(run_name="prompt_generation", tags=mlflow_tags):
                 shared.stage = 'prompt_generation'
                 generated_prompts = generate_prompts_traced(prompt_generator, requirements, assignment_text)
                 logger.info(f"✓ Generated {len(generated_prompts)} prompts")
@@ -375,11 +389,15 @@ Note: Reference corrections can be provided as either:
             logger.info("Step 2: Processing submissions with unified LangSmith traces...")
             all_evals = []
             for i, submission in enumerate(submissions):
-                with mlflow_logger.run(run_name=f"supervised_individual_evaluation_{i+1}", tags={
+                submission_mlflow_tags = {
                     "agent": "supervised_individual_evaluator",
                     "submission_index": str(i),
                     "assignment_file": Path(args.assignment).name
-                }):
+                }
+                if args.experiment_name:
+                    submission_mlflow_tags["experiment_name"] = args.experiment_name
+                
+                with mlflow_logger.run(run_name=f"supervised_individual_evaluation_{i+1}", tags=submission_mlflow_tags):
                     logger.info(f"Processing submission {i+1}/{len(submissions)}")
                     shared.stage = 'code_correction'
                     submission_corrections, evaluation_results = process_submission_traced(

@@ -28,4 +28,5 @@ python3.12 runners/run_supervised_individual_evaluator.py \
     --output-dir "$OUTPUT_DIR" \
     --config "$SYSTEM_CONFIG" \
     --evaluator-config "$EVALUATOR_CONFIG" \
+    --experiment-name "without_rag_${TIMESTAMP}" \
     --verbose

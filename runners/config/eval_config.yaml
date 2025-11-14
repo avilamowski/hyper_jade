@@ -24,13 +24,13 @@ supervised_evaluator:
   evaluation_metrics:
     completeness:
       function: "compute_completeness"
-    precision: 
-      function: "compute_precision"
-      precision_llm_config:
-        # model_name: "gpt-4o"
-        model_name: "gpt-4o-mini"
-        temperature: 0.2
-        provider: "openai"
+    # precision: 
+    #   function: "compute_precision"
+    #   precision_llm_config:
+    #     # model_name: "gpt-4o"
+    #     model_name: "gpt-4o-mini"
+    #     temperature: 0.2
+    #     provider: "openai"
     restraint: 
       function: "compute_restraint"
     content_similarity: 

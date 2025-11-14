@@ -38,8 +38,8 @@ agents:
       examples: "examples.jinja"
       default: "prompt_generators/requirement_presence.jinja"
       requirement_presence: "prompt_generators/requirement_presence.jinja"
-      error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
-      conceptual: "prompt_generators/conceptual/conceptual.es2es.jinja"
+      error_presence: "prompt_generators/error_explain/error_explain.en2en.jinja"
+      conceptual: "prompt_generators/conceptual/conceptual.en2en.jinja"
     
   code_corrector:
     enabled: true
@@ -93,10 +93,8 @@ agents:
         clarity: 1.0
         accuracy: 1.0
         actionability: 1.0
-
   
 # Logging Configuration
 logging:
   level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "assignment_evaluator.log"

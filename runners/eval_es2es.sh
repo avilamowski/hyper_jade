@@ -7,20 +7,20 @@
 ASSIGNMENT="ejemplos/3p/consigna.txt"
 REQUIREMENTS="ejemplos/3p/requirements_es/*.json"
 # REQUIREMENTS="ejemplos/3p/requirements/requirement_06.json ejemplos/3p/requirements/requirement_07.json"
-SUBMISSIONS="ejemplos/3p/alu1.py ejemplos/3p/alu2.py ejemplos/3p/alu3.py ejemplos/3p/alu4.py ejemplos/3p/alu5.py"
-REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json ejemplos/3p/alu2.json ejemplos/3p/alu3.json ejemplos/3p/alu4.json ejemplos/3p/alu5.json"
+SUBMISSIONS="ejemplos/3p/alu1.py ejemplos/3p/alu2.py ejemplos/3p/alu3.py ejemplos/3p/alu4.py ejemplos/3p/alu5.py ejemplos/3p/alu6.py ejemplos/3p/alu7.py ejemplos/3p/alu8.py ejemplos/3p/alu9.py ejemplos/3p/alu10.py"
+REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json ejemplos/3p/alu2.json ejemplos/3p/alu3.json ejemplos/3p/alu4.json ejemplos/3p/alu5.json ejemplos/3p/alu6.json ejemplos/3p/alu7.json ejemplos/3p/alu8.json ejemplos/3p/alu9.json ejemplos/3p/alu10.json"
 # SUBMISSIONS="ejemplos/3p/alu1.py"
 # REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json"
 # Add a timestamp so multiple runs don't overwrite each other. Format: YYYYMMDDTHHMMSS
 TIMESTAMP=$(date +"%Y%m%dT%H%M%S")
-OUTPUT_DIR="outputs/evaluation/with_rag/${TIMESTAMP}"
-SYSTEM_CONFIG="runners/config/with_rag.yaml"
+OUTPUT_DIR="outputs/evaluation/es2es/${TIMESTAMP}"
+SYSTEM_CONFIG="runners/config/es2es.yaml"
 EVALUATOR_CONFIG="runners/config/eval_config.yaml"
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
 # Run the evaluator
-python3.12 runners/run_supervised_individual_evaluator.py \
+python3 runners/run_supervised_individual_evaluator.py \
     --assignment "$ASSIGNMENT" \
     --requirements $REQUIREMENTS \
     --submissions $SUBMISSIONS \
@@ -28,5 +28,5 @@ python3.12 runners/run_supervised_individual_evaluator.py \
     --output-dir "$OUTPUT_DIR" \
     --config "$SYSTEM_CONFIG" \
     --evaluator-config "$EVALUATOR_CONFIG" \
-    --experiment-name "with_rag_${TIMESTAMP}" \
+    --experiment-name "es2es_${TIMESTAMP}" \
     --verbose
