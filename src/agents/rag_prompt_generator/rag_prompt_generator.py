@@ -269,108 +269,109 @@ class RAGPromptGeneratorAgent:
             raise
 
     # -------------------------- LangGraph Nodes ------------------------------ #
-    @traceable(name="rag_prepare_batch")
-    def prepare_batch_node(self, state: RAGPromptGeneratorState) -> RAGPromptGeneratorState:
-        """Prepare state for batch processing (no I/O operations)"""
-        logger.info("[Batch] Preparing state for parallel processing")
-        return state
 
-    @traceable(name="rag_process_requirement")
-    async def process_requirement_node(self, state: RAGPromptGeneratorState) -> RAGPromptGeneratorState:
-        """Process individual requirement with RAG enhancement"""
-        requirement = state["current_requirement"]
-        if not requirement:
-            logger.warning("No current requirement to process")
-            return state
-
-        logger.info(f"[RAG Process] Processing requirement: {requirement['requirement'][:50]}...")
-
-        try:
-            # Generate RAG-enhanced examples
-            examples = await rag_example_generation_node(
-                requirement, self.agent_config, self.llm, self.rag_system, self.code_generator
-            )
+    def _create_requirement_processor(self, requirement: Requirement, index: int):
+        """Create a node function for processing a specific requirement with RAG enhancement"""
+        
+        async def process_requirement_node(state: RAGPromptGeneratorState) -> RAGPromptGeneratorState:
+            """Process a single requirement with RAG enhancement - generate examples and prompt template"""
+            assignment_description = state.get("assignment_description", "")
             
-            # Convert type string to PromptType if needed
-            req_type = requirement.get("type")
-            if isinstance(req_type, str):
-                from src.agents.prompt_generator.prompt_generator import PromptType
-                for pt in PromptType:
-                    if pt.value == req_type:
-                        req_type = pt
-                        break
-                requirement["type"] = req_type
-            
-            # Generate Jinja2 template
-            jinja_template = rag_prompt_generation_node(
-                requirement, 
-                state.get("assignment_description", ""), 
-                examples, 
-                self.agent_config, 
-                self.llm
-            )
+            logger.info(f"[RAG Process {index + 1}] Processing requirement: {requirement['requirement'][:50]}...")
 
-            # Create generated prompt
-            generated_prompt = {
-                "requirement": requirement,
-                "examples": examples,
-                "jinja_template": jinja_template,
-                "index": state.get("current_requirement_index", 0),
-                "extra": {
-                    "rag_enhanced": True,
-                    "theory_sources_used": True,
-                    "generation_method": "rag_enhanced"
+            try:
+                # Generate RAG-enhanced examples
+                examples = await rag_example_generation_node(
+                    requirement, self.agent_config, self.llm, self.rag_system, self.code_generator
+                )
+                
+                # Convert type string to PromptType if needed
+                req_type = requirement.get("type")
+                if isinstance(req_type, str):
+                    from src.agents.prompt_generator.prompt_generator import PromptType
+                    for pt in PromptType:
+                        if pt.value == req_type:
+                            req_type = pt
+                            break
+                    requirement["type"] = req_type
+                
+                # Generate Jinja2 template using RAG-enhanced examples
+                jinja_template = rag_prompt_generation_node(
+                    requirement,
+                    assignment_description,
+                    examples,
+                    self.agent_config,
+                    self.llm,
+                )
+                
+                # Create result
+                generated_prompt = {
+                    "requirement": requirement,
+                    "examples": examples,
+                    "jinja_template": jinja_template,
+                    "index": index,
+                    "extra": {
+                        "rag_enhanced": True,
+                        "theory_sources_used": True,
+                        "generation_method": "rag"
+                    }
                 }
-            }
-
-            return {
-                "generated_prompts": [generated_prompt]
-            }
-
-        except Exception as e:
-            logger.error(f"Error processing requirement with RAG: {e}")
-            # Fallback to basic generation
-            examples = "Basic examples (RAG failed)"
-            jinja_template = f"# Basic template for: {requirement['requirement']}\n\nCode to analyze:\n{{ code }}"
-            
-            generated_prompt = {
-                "requirement": requirement,
-                "examples": examples,
-                "jinja_template": jinja_template,
-                "index": state.get("current_requirement_index", 0),
-                "extra": {
-                    "rag_enhanced": False,
-                    "theory_sources_used": False,
-                    "generation_method": "fallback",
-                    "error": str(e)
+                
+                logger.info(f"[RAG Process {index + 1}] Completed successfully")
+                
+                return {
+                    "generated_prompts": [generated_prompt]
                 }
-            }
-            
-            return {
-                "generated_prompts": [generated_prompt]
-            }
+                
+            except Exception as e:
+                logger.error(f"[RAG Process {index + 1}] Error processing requirement with RAG: {e}")
+                # Fallback to basic template
+                generated_prompt = {
+                    "requirement": requirement,
+                    "examples": "Error generating RAG-enhanced examples",
+                    "jinja_template": "Error: Could not generate template",
+                    "index": index,
+                    "extra": {
+                        "rag_enhanced": False,
+                        "theory_sources_used": False,
+                        "generation_method": "fallback",
+                        "error": str(e)
+                    }
+                }
+                
+                return {
+                    "generated_prompts": [generated_prompt]
+                }
+        
+        return process_requirement_node
 
-    @traceable(name="rag_collect_results")
-    def collect_results_node(self, state: RAGPromptGeneratorState) -> RAGPromptGeneratorState:
-        """Collect and organize all generated prompts"""
-        logger.info(f"[Collect] Collected {len(state.get('generated_prompts', []))} RAG-enhanced prompts")
-        return state
+    def _create_dynamic_graph(self, requirements: List[Requirement]):
+        """Create dynamic graph with nodes for each requirement, enabling parallel processing"""
+        # Create a fresh graph for this batch
+        dynamic_graph = StateGraph(RAGPromptGeneratorState)
+
+        # Add a node for each requirement
+        for i, requirement in enumerate(requirements):
+            node_name = f"rag_process_requirement_{i}"
+            node_function = self._create_requirement_processor(requirement, i)
+
+            dynamic_graph.add_node(node_name, node_function)
+
+            # Connect START to this requirement node
+            dynamic_graph.add_edge(START, node_name)
+
+            # Connect this requirement node directly to END
+            dynamic_graph.add_edge(node_name, END)
+
+        # Compile the graph with all dynamic connections
+        self.graph = dynamic_graph.compile()
+        logger.info(f"Created dynamic RAG graph with {len(requirements)} parallel nodes")
 
     def _build_graph(self):
-        """Build the LangGraph workflow"""
+        """Build a simple base LangGraph (used before requirements are known)"""
         workflow = StateGraph(RAGPromptGeneratorState)
-
-        # Add nodes
-        workflow.add_node("prepare_batch", self.prepare_batch_node)
-        workflow.add_node("process_requirement", self.process_requirement_node)
-        workflow.add_node("collect_results", self.collect_results_node)
-
-        # Define the flow
-        workflow.set_entry_point("prepare_batch")
-        workflow.add_edge("prepare_batch", "process_requirement")
-        workflow.add_edge("process_requirement", "collect_results")
-        workflow.add_edge("collect_results", END)
-
+        # Simple pass-through for initialization
+        workflow.add_edge(START, END)
         return workflow.compile()
 
     @traceable(name="RAGPromptGeneratorAgent.generate_prompts_batch")
@@ -378,60 +379,63 @@ class RAGPromptGeneratorAgent:
         self, requirements: List[Requirement], assignment_description: str
     ) -> List[GeneratedPrompt]:
         """
-        Generate prompts for multiple requirements using RAG enhancement.
+        Generate prompts for multiple requirements using RAG enhancement with parallel processing.
         This is the main method that should be called from the runner.
         """
         if not self.rag_system or not self.code_generator:
             raise Exception("RAG system not initialized. Call initialize() first.")
 
-        logger.info(f"Generating {len(requirements)} RAG-enhanced prompts...")
+        logger.info(f"Generating {len(requirements)} RAG-enhanced prompts in parallel...")
 
-        results = []
-        for i, requirement in enumerate(requirements):
-            logger.info(f"Processing requirement {i+1}/{len(requirements)}: {requirement['requirement'][:50]}...")
-            
-            # Create state for individual requirement
-            state = {
-                "current_requirement": requirement,
-                "current_requirement_index": i,
-                "assignment_description": assignment_description,
-                "generated_prompts": [],
-                "extra": {}
-            }
-            
-            # Process the requirement using async API
-            result_state = await self.graph.ainvoke(state)
-            results.extend(result_state.get("generated_prompts", []))
+        # Create dynamic graph for parallel processing
+        self._create_dynamic_graph(requirements)
 
-        logger.info(f"Generated {len(results)} RAG-enhanced prompts")
+        # Create state for batch processing
+        state: RAGPromptGeneratorState = {
+            "assignment_description": assignment_description,
+            "requirements": requirements,
+            "generated_prompts": [],
+            "extra": {},
+            "current_requirement": None,
+            "current_requirement_index": None,
+            "examples": None,
+            "jinja_template": None,
+        }
+
+        # Run the graph with dynamic nodes (all requirements process in parallel)
+        result_state = await self.graph.ainvoke(state)
+
+        # Extract results and sort by index to maintain order
+        results: List[GeneratedPrompt] = sorted(
+            result_state["generated_prompts"], 
+            key=lambda x: x["index"]
+        )
+
+        logger.info(f"Generated {len(results)} RAG-enhanced prompts in parallel")
         return results
 
     def as_graph_node(self):
         """
         Expose the agent as a LangGraph node for use in external graphs.
         Returns a function that takes a state dict and returns a state dict with the generated templates.
+        Note: This creates a synchronous wrapper around the async batch processing.
         """
         def node(state):
+            import asyncio
+            
             # If state has requirements list, process in batch
             if "requirements" in state and state["requirements"]:
-                # Process each requirement
-                for i, requirement in enumerate(state["requirements"]):
-                    individual_state = state.copy()
-                    individual_state["current_requirement"] = requirement
-                    individual_state["current_requirement_index"] = i
-                    result_state = self.graph.invoke(individual_state)
-
-                    # Accumulate results
-                    if "generated_prompts" not in state:
-                        state["generated_prompts"] = []
-                    state["generated_prompts"].append(
-                        result_state["generated_prompts"][0]
-                    )
-
+                assignment_description = state.get("assignment_description", "")
+                requirements = state["requirements"]
+                
+                # Use async batch processing with parallel execution
+                results = asyncio.run(self.generate_prompts_batch(requirements, assignment_description))
+                
+                state["generated_prompts"] = results
                 return state
             else:
-                # Single requirement processing
-                result = self.graph.invoke(state)
-                return result
+                # Single requirement processing (shouldn't happen, but fallback)
+                logger.warning("as_graph_node called without requirements list")
+                return state
 
         return node

@@ -588,17 +588,21 @@ class RAGSystem:
             # Build the query with optional class number filtering
             from weaviate.classes.query import Filter
             
-            query_kwargs = {
-                "query_vector": query_embedding,
-                "limit": retrieval_count,
-                "return_metadata": MetadataQuery(certainty=True, distance=True)
-            }
-            
             # Add class number filter if specified
             if max_class_number is not None:
-                query_kwargs["filters"] = Filter.by_property("class_number").less_or_equal(max_class_number)
-            
-            response = collection.query.near_vector(**query_kwargs)
+                filters = Filter.by_property("class_number").less_or_equal(max_class_number)
+                response = collection.query.near_vector(
+                    near_vector=query_embedding,
+                    limit=retrieval_count,
+                    return_metadata=MetadataQuery(certainty=True, distance=True),
+                    filters=filters
+                )
+            else:
+                response = collection.query.near_vector(
+                    near_vector=query_embedding,
+                    limit=retrieval_count,
+                    return_metadata=MetadataQuery(certainty=True, distance=True)
+                )
 
             if not response.objects:
                 return []
@@ -617,8 +621,9 @@ class RAGSystem:
                 logger.debug(f"First 20 characters of content {i}: {obj.properties['content'][:20]}")
                 i += 1
 
-                # Generate class name from class number
-                class_name = f"Clase {obj.properties['class_number']}" if obj.properties.get("class_number") else "Unknown"
+                # Generate class name from class number (handle 0 correctly)
+                class_number = obj.properties.get("class_number")
+                class_name = f"Clase {class_number}" if class_number is not None else "Unknown"
                 
                 context_docs.append(
                     {

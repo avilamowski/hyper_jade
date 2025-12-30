@@ -111,8 +111,16 @@ class TheoryImprover:
             # Combine all query parts
             combined_query = " ".join(query_parts)
             
+            logger.info(f"🔍 Retrieving theory for query: {combined_query[:100]}...")
+            
             # Retrieve relevant documents from vector database (no LLM processing)
             theory_sources = await rag_system.retrieve_documents(combined_query, max_results=max_results, max_class_number=max_class_number, dataset=dataset)
+            
+            logger.info(f"📚 Retrieved {len(theory_sources)} theory sources")
+            if theory_sources:
+                logger.info(f"   First source: {theory_sources[0].get('class_name', 'Unknown')} - {theory_sources[0].get('metadata', {}).get('filename', 'N/A')}")
+            else:
+                logger.warning("⚠️  No theory sources retrieved from RAG system!")
             
             return theory_sources
                 
@@ -305,7 +313,10 @@ class CodeExampleGenerator:
             )
             
             if not theory_sources:
-                logger.warning("No theory sources found, returning original examples")
+                logger.warning("No theory sources found, returning original examples with default class_name")
+                # Add default class_name to original examples
+                for example in examples:
+                    example['class_name'] = 'Sin teoría del curso'
                 return examples
             
             # Step 3: Improve examples with theory

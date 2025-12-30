@@ -75,6 +75,39 @@ _rag_config = load_rag_config()
 # Main Control Flag - from YAML config only
 USE_RAG = _rag_config.get("use_rag", False)
 
+# Override config values from YAML if available
+if "rag" in _rag_config:
+    rag_section = _rag_config["rag"]
+    
+    # Override debug settings
+    if "debug" in rag_section:
+        debug_config = rag_section["debug"]
+        RAG_DEBUG_MODE = debug_config.get("enabled", RAG_DEBUG_MODE)
+        RAG_ENABLE_FILTERING = debug_config.get("filtering_enabled", RAG_ENABLE_FILTERING)
+    
+    # Override dataset paths
+    if "datasets" in rag_section:
+        datasets = rag_section["datasets"]
+        if "python" in datasets:
+            RAG_PYTHON_NOTEBOOKS_DIR = datasets["python"].get("notebooks_dir", RAG_PYTHON_NOTEBOOKS_DIR)
+        if "haskell" in datasets:
+            RAG_HASKELL_NOTEBOOKS_DIR = datasets["haskell"].get("notebooks_dir", RAG_HASKELL_NOTEBOOKS_DIR)
+    
+    # Override reranking settings
+    if "reranking" in rag_section:
+        reranking = rag_section["reranking"]
+        RAG_ENABLE_RERANKING = reranking.get("enabled", RAG_ENABLE_RERANKING)
+        RAG_RERANKING_MODEL = reranking.get("model", RAG_RERANKING_MODEL)
+        RAG_INITIAL_RETRIEVAL_COUNT = reranking.get("initial_retrieval_count", RAG_INITIAL_RETRIEVAL_COUNT)
+        RAG_FINAL_RETRIEVAL_COUNT = reranking.get("final_retrieval_count", RAG_FINAL_RETRIEVAL_COUNT)
+    
+    # Override temperature settings
+    if "temperatures" in rag_section:
+        temps = rag_section["temperatures"]
+        RAG_TEMPERATURE_EXAMPLE_GENERATION = temps.get("example_generation", RAG_TEMPERATURE_EXAMPLE_GENERATION)
+        RAG_TEMPERATURE_THEORY_CORRECTION = temps.get("theory_correction", RAG_TEMPERATURE_THEORY_CORRECTION)
+        RAG_TEMPERATURE_FILTERING = temps.get("filtering", RAG_TEMPERATURE_FILTERING)
+
 # Inherit LLM configuration from main system
 def get_main_llm_config():
     """Get LLM configuration from main assignment_config.yaml"""
