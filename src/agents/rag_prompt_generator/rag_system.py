@@ -11,9 +11,11 @@ import json
 import re
 from typing import List, Dict, Any, Optional
 import weaviate
+from weaviate.classes.config import Configure, Property, DataType
+from weaviate.classes.query import MetadataQuery
 import nbformat
 from sentence_transformers import SentenceTransformer, CrossEncoder
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
@@ -235,8 +237,16 @@ class RAGSystem:
     async def initialize(self):
         """Initialize the RAG system components"""
         try:
-            # Initialize Weaviate client
-            self.client = weaviate.Client(url=self.weaviate_url)
+            # Initialize Weaviate client (v4 API)
+            # Parse URL to get host and port
+            url_parts = self.weaviate_url.replace('http://', '').replace('https://', '').split(':')
+            host = url_parts[0]
+            port = int(url_parts[1]) if len(url_parts) > 1 else 8080
+            
+            self.client = weaviate.connect_to_local(
+                host=host,
+                port=port
+            )
 
             # Check if Weaviate is running
             if not self.client.is_ready():
@@ -326,45 +336,43 @@ class RAGSystem:
         collection_name = f"JadeNotebooks_{dataset.title()}"
         
         # Check if collection exists
-        if self.client.schema.exists(collection_name):
+        if self.client.collections.exists(collection_name):
             logger.info(f"Collection {collection_name} already exists")
             return
 
-        # Create collection schema
-        collection_schema = {
-            "class": collection_name,
-            "description": f"JADE {dataset} course notebook content",
-            "vectorizer": "none",  # We'll provide our own embeddings
-            "properties": [
-                {
-                    "name": "content",
-                    "dataType": ["text"],
-                    "description": "The content of the notebook cell",
-                },
-                {
-                    "name": "filename",
-                    "dataType": ["string"],
-                    "description": "The name of the notebook file",
-                },
-                {
-                    "name": "notebook_path",
-                    "dataType": ["string"],
-                    "description": "The full path to the notebook file",
-                },
-                {
-                    "name": "class_number",
-                    "dataType": ["int"],
-                    "description": "The class number extracted from the notebook filename",
-                },
-                {
-                    "name": "dataset",
-                    "dataType": ["string"],
-                    "description": "The dataset type (python or haskell)",
-                },
+        # Create collection with v4 API
+        self.client.collections.create(
+            name=collection_name,
+            description=f"JADE {dataset} course notebook content",
+            vectorizer_config=Configure.Vectorizer.none(),  # We'll provide our own embeddings
+            properties=[
+                Property(
+                    name="content",
+                    data_type=DataType.TEXT,
+                    description="The content of the notebook cell",
+                ),
+                Property(
+                    name="filename",
+                    data_type=DataType.TEXT,
+                    description="The name of the notebook file",
+                ),
+                Property(
+                    name="notebook_path",
+                    data_type=DataType.TEXT,
+                    description="The full path to the notebook file",
+                ),
+                Property(
+                    name="class_number",
+                    data_type=DataType.INT,
+                    description="The class number extracted from the notebook filename",
+                ),
+                Property(
+                    name="dataset",
+                    data_type=DataType.TEXT,
+                    description="The dataset type (python or haskell)",
+                ),
             ],
-        }
-
-        self.client.schema.create_class(collection_schema)
+        )
         logger.info(f"Created collection {collection_name}")
 
     def extract_notebook_content(self, notebook_path: str, dataset: str = "python") -> List[Dict[str, Any]]:
@@ -515,7 +523,7 @@ class RAGSystem:
             # Clear existing collection for this dataset
             collection_name = f"JadeNotebooks_{dataset.title()}"
             try:
-                self.client.schema.delete_class(collection_name)
+                self.client.collections.delete(collection_name)
                 self._create_collection(dataset)
             except:
                 pass
@@ -525,10 +533,11 @@ class RAGSystem:
             documents = [chunk["content"] for chunk in all_chunks]
             embeddings = self.embedding_model.encode(documents).tolist()
 
-            # Add to Weaviate
+            # Add to Weaviate using v4 batch API
             logger.info("Adding to Weaviate...")
-            with self.client.batch as batch:
-                batch.batch_size = 100
+            collection = self.client.collections.get(collection_name)
+            
+            with collection.batch.dynamic() as batch:
                 for i, chunk in enumerate(all_chunks):
                     properties = {
                         "content": chunk["content"],
@@ -538,9 +547,8 @@ class RAGSystem:
                         "dataset": chunk["metadata"]["dataset"],
                     }
 
-                    batch.add_data_object(
-                        data_object=properties,
-                        class_name=collection_name,
+                    batch.add_object(
+                        properties=properties,
                         vector=embeddings[i],
                     )
 
@@ -574,59 +582,56 @@ class RAGSystem:
             # Generate embedding for the query
             query_embedding = self.embedding_model.encode([query]).tolist()[0]
 
+            # Get the collection
+            collection = self.client.collections.get(collection_name)
+            
             # Build the query with optional class number filtering
-            query_builder = (
-                self.client.query.get(
-                    collection_name,
-                    ["content", "filename", "notebook_path", "class_number", "dataset"],
-                )
-                .with_near_vector({"vector": query_embedding})
-                .with_limit(retrieval_count)
-                .with_additional(["certainty", "distance"])
-            )
+            from weaviate.classes.query import Filter
+            
+            query_kwargs = {
+                "query_vector": query_embedding,
+                "limit": retrieval_count,
+                "return_metadata": MetadataQuery(certainty=True, distance=True)
+            }
             
             # Add class number filter if specified
             if max_class_number is not None:
-                query_builder = query_builder.with_where({
-                    "path": ["class_number"],
-                    "operator": "LessThanEqual",
-                    "valueInt": max_class_number
-                })
+                query_kwargs["filters"] = Filter.by_property("class_number").less_or_equal(max_class_number)
             
-            results = query_builder.do()
+            response = collection.query.near_vector(**query_kwargs)
 
-            if not results.get("data", {}).get("Get", {}).get(collection_name):
+            if not response.objects:
                 return []
 
             # Prepare context from retrieved documents
             context_docs = []
             i = 1
-            for item in results["data"]["Get"][collection_name]:
+            for obj in response.objects:
                 # Calculate confidence score from certainty (0-1 scale)
-                certainty = item.get("_additional", {}).get("certainty", 0)
-                distance = item.get("_additional", {}).get("distance", 1)
+                certainty = obj.metadata.certainty if obj.metadata.certainty is not None else 0
+                distance = obj.metadata.distance if obj.metadata.distance is not None else 1
 
                 # Convert certainty to percentage and round to 1 decimal place
                 confidence = round(certainty * 100, 1) if certainty else 0
 
-                logger.debug(f"First 20 characters of content {i}: {item['content'][:20]}")
+                logger.debug(f"First 20 characters of content {i}: {obj.properties['content'][:20]}")
                 i += 1
 
                 # Generate class name from class number
-                class_name = f"Clase {item['class_number']}" if item.get("class_number") else "Unknown"
+                class_name = f"Clase {obj.properties['class_number']}" if obj.properties.get("class_number") else "Unknown"
                 
                 context_docs.append(
                     {
-                        "content": item["content"],
+                        "content": obj.properties["content"],
                         "confidence": confidence,
                         "certainty": certainty,
                         "distance": distance,
                         "class_name": class_name,
                         "metadata": {
-                            "filename": item["filename"],
-                            "notebook_path": item["notebook_path"],
-                            "class_number": item["class_number"],
-                            "dataset": item.get("dataset", dataset),
+                            "filename": obj.properties["filename"],
+                            "notebook_path": obj.properties["notebook_path"],
+                            "class_number": obj.properties["class_number"],
+                            "dataset": obj.properties.get("dataset", dataset),
                         },
                     }
                 )
