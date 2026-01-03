@@ -4,7 +4,7 @@ This module provides a small CompositeLLM that holds multiple backend clients
 and returns small stage-bound objects that expose an .invoke(...) method so
 existing agents can keep calling `.invoke(...)` without modification.
 
-Supported providers out of the box: "openai" and "ollama". Other providers
+Supported providers out of the box: "openai", "ollama", and "gemini"/"google". Other providers
 can be added by implementing the `_create_backend_from_config` function.
 
 The composite pattern lets the runner create one shared CompositeLLM and
@@ -19,6 +19,7 @@ import os
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_ollama.llms import OllamaLLM
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 def _create_backend_from_config(agent_config: Dict[str, Any]) -> Any:
@@ -37,6 +38,15 @@ def _create_backend_from_config(agent_config: Dict[str, Any]) -> Any:
 
     if provider in ("ollama", "gpt-oss", "local-ollama"):
         return OllamaLLM(model=model_name or "qwen2.5:7b", temperature=temperature)
+
+    if provider in ("gemini", "google", "google-genai"):
+        # Google API key can be provided in config or via GOOGLE_API_KEY env var
+        api_key = agent_config.get("api_key") or os.environ.get("GOOGLE_API_KEY")
+        return ChatGoogleGenerativeAI(
+            model=model_name or "gemini-pro",
+            temperature=temperature,
+            google_api_key=api_key
+        )
 
     # Placeholder for other providers (deepseek, llama_cpp, etc.)
     raise NotImplementedError(f"Provider '{provider}' is not implemented in composite_llm. Add an adapter.")

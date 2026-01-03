@@ -21,6 +21,7 @@ from jinja2 import Template
 from langchain_openai import ChatOpenAI
 from langchain_ollama.llms import OllamaLLM
 from langchain_core.messages import HumanMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 # LangGraph
 from langgraph.graph import StateGraph, END, START
@@ -98,6 +99,15 @@ class CodeCorrectorAgent:
                 )
             return ChatOpenAI(
                 model=model_name, temperature=temperature, api_key=api_key
+            )
+
+        if provider in ("gemini", "google", "google-genai"):
+            import os
+            api_key = self.agent_config.get("api_key") or os.environ.get("GOOGLE_API_KEY")
+            return ChatGoogleGenerativeAI(
+                model=model_name or "gemini-pro",
+                temperature=temperature,
+                google_api_key=api_key
             )
 
         return OllamaLLM(model=model_name, temperature=temperature)

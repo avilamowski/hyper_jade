@@ -51,10 +51,13 @@ def _spawn_job_process(job_id: str, job_type: str, payload: dict, timeout: int |
         # Call the same module as a child process with flags to run the job
         cmd = [sys.executable, os.path.abspath(__file__), '--run-job', in_f.name, out_f.name]
         logger.info(f"📣 Spawning child process for job {job_id}: {cmd}")
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        
+        # Don't capture output so logs are visible in real-time
+        # This allows seeing logs from the child process
+        proc = subprocess.run(cmd, timeout=timeout)
 
         if proc.returncode != 0:
-            logger.error(f"Child process failed (rc={proc.returncode}): stdout={proc.stdout} stderr={proc.stderr}")
+            logger.error(f"Child process failed (rc={proc.returncode})")
             # Try to read out file if exists to give more context
         try:
             with open(out_f.name, 'r') as f:
@@ -143,6 +146,15 @@ def main():
 def _run_job_child(input_path: str, output_path: str) -> None:
     """Child process entrypoint: read input JSON, run job, write output JSON."""
     import traceback
+    
+    # Ensure logging goes to stdout/stderr so parent process can see it
+    # Reconfigure logging to ensure it's visible
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        force=True  # Force reconfiguration even if already configured
+    )
+    
     try:
         with open(input_path, 'r') as f:
             data = json.load(f)
@@ -151,6 +163,7 @@ def _run_job_child(input_path: str, output_path: str) -> None:
         payload = data.get('payload')
 
         logger.info(f"🔧 Child process: running job {job_id} type={job_type}")
+        print(f"🔧 Child process: running job {job_id} type={job_type}", flush=True)
 
         job_handlers = JobHandlers()
         result = job_handlers.process_job(job_id, job_type, payload)
@@ -159,10 +172,12 @@ def _run_job_child(input_path: str, output_path: str) -> None:
         with open(output_path, 'w') as f:
             json.dump(out, f)
         logger.info(f"✅ Child process completed job {job_id}")
+        print(f"✅ Child process completed job {job_id}", flush=True)
         sys.exit(0)
     except Exception as e:
         tb = traceback.format_exc()
         logger.error(f"Child job runner exception: {e}\n{tb}")
+        print(f"❌ Child job runner exception: {e}\n{tb}", flush=True, file=sys.stderr)
         out = {"status": "error", "error": str(e), "traceback": tb}
         try:
             with open(output_path, 'w') as f:

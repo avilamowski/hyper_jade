@@ -36,6 +36,11 @@ rag:
     example_generation: 0.7
     theory_correction: 0.3
     filtering: 0.1
+  
+  # Theory Improvement Model Configuration
+  theory_improvement:
+    provider: "gemini"  # "openai", "gemini", or "ollama"
+    model_name: "gemini-3-flash-preview"  # Model to use for theory improvement
     
   # Dataset Configuration
   datasets:

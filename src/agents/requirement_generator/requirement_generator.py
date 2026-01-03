@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 # LangGraph
 from langgraph.graph import StateGraph, END
@@ -115,15 +116,26 @@ class RequirementGeneratorAgent:
         self.graph = self._build_graph()
 
     def _setup_llm(self):
-        if self.agent_config.get("provider") == "openai":
+        provider = str(self.agent_config.get("provider", "openai")).lower().strip()
+        model_name = self.agent_config.get("model_name", "gpt-4")
+        temperature = float(self.agent_config.get("temperature", 0.1))
+        
+        if provider == "openai":
             return ChatOpenAI(
-                model=self.agent_config.get("model_name", "gpt-4"),
-                temperature=self.agent_config.get("temperature", 0.1),
+                model=model_name,
+                temperature=temperature,
+            )
+        elif provider in ("gemini", "google", "google-genai"):
+            api_key = self.agent_config.get("api_key") or os.environ.get("GOOGLE_API_KEY")
+            return ChatGoogleGenerativeAI(
+                model=model_name or "gemini-pro",
+                temperature=temperature,
+                google_api_key=api_key
             )
         else:
             return OllamaLLM(
-                model=self.agent_config.get("model_name", "qwen2.5:7b"),
-                temperature=self.agent_config.get("temperature", 0.1),
+                model=model_name or "qwen2.5:7b",
+                temperature=temperature,
             )
 
     

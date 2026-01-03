@@ -147,58 +147,123 @@ class TheoryImprover:
             
             improved_examples = []
             
-            for example in examples:
-                # Get language-specific prompt
-                prompt = self.prompt_templates.format_template(
-                    language,
-                    "theory_improvement",
-                    requirement=requirement,
-                    theory_context=theory_context,
-                    description=example['description'],
-                    code=example['code'],
-                    approach=example['approach']
-                )
-                
-                # Get language-specific system message
-                system_message = self.prompt_templates.get_system_message(language, "theory_improvement")
-
-                # Create LLM instance with lower temperature for theory-based correction
-                theory_llm = self.llm_factory.create_llm(temperature=RAG_TEMPERATURE_THEORY_CORRECTION)
-                    
-                messages = [
-                    SystemMessage(content=system_message),
-                    HumanMessage(content=prompt)
-                ]
-                
-                response = theory_llm.invoke(messages)
-                
-                # Handle different response types (OpenAI has .content, Ollama returns string directly)
-                if hasattr(response, 'content'):
-                    response_text = getattr(response, 'content', '').strip()
-                else:
-                    response_text = str(response).strip()
-                
-                try:
-                    # Parse XML response for improved example
-                    xml_parsed = self.xml_parser.parse_xml_response(response_text, 1)
-                    if xml_parsed:
-                        improved_example = xml_parsed[0]
-                        improved_example['original_code'] = example['code']
-                        improved_example['original_approach'] = example['approach']
-                        # Add class name from the most relevant theory source
-                        if theory_sources:
-                            improved_example['class_name'] = theory_sources[0].get('class_name', 'Unknown')
-                        improved_examples.append(improved_example)
-                    else:
-                        # Fallback to original example
-                        example['class_name'] = theory_sources[0].get('class_name', 'Unknown') if theory_sources else 'Unknown'
-                        improved_examples.append(example)
-                except Exception as parse_error:
-                    logger.warning(f"Error parsing improved example: {parse_error}")
-                    example['class_name'] = theory_sources[0].get('class_name', 'Unknown') if theory_sources else 'Unknown'
-                    improved_examples.append(example)
+            num_examples = len(examples)
+            logger.info(f"Starting to improve {num_examples} examples with theory using Gemini")
             
-            logger.info(f"Improved {len(improved_examples)} examples with theory")
+            if num_examples == 0:
+                logger.warning("No examples to improve, returning empty list")
+                return []
+            
+            for idx, example in enumerate(examples, 1):
+                try:
+                    logger.info(f"[{idx}/{num_examples}] Starting improvement of example {idx}")
+                    logger.info(f"[{idx}/{num_examples}] Example has description: {bool(example.get('description'))}, code length: {len(example.get('code', ''))}")
+                    
+                    # Get language-specific prompt
+                    prompt = self.prompt_templates.format_template(
+                        language,
+                        "theory_improvement",
+                        requirement=requirement,
+                        theory_context=theory_context,
+                        description=example.get('description', f'Example {idx}'),
+                        code=example.get('code', ''),
+                        approach=example.get('approach', '')
+                    )
+                    
+                    # Get language-specific system message
+                    system_message = self.prompt_templates.get_system_message(language, "theory_improvement")
+
+                    # Create a NEW LLM instance for EACH example to ensure separate calls
+                    logger.info(f"[{idx}/{num_examples}] Creating NEW ChatGoogleGenerativeAI instance")
+                    theory_llm = self.llm_factory.create_theory_improvement_llm(temperature=RAG_TEMPERATURE_THEORY_CORRECTION)
+                    logger.info(f"[{idx}/{num_examples}] Created ChatGoogleGenerativeAI instance: {type(theory_llm).__name__}")
+                        
+                    messages = [
+                        SystemMessage(content=system_message),
+                        HumanMessage(content=prompt)
+                    ]
+                    
+                    logger.info(f"[{idx}/{num_examples}] INVOKING ChatGoogleGenerativeAI.invoke() NOW")
+                    response = theory_llm.invoke(messages)
+                    logger.info(f"[{idx}/{num_examples}] RECEIVED response from ChatGoogleGenerativeAI (type: {type(response).__name__})")
+                    
+                    # Handle different response types
+                    # ChatGoogleGenerativeAI returns AIMessage with content as list or string
+                    if hasattr(response, 'content'):
+                        content = response.content
+                        # Gemini can return content as a list of content blocks
+                        if isinstance(content, list):
+                            # Join all content blocks
+                            response_text = ' '.join(str(c) for c in content if c).strip()
+                        else:
+                            response_text = str(content).strip()
+                    else:
+                        response_text = str(response).strip()
+                    
+                    logger.info(f"[{idx}/{num_examples}] Response text length: {len(response_text)} characters")
+                    
+                    try:
+                        # Parse XML response for improved example
+                        xml_parsed = self.xml_parser.parse_xml_response(response_text, 1)
+                        if xml_parsed and len(xml_parsed) > 0:
+                            improved_example = xml_parsed[0]
+                            # Preserve original fields
+                            improved_example['original_code'] = example.get('code', '')
+                            improved_example['original_approach'] = example.get('approach', '')
+                            # Preserve original description if not in parsed response
+                            if 'description' not in improved_example or not improved_example['description']:
+                                improved_example['description'] = example.get('description', f'Example {idx}')
+                            # Add class name from the most relevant theory source
+                            if theory_sources:
+                                improved_example['class_name'] = theory_sources[0].get('class_name', 'Unknown')
+                            else:
+                                improved_example['class_name'] = 'Unknown'
+                            # Ensure improvements and theory_alignment are preserved
+                            if 'improvements' not in improved_example:
+                                improved_example['improvements'] = []
+                            if 'theory_alignment' not in improved_example:
+                                improved_example['theory_alignment'] = ''
+                            logger.info(f"[{idx}/{num_examples}] ✓ Successfully parsed improved example with class_name: {improved_example.get('class_name', 'Unknown')}")
+                            improved_examples.append(improved_example)
+                        else:
+                            # Fallback to original example but add metadata
+                            logger.warning(f"[{idx}/{num_examples}] ⚠ XML parsing returned empty, using original with metadata")
+                            fallback_example = example.copy()
+                            fallback_example['class_name'] = theory_sources[0].get('class_name', 'Unknown') if theory_sources else 'Unknown'
+                            fallback_example['improvements'] = []
+                            fallback_example['theory_alignment'] = 'Improvement parsing failed'
+                            improved_examples.append(fallback_example)
+                    except Exception as parse_error:
+                        logger.warning(f"[{idx}/{num_examples}] ⚠ Error parsing improved example: {parse_error}")
+                        # Fallback to original example but preserve structure
+                        fallback_example = example.copy()
+                        fallback_example['class_name'] = theory_sources[0].get('class_name', 'Unknown') if theory_sources else 'Unknown'
+                        fallback_example['improvements'] = []
+                        fallback_example['theory_alignment'] = f'Parsing error: {str(parse_error)}'
+                        improved_examples.append(fallback_example)
+                    
+                    logger.info(f"[{idx}/{num_examples}] ✓ Completed improvement of example {idx}")
+                    
+                except Exception as e:
+                    logger.error(f"[{idx}/{num_examples}] ✗ ERROR during improvement of example {idx}: {e}", exc_info=True)
+                    # Even on error, add the original example to maintain count
+                    error_example = example.copy()
+                    error_example['class_name'] = theory_sources[0].get('class_name', 'Unknown') if theory_sources else 'Unknown'
+                    error_example['improvements'] = []
+                    error_example['theory_alignment'] = f'Error during improvement: {str(e)}'
+                    improved_examples.append(error_example)
+            
+            logger.info(f"✓✓✓ COMPLETED: Improved {len(improved_examples)}/{num_examples} examples with theory")
+            # Log summary of improved examples
+            for idx, ex in enumerate(improved_examples, 1):
+                logger.info(f"  Final Example {idx}: class_name={ex.get('class_name', 'Unknown')}, "
+                          f"has_improvements={bool(ex.get('improvements'))}, "
+                          f"has_theory_alignment={bool(ex.get('theory_alignment'))}, "
+                          f"code_length={len(ex.get('code', ''))}")
+            
+            if len(improved_examples) != num_examples:
+                logger.error(f"⚠⚠⚠ MISMATCH: Expected {num_examples} improved examples but got {len(improved_examples)}")
+            
             return improved_examples
             
         except Exception as e:
@@ -320,9 +385,18 @@ class CodeExampleGenerator:
                 return examples
             
             # Step 3: Improve examples with theory
+            logger.info(f"About to improve {len(examples)} examples with theory")
             improved_examples = await self.theory_improver.improve_examples_with_theory(
                 examples, requirement, theory_sources
             )
+            logger.info(f"Received {len(improved_examples)} improved examples from improve_examples_with_theory")
+            
+            # Log what we got from improvement
+            for idx, ex in enumerate(improved_examples, 1):
+                logger.info(f"  Improved example {idx}: class_name={ex.get('class_name', 'Unknown')}, "
+                          f"code_preview={ex.get('code', '')[:100]}..., "
+                          f"has_improvements={bool(ex.get('improvements'))}, "
+                          f"has_theory_alignment={bool(ex.get('theory_alignment'))}")
             
             # Step 4: Filter theory-specific elements
             theory_context = "\n\n".join([
@@ -330,14 +404,31 @@ class CodeExampleGenerator:
                 for source in theory_sources
             ])
             
+            logger.info(f"About to filter {len(improved_examples)} improved examples (filtering_enabled={RAG_ENABLE_FILTERING})")
             filtered_examples = await self.theory_filter.filter_theory_specific_elements(
                 improved_examples, requirement, theory_context
             )
+            logger.info(f"Received {len(filtered_examples)} filtered examples")
+            
+            # Log what we got from filtering
+            for idx, ex in enumerate(filtered_examples, 1):
+                logger.info(f"  Filtered example {idx}: class_name={ex.get('class_name', 'Unknown')}, "
+                          f"code_preview={ex.get('code', '')[:100]}..., "
+                          f"has_improvements={bool(ex.get('improvements'))}, "
+                          f"has_theory_alignment={bool(ex.get('theory_alignment'))}")
             
             logger.info(f"Generated {len(filtered_examples)} enhanced examples")
+            
+            # Log summary of what we're returning
+            for idx, ex in enumerate(filtered_examples, 1):
+                logger.info(f"  Returning example {idx}: class_name={ex.get('class_name', 'Unknown')}, "
+                          f"has_improvements={bool(ex.get('improvements'))}, "
+                          f"has_theory_alignment={bool(ex.get('theory_alignment'))}, "
+                          f"code_preview={ex.get('code', '')[:100]}...")
+            
             return filtered_examples
             
         except Exception as e:
-            logger.error(f"Error generating enhanced examples: {e}")
+            logger.error(f"Error generating enhanced examples: {e}", exc_info=True)
             # Fallback to basic examples
             return await self.code_generator.generate_examples(requirement, num_examples)
