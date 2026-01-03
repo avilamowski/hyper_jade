@@ -1,0 +1,154 @@
+Clase 0:
+- Variables: etiquetas que apuntan a un valor en memoria.
+- Asignación de variables: con el operador de asignación =.
+- Nombres de variables: deben ser descriptivos y autodocumentados.
+- Expresiones: combinación de elementos que devuelve un valor.
+- Tipos de datos básicos: int, float, str, bool, NoneType.
+- Función type(): devuelve el tipo de dato de una variable.
+- Tipado dinámico: las variables pueden cambiar de tipo de dato.
+- Conversión de tipos (casting): usando funciones como int(), str().
+- Conversión a booleano: 0, "" y None evalúan como False.
+- Conversión implícita: Python convierte tipos en algunas operaciones.
+- Uso de variables: deben crearse antes de poder ser usadas.
+- Buenas prácticas: usar nombres significativos para las variables.
+
+Clase 1:
+- Operadores (símbolos de cálculo) y operandos (valores).
+- Operadores unarios `+` y `-` que operan sobre el signo.
+- Operadores aritméticos básicos: suma `+`, resta `-`, multiplicación `*`.
+- División `/`: siempre devuelve un resultado de tipo `float`.
+- División entera `//`: devuelve solo la parte entera del resultado.
+- Módulo `%`: calcula el resto de la división entera.
+- Potencia `**`: eleva una base a un exponente.
+- Precedencia de operadores: define el orden de las operaciones.
+- Orden de precedencia: Potencia, unarios, `* / // %`, `+ -`.
+- Usar paréntesis `()` para explicitar el orden de ejecución.
+- Misma precedencia: se evalúa de izquierda a derecha.
+- Excepción: la potencia `**` se asocia de derecha a izquierda.
+
+Clase 2:
+- Operadores de comparación: `< > <= >= == !=` retornan booleanos.
+- Comparación de strings: Se basa en el valor de la tabla ASCII.
+- Tabla ASCII: Código estándar que representa caracteres con números.
+- Operadores de strings: `+` para concatenar, `*` para repetir.
+- Funciones `ord()` y `chr()`: Convierten entre carácter y valor ASCII.
+- Operadores lógicos: `and`, `or`, `not` para operaciones booleanas.
+- Precedencia de operadores: Establece el orden de evaluación de expresiones.
+- Evaluación mínima: La evaluación se detiene al conocer el resultado.
+- Índices en strings: Acceso a caracteres individuales usando corchetes `[]`.
+- Indexación de strings: El primer carácter es el índice 0.
+- Indexación negativa: El índice -1 representa el último carácter.
+- Slices (rebanadas): Extraen subcadenas con la sintaxis `[start:stop:step]`.
+
+Clase 3:
+- `print()`: Muestra datos en pantalla, usa `sep` y `end`.
+- f-strings: Formatean cadenas usando `f''` y `{}`.
+- `input()`: Solicita datos al usuario, siempre devuelve `str`.
+- Convertir `input()` a número con `int()` o `float()`.
+- Funciones matemáticas: `abs()` (valor absoluto) y `round()` (redondear).
+- Funciones de cadena: `len()` (longitud), `ord()` y `chr()`.
+- `import`: Carga librerías/módulos externos no incluidos.
+- `from modulo import funcion`: Importa una función específica.
+- Módulo `math`: Funciones trigonométricas y matemáticas avanzadas.
+- Módulo `random`: Genera números aleatorios con `randint()` y `random()`.
+- Errores comunes: `NameError` (variable no definida).
+- Errores comunes: `ValueError`, `ZeroDivisionError`, `IndexError`, `SyntaxError`.
+
+Clase 4:
+- Estructuras de decisión: Controlan el flujo de ejecución del programa.
+- Sentencia `if`: Ejecuta un bloque si la condición es verdadera.
+- `if-else`: Ejecuta un bloque si es `True`, otro si `False`.
+- `if-elif-else`: Evalúa múltiples condiciones mutuamente excluyentes.
+- Indentación: Obligatoria para definir los bloques de código en Python.
+- Errores de indentación: Un error puede arruinar todo el algoritmo.
+- `if` anidados: Estructuras `if` dentro de otras para lógica compleja.
+- Orden de evaluación: Las condiciones se comprueban en secuencia.
+- Buena práctica: Usar paréntesis para asegurar el orden en expresiones.
+- Buena práctica: Usar espacios consistentes para la indentación, no tabs.
+- Buena práctica: Nombrar constantes en mayúsculas (ej. `DESCUENTO`).
+- Buena práctica: Usar nombres de variables descriptivos y claros.
+
+Clase 5:
+- Ciclo while: repite código mientras una condición es verdadera.
+- Sintaxis: `while <condición>: ...` con indentación.
+- Condición: se evalúa antes de cada iteración del ciclo.
+- Variable de control: debe inicializarse antes del ciclo.
+- Actualización: la variable debe cambiar para poder salir del ciclo.
+- Ciclos infinitos: ocurren si la condición nunca es falsa.
+- Buena práctica: asegurar condiciones de entrada y salida del ciclo.
+- Patrón de validación: usar `while` para validar datos de entrada.
+- Ejemplo de validación: pedir un número hasta que sea válido.
+- Ciclos enlazados: un ciclo `while` dentro de otro.
+- Ejemplo enlazado: pedir 10 números validando cada uno.
+- Operador de asignación: `a += 1` para incrementar una variable.
+
+Clase 6:
+- Sintaxis de función: `def nombre(parametros): ... return valor`
+- Parámetros: Datos que la función recibe para trabajar.
+- Valor de retorno: Resultado devuelto por la función con `return`.
+- Retorno implícito `None`: Si no hay `return` explícito.
+- Invocación de función: Llamar a la función para ejecutarla.
+- Scope de variables: Contexto global vs. local (de la función).
+- Buena práctica: Declarar funciones antes de usarlas.
+- Prohibido usar variables globales: Pasar datos por parámetros.
+- Retornar múltiples valores: `return valor1, valor2, ...`
+- Dividir y conquistar: Descomponer problemas en funciones pequeñas.
+- Reusabilidad: Crear funciones genéricas para ser reutilizadas.
+- Alta cohesión: Funciones con una tarea específica y bien definida.
+
+Clase 7:
+- Ciclo `for`: itera sobre una secuencia de valores.
+- Secuencias de valores: `str` como secuencia de caracteres.
+- Sintaxis del `for`: `for VARIABLE in SECUENCIA:`.
+- `for` vs `while`: `for` es más simple para secuencias.
+- `range()`: genera secuencias de números enteros.
+- Sintaxis `range()`: `range(inicio, final, salto)`.
+- El valor `final` de `range()` no se incluye.
+- `range()`: admite 1, 2 o 3 argumentos (valores por defecto).
+- Cuándo usar `while`: si no se puede predecir el avance.
+- No modificar la variable de control dentro del `for`.
+- La variable del `for` se considera de solo lectura.
+- La secuencia de `range()` es inmutable durante la iteración.
+
+Clase 8:
+- Gestión de errores mediante excepciones.
+- Bloque try/except para capturar y manejar errores.
+- Bloque 'finally' se ejecuta siempre al final.
+- 'ValueError': error al convertir tipos de datos.
+- Variable no se crea si su asignación genera un error.
+- 'except Exception' para capturar cualquier tipo de error.
+- El comando 'raise' para generar excepciones propias.
+- Al usar 'raise', la ejecución de la función se detiene.
+- Capturar excepciones generadas por una función.
+- Buena práctica: las funciones deben generar errores.
+- Buena práctica: el programa principal debe capturar errores.
+- Validar argumentos y tipos de datos para prevenir errores.
+
+Clase 9:
+- Listas: tipo de dato secuencial, ordenado y mutable.
+- Acceso a elementos: mediante índices y slicing `[]`.
+- Modificar listas: el contenido puede cambiar sin crear una nueva.
+- Añadir elementos: con el método `append()` al final.
+- Borrar elementos: con la instrucción `del()`.
+- Operador `+`: concatena dos listas en una nueva.
+- Operador `*`: repite los elementos de una lista.
+- Recorrer por valor: `for elemento in lista:`.
+- Recorrer por índice: `for i in range(len(lista)):`.
+- Función `len()`: devuelve la cantidad de elementos.
+- Listas en funciones: se pasan por referencia (no por copia).
+- Cambios en funciones: las modificaciones dentro de la función persisten.
+
+Clase 10:
+- Proceso de ordenamiento de listas de valores.
+- Algoritmo de Ordenamiento por Burbujeo (Bubble Sort).
+- Burbujeo: llevar el valor más grande al final.
+- El intercambio de valores es la operación clave.
+- El ordenamiento por burbujeo es progresivo.
+- Manejo de múltiples listas con información relacionada.
+- Mantener consistencia de datos entre listas.
+- Ejemplo: listas de estudiantes, legajos y notas.
+- Filtrado de información basado en una lista.
+- Ejemplo de filtrado: buscar la mejor nota.
+- Ordenamiento simultáneo de listas para mantener consistencia.
+- Ejemplo: ordenar estudiantes por su nota cursada.
+
