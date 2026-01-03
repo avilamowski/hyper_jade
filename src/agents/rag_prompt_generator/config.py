@@ -22,6 +22,12 @@ RAG_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Use same key as main system
 RAG_OPENAI_MODEL = os.getenv("RAG_OPENAI_MODEL", "gpt-3.5-turbo")
 RAG_OPENAI_BASE_URL = os.getenv("RAG_OPENAI_BASE_URL")
 
+# Google/Gemini Configuration for RAG
+RAG_GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+RAG_GOOGLE_MODEL = os.getenv("RAG_GOOGLE_MODEL", "gemini-pro")
+RAG_THEORY_IMPROVEMENT_PROVIDER = os.getenv("RAG_THEORY_IMPROVEMENT_PROVIDER", "openai")  # "openai", "gemini", or "ollama"
+RAG_THEORY_IMPROVEMENT_MODEL = os.getenv("RAG_THEORY_IMPROVEMENT_MODEL")  # If None, uses RAG_GOOGLE_MODEL or RAG_OPENAI_MODEL
+
 # Text Splitter Configuration (will be overridden by YAML config)
 RAG_TEXT_SPLITTER_STRATEGY = os.getenv("RAG_TEXT_SPLITTER_STRATEGY", "cell_based")
 RAG_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "1500"))
@@ -163,3 +169,9 @@ RAG_LANGSMITH_PROJECT = _rag_config.get("rag", {}).get("langsmith", {}).get("pro
 RAG_LANGSMITH_ENDPOINT = _rag_config.get("rag", {}).get("langsmith", {}).get("endpoint", RAG_LANGSMITH_ENDPOINT)
 RAG_LANGSMITH_TRACING = _rag_config.get("rag", {}).get("langsmith", {}).get("enabled", RAG_LANGSMITH_TRACING)
 RAG_ENABLE_LANGSMITH_TRACING = _rag_config.get("rag", {}).get("langsmith", {}).get("enabled", RAG_ENABLE_LANGSMITH_TRACING)
+
+# Theory Improvement Model Configuration (from YAML)
+theory_improvement_config = _rag_config.get("rag", {}).get("theory_improvement", {})
+if theory_improvement_config:
+    RAG_THEORY_IMPROVEMENT_PROVIDER = theory_improvement_config.get("provider", RAG_THEORY_IMPROVEMENT_PROVIDER)
+    RAG_THEORY_IMPROVEMENT_MODEL = theory_improvement_config.get("model_name", RAG_THEORY_IMPROVEMENT_MODEL)

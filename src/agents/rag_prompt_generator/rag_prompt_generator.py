@@ -67,6 +67,7 @@ async def rag_example_generation_node(requirement: Requirement, agent_config: di
         
         # Format examples for the prompt
         formatted_examples = []
+        logger.info(f"Formatting {len(examples)} examples for prompt generation")
         for i, example in enumerate(examples, 1):
             code = example.get("code", "")
             description = example.get("description", f"Example {i}")
@@ -74,15 +75,40 @@ async def rag_example_generation_node(requirement: Requirement, agent_config: di
             theory_alignment = example.get("theory_alignment", "")
             class_name = example.get("class_name", "Unknown")
             
+            logger.info(f"Example {i} details: class_name={class_name}, "
+                       f"improvements_type={type(improvements).__name__}, "
+                       f"theory_alignment_type={type(theory_alignment).__name__}, "
+                       f"code_length={len(code)}, "
+                       f"has_improvements={bool(improvements)}, "
+                       f"has_theory_alignment={bool(theory_alignment)}")
+            
+            # Log the actual content for debugging
+            if improvements:
+                logger.info(f"  Example {i} improvements: {improvements}")
+            if theory_alignment:
+                logger.info(f"  Example {i} theory_alignment (first 200 chars): {str(theory_alignment)[:200]}")
+            
             formatted_example = f"Example {i}: {description}\n"
             formatted_example += f"**{class_name}**\n"  # Add class name
             formatted_example += f"```python\n{code}\n```\n"
             
             if improvements:
-                formatted_example += f"Improvements: {'; '.join(improvements)}\n"
+                # Handle both list and string formats
+                if isinstance(improvements, list):
+                    improvements_str = '; '.join(str(imp) for imp in improvements if imp)
+                else:
+                    improvements_str = str(improvements)
+                if improvements_str:
+                    formatted_example += f"Improvements: {improvements_str}\n"
             
             if theory_alignment:
-                formatted_example += f"Theory alignment: {theory_alignment}\n"
+                # Handle both list and string formats (sometimes it gets parsed as list)
+                if isinstance(theory_alignment, list):
+                    theory_alignment_str = ' '.join(str(ta) for ta in theory_alignment if ta)
+                else:
+                    theory_alignment_str = str(theory_alignment).strip()
+                if theory_alignment_str:
+                    formatted_example += f"Theory alignment: {theory_alignment_str}\n"
             
             formatted_examples.append(formatted_example)
         

@@ -8,6 +8,7 @@ from pydantic import SecretStr
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama.llms import OllamaLLM
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from .config import (
     RAG_AI_PROVIDER,
     RAG_OPENAI_API_KEY,
@@ -19,6 +20,10 @@ from .config import (
     RAG_TEMPERATURE_EXAMPLE_GENERATION,
     RAG_TEMPERATURE_THEORY_CORRECTION,
     RAG_TEMPERATURE_FILTERING,
+    RAG_GOOGLE_API_KEY,
+    RAG_GOOGLE_MODEL,
+    RAG_THEORY_IMPROVEMENT_PROVIDER,
+    RAG_THEORY_IMPROVEMENT_MODEL,
 )
 
 # Configure logging
@@ -36,26 +41,66 @@ class LLMFactory:
         self.ollama_host = RAG_OLLAMA_HOST
         self.ollama_port = RAG_OLLAMA_PORT
         self.model_name = RAG_MODEL_NAME
+        self.google_api_key = RAG_GOOGLE_API_KEY
+        self.google_model = RAG_GOOGLE_MODEL
+        self.theory_improvement_provider = RAG_THEORY_IMPROVEMENT_PROVIDER
+        self.theory_improvement_model = RAG_THEORY_IMPROVEMENT_MODEL
     
-    def create_llm(self, temperature: float = RAG_TEMPERATURE_EXAMPLE_GENERATION):
-        """Create an LLM instance with a specific temperature."""
-        if self.ai_provider == "openai":
+    def create_llm(self, temperature: float = RAG_TEMPERATURE_EXAMPLE_GENERATION, 
+                   provider: Optional[str] = None, model_name: Optional[str] = None):
+        """Create an LLM instance with a specific temperature.
+        
+        Args:
+            temperature: Temperature for the LLM
+            provider: Optional provider override ("openai", "ollama", "gemini")
+            model_name: Optional model name override
+        """
+        # Use provided provider or default to self.ai_provider
+        effective_provider = provider or self.ai_provider
+        
+        if effective_provider in ("openai", "openai-compatible"):
             if not self.openai_api_key:
                 raise Exception("OpenAI API key is required when using OpenAI provider")
             
+            effective_model = model_name or self.openai_model
             return ChatOpenAI(
-                model=self.openai_model,
+                model=effective_model,
                 api_key=SecretStr(self.openai_api_key) if self.openai_api_key else None,
                 base_url=self.openai_base_url,
                 temperature=temperature
             )
+        elif effective_provider in ("gemini", "google", "google-genai"):
+            if not self.google_api_key:
+                raise Exception("Google API key is required when using Gemini provider")
+            
+            effective_model = model_name or self.google_model
+            return ChatGoogleGenerativeAI(
+                model=effective_model,
+                temperature=temperature,
+                google_api_key=self.google_api_key
+            )
         else:
             # Initialize Ollama LLM
+            effective_model = model_name or self.model_name
             return OllamaLLM(
-                model=self.model_name,
+                model=effective_model,
                 temperature=temperature,
                 base_url=f"http://{self.ollama_host}:{self.ollama_port}"
             )
+    
+    def create_theory_improvement_llm(self, temperature: float = RAG_TEMPERATURE_THEORY_CORRECTION):
+        """Create an LLM instance specifically for theory improvement.
+        
+        Uses the configured theory improvement provider and model, or falls back
+        to the default provider/model if not configured.
+        """
+        # If no specific model is configured, use None to let create_llm use defaults
+        effective_model = self.theory_improvement_model if self.theory_improvement_model else None
+        return self.create_llm(
+            temperature=temperature,
+            provider=self.theory_improvement_provider,
+            model_name=effective_model
+        )
     
     def create_ragas_llm(self):
         """Create an LLM instance for Ragas metrics."""
@@ -210,8 +255,15 @@ class XMLParser:
             filtered_approach = re.search(approach_pattern, filtered_content, re.DOTALL | re.IGNORECASE)
             filtering_summary = re.search(summary_pattern, filtered_content, re.DOTALL | re.IGNORECASE)
             
-            # Create filtered example
+            # Create filtered example - preserve ALL original fields first
             filtered_example = original_example.copy()
+            
+            # Preserve important fields from improved examples
+            # These should not be lost during filtering
+            preserved_fields = ['class_name', 'improvements', 'theory_alignment', 'original_code', 'original_approach']
+            for field in preserved_fields:
+                if field in original_example:
+                    filtered_example[field] = original_example[field]
             
             # Update code if filtered version was provided
             if filtered_code and filtered_code.group(1).strip():
@@ -219,10 +271,20 @@ class XMLParser:
                 filtered_example["was_filtered"] = True
             else:
                 filtered_example["was_filtered"] = False
+                # If no filtered code, keep original code
+                if "code" not in filtered_example:
+                    filtered_example["code"] = original_example.get("code", "")
             
             # Update approach if provided
             if filtered_approach and filtered_approach.group(1).strip():
                 filtered_example["approach"] = filtered_approach.group(1).strip()
+            # If no filtered approach, preserve original
+            elif "approach" not in filtered_example:
+                filtered_example["approach"] = original_example.get("approach", "")
+            
+            # Ensure description is preserved
+            if "description" not in filtered_example:
+                filtered_example["description"] = original_example.get("description", "Example")
             
             # Add filtering metadata
             filtered_example["has_irrelevant_elements"] = has_irrelevant.group(1).strip().lower() == "true" if has_irrelevant else False
