@@ -22,10 +22,11 @@ class PromptTemplates:
         templates_dir = os.path.join(current_dir, "templates")
         
         # Initialize Jinja2 environment
+        # NOTE: lstrip_blocks is NOT used to preserve code indentation in templates
         self.jinja_env = Environment(
             loader=FileSystemLoader(templates_dir),
             trim_blocks=True,
-            lstrip_blocks=True
+            lstrip_blocks=False  # Keep False to preserve code indentation
         )
         
         # Cache for loaded templates

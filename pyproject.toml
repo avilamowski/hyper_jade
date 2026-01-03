@@ -40,7 +40,7 @@ dev-dependencies = []
 
 [project.scripts]
 worker = "worker.main:main"
-setup-rag = "setup_rag:main"
+setup-rag = "setup_rag:cli_main"
 list-outputs = "list_outputs:main"
 start-worker = "start_worker:main"
 view-metrics = "view_mlflow_metrics:main"

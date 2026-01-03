@@ -52,8 +52,10 @@ from .config import (
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+log_level = logging.DEBUG if RAG_DEBUG_MODE else logging.INFO
+logging.basicConfig(level=log_level, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logger.setLevel(log_level)
 
 # Import LangSmith for tracing if available
 try:
@@ -98,10 +100,16 @@ def extract_class_number(filename: str) -> int:
         return 999
 
 
-def preprocess_cell_content(cell_text: str) -> str:
+def preprocess_cell_content(cell_text: str, preserve_leading_whitespace: bool = False) -> str:
     """
     Preprocess cell content to clean markdown links and HTML images.
     """
+    # For code cells, return as-is to preserve all indentation
+    if preserve_leading_whitespace:
+        logger.debug(f"Preserving whitespace for code cell (first 100 chars): {repr(cell_text[:100])}")
+        return cell_text
+    
+    # Only apply preprocessing to non-code cells (markdown)
     # Remove markdown links but keep the text
     cell_text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', cell_text)
     
@@ -386,20 +394,25 @@ class RAGSystem:
             filename = os.path.basename(notebook_path)
 
             for cell in notebook.cells:
-                cell_text = cell.source.strip()
-                if cell_text:
-                    # Preprocess the cell content to clean markdown links and HTML images
-                    preprocessed_text = preprocess_cell_content(cell_text)
-                    
-                    # Add language-specific code block markers for code cells
-                    if cell.cell_type == "code":
-                        # Determine the language based on dataset
-                        language = "python" if dataset == "python" else "haskell"
-                        formatted_cell = f"```{language}\n{preprocessed_text}\n```"
-                        combined_content.append(formatted_cell)
-                    else:
-                        # For markdown cells, add the preprocessed text
-                        combined_content.append(preprocessed_text)
+                # Preserve raw cell source for code cells so we don't remove
+                # leading indentation. For markdown cells we still normalize
+                # by trimming leading/trailing whitespace.
+                cell_text = cell.source
+                # Skip empty cells (allow whitespace-only test)
+                if not cell_text or not cell_text.strip():
+                    continue
+
+                if cell.cell_type == "code":
+                    # For code cells preserve leading whitespace/tabs
+                    preprocessed_text = preprocess_cell_content(cell_text, preserve_leading_whitespace=True)
+                    formatted_cell = f"```python\n{preprocessed_text}\n```"
+                    logger.debug(f"Code cell formatted (first 200 chars):\n{repr(formatted_cell[:200])}")
+                    logger.debug(f"Code cell preview:\n{formatted_cell[:300]}")
+                    combined_content.append(formatted_cell)
+                else:
+                    # For markdown cells, clean and trim
+                    preprocessed_text = preprocess_cell_content(cell_text, preserve_leading_whitespace=False)
+                    combined_content.append(preprocessed_text)
 
             if not combined_content:
                 return []
