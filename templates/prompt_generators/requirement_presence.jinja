@@ -17,6 +17,14 @@ The complete assignment for the students is the following:
 ASSIGNMENT DESCRIPTION:
 {{ assignment_description }}
 
+EXAMPLES THAT WILL BE PROVIDED (for your reference only - do NOT copy these into your template):
+
+Good examples (that should return <RESULT>YES</RESULT>):
+{{ good_examples }}
+
+Bad examples (that should return <RESULT>NO</RESULT>):
+{{ bad_examples }}
+
 *The Analyzer* should only analyze the code based on the requirement provided, and not any other aspect of the assignment.
 The template should follow this EXACT structure (without the backticks):
 
@@ -30,7 +38,11 @@ PROMPT STRUCTURE:
 Definition:
 - [You should define what constitutes valid/invalid code for this requirement]
 
-{{ examples }}
+Examples that should return <RESULT>YES</RESULT>:
+\{\{ good_examples \}\}
+
+Examples that should return <RESULT>NO</RESULT>:
+\{\{ bad_examples \}\}
 
 *The Analyzer* Instructions:
 - *The Analyzer* should Return YES if the code implements the required behavior.
@@ -47,10 +59,11 @@ Code to analyze:
 
 IMPORTANT: 
 - This is a TEMPLATE for analysis, NOT code for you to implement
-- You should use "\{\{ code \}\}" (with double braces) for the Jinja2 variable
-- The template will be filled with student code later
+- You should use "\{\{ code \}\}" (with double braces) for the Jinja2 variable containing student code
+- You MUST use "\{\{ good_examples \}\}" and "\{\{ bad_examples \}\}" (with double braces) as placeholders where examples should appear - do NOT write example code yourself, just use these placeholders
+- The template will be filled with student code and examples later automatically
 - You should focus on the specific requirement given
-- You must provide clear examples of what passes and what fails
+- The examples you saw above are ONLY for your reference to understand what will be provided - do NOT copy them into your template, just use the placeholders
 
 Generate only the template, no explanations or additional text.
 Example:

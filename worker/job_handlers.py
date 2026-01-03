@@ -44,9 +44,13 @@ from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.models import PromptType
 from src.agents.rag_prompt_generator.config import USE_RAG
-from src.agents.rag_prompt_generator.rag_prompt_generator import RAGPromptGeneratorAgent
+from src.agents.rag_prompt_generator.rag_prompt_generator import RAGPromptGeneratorAgent, format_rag_examples_simple
+from src.agents.prompt_generator.prompt_generator import split_examples
 
 from langsmith import tracing_context, Client as LangSmithClient
+from jinja2 import Template as JinjaTemplate
+import asyncio
+import inspect
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -212,7 +216,6 @@ class JobHandlers:
                 logger.info("🧠 Initializing RAG-enhanced prompt generator...")
                 agent = RAGPromptGeneratorAgent(config)
                 # Initialize RAG system
-                import asyncio
                 try:
                     asyncio.run(agent.initialize())
                     logger.info("✅ RAG agent initialized successfully")
@@ -245,8 +248,6 @@ class JobHandlers:
                             break
             # Generate prompts
             logger.info(f"🔧 Generating prompts for {len(requirements)} requirements")
-            import asyncio
-            import inspect
             # Check if generate_prompts_batch is async
             if inspect.iscoroutinefunction(agent.generate_prompts_batch):
                 # RAG agent uses async method
@@ -269,13 +270,35 @@ class JobHandlers:
                     req_id = requirement_ids[i]
                     result = results[i]
                     req_obj = requirements[i]
-                    prompt_template = result["jinja_template"]
+                    jinja_template = result["jinja_template"]
+                    examples = result.get("examples", "")
+                    
+                    # Render template with examples before saving for web UI display
+                    # Check if examples are in RAG format (with metadata) and convert to simple format
+                    if "**" in examples or "Improvements:" in examples or "Theory alignment:" in examples:
+                        # RAG format detected - convert to simple format
+                        examples = format_rag_examples_simple(examples)
+                    
+                    good_examples, bad_examples = split_examples(examples)
+                    try:
+                        # Clean escaped braces from template (LLM sometimes generates \{\{ instead of {{)
+                        cleaned_template = jinja_template.replace(r"\{\{", "{{").replace(r"\}\}", "}}")
+                        template = JinjaTemplate(cleaned_template)
+                        rendered_prompt = template.render(
+                            good_examples=good_examples,
+                            bad_examples=bad_examples,
+                            code="{{ code }}",  # Keep code placeholder for later use
+                        )
+                    except Exception as render_error:
+                        logger.warning(f"Could not render template with examples: {render_error}. Using template as-is.")
+                        # Clean escaped braces even if rendering fails
+                        rendered_prompt = jinja_template.replace(r"\{\{", "{{").replace(r"\}\}", "}}")
                     
                     req_update = RequirementUpdate(
                         requirement=req_obj["requirement"],
                         function=req_obj["function"],
                         type=req_obj["type"].value if hasattr(req_obj["type"], "value") else str(req_obj["type"]),
-                        prompt_template=prompt_template
+                        prompt_template=rendered_prompt  # Save with examples injected for web UI
                     )
                     self.api_client.update_requirement(assignment_id, req_id, req_update)
                     updated_count += 1

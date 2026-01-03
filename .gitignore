@@ -5,3 +5,4 @@ outputs/
 .env
 .vscode
 data/
+.cursor/rules

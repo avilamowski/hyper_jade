@@ -10,6 +10,8 @@ from __future__ import annotations
 from typing import Dict, Any, TypedDict, List, Optional, Annotated
 import logging
 import time
+import re
+import asyncio
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -38,8 +40,57 @@ except ImportError:
 from .rag_system import RAGSystem
 from .code_generator import CodeExampleGenerator
 from .config import USE_RAG
+from src.agents.prompt_generator.prompt_generator import PromptType
 
 logger = logging.getLogger(__name__)
+
+
+def format_rag_examples_simple(examples: str) -> str:
+    """
+    Convert RAG examples (with metadata) to simple format (just code).
+    Removes metadata like class names, improvements, theory alignment.
+    
+    Args:
+        examples: RAG-formatted examples string with metadata
+    
+    Returns:
+        Simple formatted examples string matching the standard format (Good example X: / Bad Example X:)
+    """
+    # Extract all code blocks from ```python blocks
+    code_blocks = re.findall(r'```python\n(.*?)\n```', examples, re.DOTALL)
+    
+    if not code_blocks:
+        # Fallback: try to find code in other formats or return as-is
+        logger.warning("Could not extract code blocks from RAG examples, returning as-is")
+        return examples
+    
+    formatted_examples = []
+    for i, code in enumerate(code_blocks, 1):
+        # Clean code: handle \n as string literals
+        code = code.strip()
+        # Replace literal \n with actual newlines
+        code = code.replace('\\n', '\n')
+        # Remove any remaining escape sequences
+        code = code.replace('\\t', '\t')
+        code = code.replace('\\r', '\r')
+        
+        # Split into lines and indent properly (4 spaces)
+        lines = code.split('\n')
+        indented_lines = []
+        for line in lines:
+            if line.strip():  # Non-empty line
+                indented_lines.append('    ' + line)
+            else:  # Empty line - keep it but don't add extra spaces
+                indented_lines.append('')
+        
+        indented_code = '\n'.join(indented_lines)
+        
+        # Format as "Good example X:" (RAG examples are typically all "good" examples)
+        formatted_examples.append(f"Good example {i}:\n{indented_code}")
+    
+    # RAG examples are typically all "good" examples
+    # If we need bad examples, they would need to be generated separately
+    return "\n\n".join(formatted_examples)
 
 
 # --- LangGraph Node: RAG-Enhanced Example Generation ---
@@ -50,9 +101,6 @@ async def rag_example_generation_node(requirement: Requirement, agent_config: di
     Returns the generated examples as a string.
     """
     try:
-        # Generate examples using RAG system
-        import asyncio
-        
         # Generate examples using RAG system
         examples = await code_generator.generate_enhanced_examples(
             requirement=requirement["requirement"],
@@ -217,12 +265,44 @@ context for student code analysis.
     logger.info(f"[RAG Node] After markdown cleanup length: {len(jinja_template)}")
     logger.info(f"[RAG Node] After markdown cleanup preview: {jinja_template[:200]}...")
 
+    # Clean escaped braces (LLM sometimes generates \{\{ instead of {{)
+    jinja_template = jinja_template.replace(r"\{\{", "{{").replace(r"\}\}", "}}")
+    
     # Ensure the template has the basic structure
     if "{{ code }}" not in jinja_template and "{{code}}" not in jinja_template:
         jinja_template = jinja_template.replace("{{ student_code }}", "{{ code }}")
         jinja_template = jinja_template.replace("{{code}}", "{{ code }}")
         if "{{ code }}" not in jinja_template:
             jinja_template += "\n\nCode to analyze:\n{{ code }}"
+    
+    # Ensure the template has {{ good_examples }} and {{ bad_examples }} placeholders
+    # If not present, try to add them in appropriate places
+    has_good = "{{ good_examples }}" in jinja_template or "{{good_examples}}" in jinja_template
+    has_bad = "{{ bad_examples }}" in jinja_template or "{{bad_examples}}" in jinja_template
+    
+    # Also check for old {{ examples }} format and suggest replacement
+    if "{{ examples }}" in jinja_template or "{{examples}}" in jinja_template:
+        logger.warning("Template uses old {{ examples }} format. Consider updating to use {{ good_examples }} and {{ bad_examples }} separately.")
+    
+    # If neither placeholder is present, add them before {{ code }}
+    if not has_good and not has_bad:
+        examples_placeholder = "{{ good_examples }}\n\n{{ bad_examples }}"
+        
+        # Check if "Code to analyze:" already exists
+        if "Code to analyze:" in jinja_template:
+            # Insert examples before the existing "Code to analyze:" line
+            jinja_template = jinja_template.replace(
+                "Code to analyze:",
+                f"{examples_placeholder}\n\nCode to analyze:",
+                1  # Only replace first occurrence to avoid duplication
+            )
+        elif "{{ code }}" in jinja_template:
+            # No "Code to analyze:" label exists, add placeholders and label before {{ code }}
+            jinja_template = jinja_template.replace(
+                "{{ code }}",
+                f"{examples_placeholder}\n\nCode to analyze:\n{{ code }}",
+                1  # Only replace first occurrence
+            )
 
     # Debug: Log final template
     logger.info(f"[RAG Node] Final template length: {len(jinja_template)}")
@@ -314,7 +394,6 @@ class RAGPromptGeneratorAgent:
                 # Convert type string to PromptType if needed
                 req_type = requirement.get("type")
                 if isinstance(req_type, str):
-                    from src.agents.prompt_generator.prompt_generator import PromptType
                     for pt in PromptType:
                         if pt.value == req_type:
                             req_type = pt
@@ -447,8 +526,6 @@ class RAGPromptGeneratorAgent:
         Note: This creates a synchronous wrapper around the async batch processing.
         """
         def node(state):
-            import asyncio
-            
             # If state has requirements list, process in batch
             if "requirements" in state and state["requirements"]:
                 assignment_description = state.get("assignment_description", "")

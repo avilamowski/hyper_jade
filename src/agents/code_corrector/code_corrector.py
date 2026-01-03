@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Dict, Any, TypedDict, List, Optional, Annotated
 import re
 import logging
+import os
 
 from dotenv import load_dotenv, dotenv_values
 from jinja2 import Template
@@ -28,6 +29,7 @@ from langgraph.graph import StateGraph, END, START
 
 from src.config import get_agent_config
 from src.agents.utils.reducers import keep_last, concat
+from src.agents.prompt_generator.prompt_generator import split_examples
 from src.models import Requirement, GeneratedPrompt, Submission, Correction
 
 logger = logging.getLogger(__name__)
@@ -102,7 +104,6 @@ class CodeCorrectorAgent:
             )
 
         if provider in ("gemini", "google", "google-genai"):
-            import os
             api_key = self.agent_config.get("api_key") or os.environ.get("GOOGLE_API_KEY")
             return ChatGoogleGenerativeAI(
                 model=model_name or "gemini-pro",
@@ -175,10 +176,33 @@ class CodeCorrectorAgent:
             else:
                 student_code = submission["code"]
 
-            # Render the Jinja template with the student code
-            rendered_prompt = Template(generated_prompt["jinja_template"]).render(
-                code=student_code
-            )
+            # Check if template already has examples injected (no placeholders)
+            # If it does, we only need to inject the student code
+            template_str = generated_prompt["jinja_template"]
+            has_placeholders = "{{ good_examples }}" in template_str or "{{ bad_examples }}" in template_str
+            
+            if has_placeholders:
+                # Template has placeholders, need to render with examples
+                examples_str = generated_prompt.get("examples", "")
+                if examples_str:
+                    good_examples, bad_examples = split_examples(examples_str)
+                    rendered_prompt = Template(template_str).render(
+                        code=student_code,
+                        good_examples=good_examples,
+                        bad_examples=bad_examples,
+                    )
+                else:
+                    # No examples available, render with empty examples
+                    rendered_prompt = Template(template_str).render(
+                        code=student_code,
+                        good_examples="",
+                        bad_examples="",
+                    )
+            else:
+                # Template already has examples injected, only need to inject student code
+                rendered_prompt = Template(template_str).render(
+                    code=student_code,
+                )
 
             # Call LLM for analysis
             analysis = self._call_llm(rendered_prompt)
