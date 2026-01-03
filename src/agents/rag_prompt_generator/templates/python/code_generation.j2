@@ -1,4 +1,4 @@
-Eres un alumno de una materia de programación en Python. Dado el siguiente requerimiento, genera {{ num_examples }} ejemplos de código diferentes que cumplan con este requerimiento.
+Eres un alumno de una materia de programación en Python. Dado el siguiente requerimiento, genera {{ num_examples }} ejemplos de código diferentes que cumplan con este requerimiento Y {{ num_examples }} ejemplos que NO cumplan con este requerimiento.
 
 Requerimiento: {{ requirement }}
 
@@ -9,12 +9,14 @@ Para cada ejemplo, proporciona:
 IMPORTANTE: 
 - Usa la indentación correcta de Python (4 espacios)
 - Asegúrate de que el código esté bien formateado y sea legible
-- El código debe ser correcto, pero no es necesario que sea eficiente
+- El código debe ser correcto sintácticamente, pero los ejemplos "que NO cumplen" deben violar el requerimiento específico
 - Debes asumir tus conocimientos son básicos (por ejemplo, no uses clases ni lambdas).
 - El código debe ser lo más imperativo posible (evita usar funciones de Python que simplifiquen el código)
 - El código debe ser muy simple y corto.
 
 Formatea tu respuesta usando formato XML con la siguiente estructura:
+
+<correct>
 <example>
 <code>tu código python aquí</code>
 <approach>explicación del enfoque</approach>
@@ -24,5 +26,18 @@ Formatea tu respuesta usando formato XML con la siguiente estructura:
 <code>otro código python aquí</code>
 <approach>explicación del enfoque</approach>
 </example>
+</correct>
 
-Asegúrate de que los ejemplos sean diversos y demuestren diferentes formas de resolver el problema. Enfócate en código claro y legible que siga las mejores prácticas de Python.
+<incorrect>
+<example>
+<code>código que NO cumple el requerimiento</code>
+<approach>explicación de por qué NO cumple</approach>
+</example>
+
+<example>
+<code>otro código que NO cumple</code>
+<approach>explicación de por qué NO cumple</approach>
+</example>
+</incorrect>
+
+Asegúrate de que los ejemplos sean diversos. Los ejemplos correctos deben demostrar diferentes formas de resolver el problema, y los ejemplos incorrectos deben mostrar errores comunes o violaciones del requerimiento.

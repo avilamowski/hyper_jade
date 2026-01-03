@@ -40,7 +40,7 @@ except ImportError:
 from .rag_system import RAGSystem
 from .code_generator import CodeExampleGenerator
 from .config import USE_RAG
-from src.agents.prompt_generator.prompt_generator import PromptType
+from src.agents.prompt_generator.prompt_generator import PromptType, split_examples
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ def format_rag_examples_simple(examples: str) -> str:
     """
     Convert RAG examples (with metadata) to simple format (just code).
     Removes metadata like class names, improvements, theory alignment.
+    Preserves the distinction between good and bad examples.
     
     Args:
         examples: RAG-formatted examples string with metadata
@@ -56,87 +57,121 @@ def format_rag_examples_simple(examples: str) -> str:
     Returns:
         Simple formatted examples string matching the standard format (Good example X: / Bad Example X:)
     """
-    # Extract all code blocks from ```python blocks
-    code_blocks = re.findall(r'```python\n(.*?)\n```', examples, re.DOTALL)
+    # Split into individual example blocks by looking for "Good example" or "Bad example" headers
+    import re
     
-    if not code_blocks:
-        # Fallback: try to find code in other formats or return as-is
-        logger.warning("Could not extract code blocks from RAG examples, returning as-is")
-        return examples
+    # Find all example blocks with their headers
+    example_pattern = r'((?:Good|Bad) example \d+:.*?)(?=(?:Good|Bad) example \d+:|$)'
+    example_blocks = re.findall(example_pattern, examples, re.DOTALL | re.IGNORECASE)
     
+    if not example_blocks:
+        # Fallback: try to extract code blocks from ```python blocks
+        logger.warning("Could not find example blocks, trying to extract code blocks")
+        code_blocks = re.findall(r'```python\n(.*?)\n```', examples, re.DOTALL)
+        
+        if not code_blocks:
+            logger.warning("Could not extract code blocks from RAG examples, returning as-is")
+            return examples
+        
+        # Format all as good examples (old behavior as fallback)
+        formatted_examples = []
+        for i, code in enumerate(code_blocks, 1):
+            code = code.strip()
+            # Clean escape sequences
+            code = code.replace('\\n', '\n')
+            code = code.replace('\\t', '\t')
+            code = code.replace('\\r', '\r')
+            
+            lines = code.split('\n')
+            indented_lines = []
+            for line in lines:
+                if line.strip():
+                    indented_lines.append('    ' + line)
+                else:
+                    indented_lines.append('')
+            indented_code = '\n'.join(indented_lines)
+            formatted_examples.append(f"Good example {i}:\n{indented_code}")
+        
+        return "\n\n".join(formatted_examples)
+    
+    # Process each example block, preserving Good/Bad distinction
     formatted_examples = []
-    for i, code in enumerate(code_blocks, 1):
-        # Clean code: handle \n as string literals
-        code = code.strip()
-        # Replace literal \n with actual newlines
-        code = code.replace('\\n', '\n')
-        # Remove any remaining escape sequences
-        code = code.replace('\\t', '\t')
-        code = code.replace('\\r', '\r')
-        
-        # Split into lines and indent properly (4 spaces)
-        lines = code.split('\n')
-        indented_lines = []
-        for line in lines:
-            if line.strip():  # Non-empty line
-                indented_lines.append('    ' + line)
-            else:  # Empty line - keep it but don't add extra spaces
-                indented_lines.append('')
-        
-        indented_code = '\n'.join(indented_lines)
-        
-        # Format as "Good example X:" (RAG examples are typically all "good" examples)
-        formatted_examples.append(f"Good example {i}:\n{indented_code}")
+    good_count = 0
+    bad_count = 0
     
-    # RAG examples are typically all "good" examples
-    # If we need bad examples, they would need to be generated separately
+    for block in example_blocks:
+        # Extract the header to determine if it's good or bad
+        is_bad = block.strip().lower().startswith('bad')
+        
+        # Extract code from this block
+        code_match = re.search(r'```python\n(.*?)\n```', block, re.DOTALL)
+        if not code_match:
+            # Try without language specifier
+            code_match = re.search(r'```\n(.*?)\n```', block, re.DOTALL)
+        
+        if code_match:
+            code = code_match.group(1).strip()
+            
+            # Clean code: handle escape sequences
+            code = code.replace('\\n', '\n')
+            code = code.replace('\\t', '\t')
+            code = code.replace('\\r', '\r')
+            
+            # Clean and indent code
+            lines = code.split('\n')
+            indented_lines = []
+            for line in lines:
+                if line.strip():
+                    indented_lines.append('    ' + line)
+                else:
+                    indented_lines.append('')
+            indented_code = '\n'.join(indented_lines)
+            
+            # Format with appropriate header
+            if is_bad:
+                bad_count += 1
+                formatted_examples.append(f"Bad example {bad_count}:\n{indented_code}")
+            else:
+                good_count += 1
+                formatted_examples.append(f"Good example {good_count}:\n{indented_code}")
+    
+    logger.info(f"Formatted {good_count} good examples and {bad_count} bad examples from RAG output")
     return "\n\n".join(formatted_examples)
 
 
 # --- LangGraph Node: RAG-Enhanced Example Generation ---
 @traceable(name="rag_generate_examples")
-async def rag_example_generation_node(requirement: Requirement, agent_config: dict, llm, rag_system, code_generator) -> str:
+async def rag_example_generation_node(requirement: Requirement, agent_config: dict, llm, rag_system, code_generator, assignment_description: str = "") -> str:
     """
     Node for generating examples using RAG system and course theory.
-    Returns the generated examples as a string.
+    Generates both good examples (RAG-enhanced) and bad examples (original).
+    Returns the formatted examples as a string.
     """
     try:
-        # Generate examples using RAG system
-        examples = await code_generator.generate_enhanced_examples(
+        # Generate good examples (RAG-enhanced) and bad examples (original)
+        good_examples, bad_examples = await code_generator.generate_enhanced_examples(
             requirement=requirement["requirement"],
             num_examples=3,
             max_theory_results=5,
-            dataset="python"  # Default to python for now
+            dataset="python",  # Default to python for now
+            assignment_description=assignment_description
         )
         
-        if not examples:
+        if not good_examples and not bad_examples:
             logger.error("RAG example generation failed: No examples generated")
             return "Error generating examples using RAG system."
         
-        # Format examples for the prompt
-        formatted_examples = []
-        logger.info(f"Formatting {len(examples)} examples for prompt generation")
-        for i, example in enumerate(examples, 1):
+        # Format GOOD examples (RAG-enhanced) for the prompt
+        formatted_good_examples = []
+        logger.info(f"Formatting {len(good_examples)} GOOD examples for prompt generation")
+        for i, example in enumerate(good_examples, 1):
             code = example.get("code", "")
             description = example.get("description", f"Example {i}")
             improvements = example.get("improvements", [])
             theory_alignment = example.get("theory_alignment", "")
             class_name = example.get("class_name", "Unknown")
             
-            logger.info(f"Example {i} details: class_name={class_name}, "
-                       f"improvements_type={type(improvements).__name__}, "
-                       f"theory_alignment_type={type(theory_alignment).__name__}, "
-                       f"code_length={len(code)}, "
-                       f"has_improvements={bool(improvements)}, "
-                       f"has_theory_alignment={bool(theory_alignment)}")
-            
-            # Log the actual content for debugging
-            if improvements:
-                logger.info(f"  Example {i} improvements: {improvements}")
-            if theory_alignment:
-                logger.info(f"  Example {i} theory_alignment (first 200 chars): {str(theory_alignment)[:200]}")
-            
-            formatted_example = f"Example {i}: {description}\n"
+            formatted_example = f"Good example {i}: {description}\n"
             formatted_example += f"**{class_name}**\n"  # Add class name
             formatted_example += f"```python\n{code}\n```\n"
             
@@ -158,9 +193,29 @@ async def rag_example_generation_node(requirement: Requirement, agent_config: di
                 if theory_alignment_str:
                     formatted_example += f"Theory alignment: {theory_alignment_str}\n"
             
-            formatted_examples.append(formatted_example)
+            formatted_good_examples.append(formatted_example)
         
-        return "\n\n".join(formatted_examples)
+        # Format BAD examples (original, not RAG-enhanced)
+        formatted_bad_examples = []
+        logger.info(f"Formatting {len(bad_examples)} BAD examples for prompt generation")
+        for i, example in enumerate(bad_examples, 1):
+            code = example.get("code", "")
+            approach = example.get("approach", f"Does not satisfy the requirement")
+            
+            formatted_example = f"Bad example {i}:\n"
+            formatted_example += f"```python\n{code}\n```\n"
+            formatted_example += f"Why it's incorrect: {approach}\n"
+            
+            formatted_bad_examples.append(formatted_example)
+        
+        # Combine good and bad examples
+        combined_examples = "\n\n".join(formatted_good_examples)
+        if formatted_bad_examples:
+            combined_examples += "\n\n" + "\n\n".join(formatted_bad_examples)
+        
+        logger.info(f"Combined {len(good_examples)} good + {len(bad_examples)} bad examples")
+        
+        return combined_examples
         
     except Exception as e:
         logger.error(f"Error in RAG example generation: {e}")
@@ -192,56 +247,21 @@ def rag_prompt_generation_node(
     template_file = template_map.get(prompt_type.value, template_map.get("default"))
     template = env.get_template(template_file)
     
-    # Create enhanced prompt that includes RAG information
-    # Read the template file directly to get the raw template content
-    template_path = f"templates/{template_file}"
-    try:
-        with open(template_path, 'r', encoding='utf-8') as f:
-            template_content = f.read()
-    except Exception as e:
-        logger.error(f"Error reading template file {template_path}: {e}")
-        # Fallback to rendering the template
-        template_content = template.render(
-            requirement=requirement_body,
-            assignment_description=assignment_description,
-            code="{{ code }}",
-            examples=examples,
-        )
+    # Split RAG examples into good and bad, same as standard version
+    good_examples, bad_examples = split_examples(examples)
     
-    # Create a prompt that includes the template structure and the actual values
-    enhanced_prompt = f"""
-You are a Prompt Engineer creating a Jinja2 template for a code analyzer.
-
-REQUIREMENT TO ANALYZE:
-{requirement_body}
-
-ASSIGNMENT DESCRIPTION:
-{assignment_description}
-
-RAG-ENHANCED EXAMPLES:
-{examples}
-
-TEMPLATE STRUCTURE TO FOLLOW:
-{template_content}
-
-Create a complete Jinja2 template that follows the structure above but fills in the specific requirement and uses the provided examples.
-"""
-    
-    # Add RAG-specific instructions
-    rag_instructions = """
-
-IMPORTANT RAG ENHANCEMENT:
-The examples above were generated using course theory and materials.
-Use these examples as a strong foundation for your analysis template.
-The examples are based on actual course content and should provide better
-context for student code analysis.
-
-"""
-    
-    enhanced_prompt += rag_instructions
+    # Pass examples as context so LLM understands what examples will be provided,
+    # but instruct it to use {{ good_examples }} and {{ bad_examples }} placeholders
+    prompt = template.render(
+        requirement=requirement_body,
+        assignment_description=assignment_description,
+        code="{{ code }}",
+        good_examples=good_examples,  # Pass as context
+        bad_examples=bad_examples,   # Pass as context
+    )
 
     logger.info("[RAG Node] Invoking LLM for template...")
-    response = llm.invoke([HumanMessage(content=enhanced_prompt)])
+    response = llm.invoke([HumanMessage(content=prompt)])
 
     # Fix: Extract content properly based on LLM type
     if hasattr(response, "content"):
@@ -313,6 +333,8 @@ context for student code analysis.
 
 class RAGPromptGeneratorState(TypedDict):
     # All fields are Annotated to allow concurrent writes
+    assignment_description: Annotated[str, keep_last]
+    requirements: Annotated[List[Requirement], keep_last]
     current_requirement: Annotated[Optional[Requirement], keep_last]
     current_requirement_index: Annotated[Optional[int], keep_last]
     examples: Annotated[Optional[str], keep_last]
@@ -388,7 +410,7 @@ class RAGPromptGeneratorAgent:
             try:
                 # Generate RAG-enhanced examples
                 examples = await rag_example_generation_node(
-                    requirement, self.agent_config, self.llm, self.rag_system, self.code_generator
+                    requirement, self.agent_config, self.llm, self.rag_system, self.code_generator, assignment_description
                 )
                 
                 # Convert type string to PromptType if needed
