@@ -17,6 +17,14 @@ The complete assignment for the students is the following:
 ASSIGNMENT DESCRIPTION:
 {{ assignment_description }}
 
+EXAMPLES THAT WILL BE PROVIDED (for your reference only - do NOT copy these into your template):
+
+Good examples (high scores):
+{{ good_examples }}
+
+Bad examples (low scores):
+{{ bad_examples }}
+
 *The Analyzer* should only analyze the code based on the conceptual property provided, and not any other aspect of the assignment.
 The template should follow this EXACT structure (without the backticks):
 
@@ -30,7 +38,11 @@ PROMPT STRUCTURE:
 Definition:
 - [You should define what constitutes different levels of the conceptual property, from poor (1-3) to excellent (8-10)]
 
-{{ examples }}
+Examples that demonstrate the concept well (high scores):
+\{\{ good_examples \}\}
+
+Examples that demonstrate the concept poorly (low scores):
+\{\{ bad_examples \}\}
 
 *The Analyzer* Instructions:
 - *The Analyzer* should evaluate the code on a scale from 1 to 10 based on how well it demonstrates the conceptual property.
@@ -46,10 +58,11 @@ Code to analyze:
 
 IMPORTANT: 
 - This is a TEMPLATE for analysis, NOT code for you to implement
-- You should use "\{\{ code \}\}" (with double braces) for the Jinja2 variable
-- The template will be filled with student code later
+- You should use "\{\{ code \}\}" (with double braces) for the Jinja2 variable containing student code
+- You MUST use "\{\{ good_examples \}\}" and "\{\{ bad_examples \}\}" (with double braces) as placeholders where examples should appear - do NOT write example code yourself, just use these placeholders
+- The template will be filled with student code and examples later automatically
 - You should focus on the specific conceptual property given
-- You must provide clear examples of different score levels
+- The examples you saw above are ONLY for your reference to understand what will be provided - do NOT copy them into your template, just use the placeholders
 
 Generate only the template, no explanations or additional text.
 Example:

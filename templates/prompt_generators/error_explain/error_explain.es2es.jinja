@@ -16,6 +16,14 @@ La consigna completa para los estudiantes es la siguiente:
 DESCRIPCIÓN DE LA CONSIGNA:
 {{ assignment_description }}
 
+EJEMPLOS QUE SE PROPORCIONARÁN (solo para tu referencia - NO copies estos en tu plantilla):
+
+Ejemplos buenos (que deben devolver <RESULT>[Explicación]</RESULT>):
+{{ good_examples }}
+
+Ejemplos malos (que deben devolver <RESULT>NO</RESULT>):
+{{ bad_examples }}
+
 IMPORTANTE: Todo el texto del prompt y la salida que produzca *The Analyzer* deben estar en español. El prompt generado por el agente también debe estar en español.
 
 *The Analyzer* debe analizar únicamente el código en base al error provisto, y no cualquier otro aspecto de la consigna.
@@ -31,7 +39,10 @@ Tarea de *The Analyzer*:
 Definición:
 - [Define qué constituye código válido / inválido para este error]
 
-{{ examples }}
+CRÍTICO: Has visto ejemplos arriba que se proporcionarán a *The Analyzer*. Sin embargo, en tu plantilla debes usar DOS marcadores de posición Jinja2 separados:
+- \{\{ good_examples \}\} (con doble llave) para ejemplos que deben devolver <RESULT>[Explicación]</RESULT>
+- \{\{ bad_examples \}\} (con doble llave) para ejemplos que deben devolver <RESULT>NO</RESULT>
+NO copies ni reescribas los ejemplos - solo usa estos marcadores de posición que se llenarán automáticamente con los ejemplos reales más tarde.
 
 Instrucciones para *The Analyzer*:
 - *The Analyzer* debe devolver una explicación del error si el código contiene el comportamiento prohibido.
@@ -48,10 +59,11 @@ Código a analizar:
 
 IMPORTANTE:
 - ESTA ES UNA PLANTILLA para análisis, NO código para implementar.
-- Debes usar "\{\{ code \}\}" (con doble llave escapada) para la variable Jinja2 en el ejemplo final.
-- La plantilla se rellenará con el código del estudiante más tarde.
+- Debes usar "\{\{ code \}\}" (con doble llave escapada) para la variable Jinja2 que contiene el código del estudiante.
+- Has visto ejemplos arriba para referencia, pero en tu plantilla DEBES usar "\{\{ good_examples \}\}" y "\{\{ bad_examples \}\}" (con doble llave escapada) como marcadores de posición - NO copies los ejemplos que viste, solo usa estos marcadores de posición.
+- La plantilla se rellenará con el código del estudiante y los ejemplos más tarde automáticamente.
 - Debes centrarte en el error específico provisto.
-- Debes proporcionar ejemplos claros de qué pasa y qué falla.
+- Los ejemplos que viste son solo para ayudarte a entender qué tipo de ejemplos se proporcionarán - usa esa comprensión para estructurar tu plantilla, pero usa el marcador de posición.
 
 Genera únicamente la plantilla, sin explicaciones ni texto adicional.
 Ejemplo:

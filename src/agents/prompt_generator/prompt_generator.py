@@ -33,10 +33,67 @@ from langgraph.graph.message import add_messages
 from src.config import get_agent_config
 from src.agents.utils.reducers import keep_last, concat
 
+# Import LangSmith for tracing
+try:
+    from langsmith import traceable
+    LANGSMITH_AVAILABLE = True
+except ImportError:
+    LANGSMITH_AVAILABLE = False
+    # Create a no-op decorator if LangSmith is not available
+    def traceable(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+
 logger = logging.getLogger(__name__)
 
 
+def split_examples(examples: str) -> tuple[str, str]:
+    """
+    Split examples string into good_examples and bad_examples.
+    Looks for patterns like "Good example" and "Bad Example" (case insensitive).
+    
+    Returns:
+        tuple: (good_examples, bad_examples) as strings
+    """
+    import re
+    
+    # Normalize line endings
+    examples = examples.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # Try to find the split point between good and bad examples
+    # Look for "Bad Example" or "Bad" patterns (case insensitive)
+    bad_pattern = re.compile(r'(?i)(?:^|\n)\s*(?:Bad\s+Example|Bad\s+example|Ejemplo\s+malo|Ejemplo\s+incorrecto)', re.MULTILINE)
+    
+    match = bad_pattern.search(examples)
+    if match:
+        split_pos = match.start()
+        good_examples = examples[:split_pos].strip()
+        bad_examples = examples[split_pos:].strip()
+    else:
+        # If no clear split found, try to split by "Bad" at start of line
+        lines = examples.split('\n')
+        split_line = None
+        for i, line in enumerate(lines):
+            if re.match(r'^\s*(?:Bad\s+Example|Bad\s+example|Ejemplo\s+malo)', line, re.IGNORECASE):
+                split_line = i
+                break
+        
+        if split_line:
+            good_examples = '\n'.join(lines[:split_line]).strip()
+            bad_examples = '\n'.join(lines[split_line:]).strip()
+        else:
+            # Fallback: assume all examples are good, or split by some heuristic
+            # For now, return all as good_examples and empty bad_examples
+            logger.warning("Could not find clear split between good and bad examples. Using all as good_examples.")
+            good_examples = examples
+            bad_examples = ""
+    
+    return good_examples, bad_examples
+
+
 # --- LangGraph Node: Example Generation ---
+@traceable(name="example_generation")
 def example_generation_node(requirement: Requirement, agent_config: dict, llm) -> str:
     """
     Node for generating examples from a requirement.
@@ -74,6 +131,7 @@ def example_generation_node(requirement: Requirement, agent_config: dict, llm) -
 
 
 # --- LangGraph Node: Prompt Generation ---
+@traceable(name="prompt_generation")
 def prompt_generation_node(
     requirement: Requirement,
     assignment_description: str,
@@ -96,11 +154,18 @@ def prompt_generation_node(
     )
     template_file = template_map.get(prompt_type.value, template_map.get("default"))
     template = env.get_template(template_file)
+    
+    # Split examples into good and bad for better template structure
+    good_examples, bad_examples = split_examples(examples)
+    
+    # Pass examples as context so LLM understands what examples will be provided,
+    # but instruct it to use {{ good_examples }} and {{ bad_examples }} placeholders
     prompt = template.render(
         requirement=requirement_body,
         assignment_description=assignment_description,
         code="{{ code }}",
-        examples=examples,
+        good_examples=good_examples,  # Pass as context
+        bad_examples=bad_examples,   # Pass as context
     )
 
     logger.info("[Node] Invoking LLM for template...")
@@ -119,6 +184,9 @@ def prompt_generation_node(
         )
     elif "```" in jinja_template:
         jinja_template = jinja_template.split("```", 1)[-1].strip()
+    
+    # Clean escaped braces (LLM sometimes generates \{\{ instead of {{)
+    jinja_template = jinja_template.replace(r"\{\{", "{{").replace(r"\}\}", "}}")
 
     # Ensure the template has the basic structure
     if "{{ code }}" not in jinja_template and "{{code}}" not in jinja_template:
@@ -126,6 +194,35 @@ def prompt_generation_node(
         jinja_template = jinja_template.replace("{{code}}", "{{ code }}")
         if "{{ code }}" not in jinja_template:
             jinja_template += "\n\nCode to analyze:\n{{ code }}"
+    
+    # Ensure the template has {{ good_examples }} and {{ bad_examples }} placeholders
+    # If not present, try to add them in appropriate places
+    has_good = "{{ good_examples }}" in jinja_template or "{{good_examples}}" in jinja_template
+    has_bad = "{{ bad_examples }}" in jinja_template or "{{bad_examples}}" in jinja_template
+    
+    # Also check for old {{ examples }} format and suggest replacement
+    if "{{ examples }}" in jinja_template or "{{examples}}" in jinja_template:
+        logger.warning("Template uses old {{ examples }} format. Consider updating to use {{ good_examples }} and {{ bad_examples }} separately.")
+    
+    # If neither placeholder is present, add them before {{ code }}
+    if not has_good and not has_bad:
+        examples_placeholder = "{{ good_examples }}\n\n{{ bad_examples }}"
+        
+        # Check if "Code to analyze:" already exists
+        if "Code to analyze:" in jinja_template:
+            # Insert examples before the existing "Code to analyze:" line
+            jinja_template = jinja_template.replace(
+                "Code to analyze:",
+                f"{examples_placeholder}\n\nCode to analyze:",
+                1  # Only replace first occurrence to avoid duplication
+            )
+        elif "{{ code }}" in jinja_template:
+            # No "Code to analyze:" label exists, add placeholders and label before {{ code }}
+            jinja_template = jinja_template.replace(
+                "{{ code }}",
+                f"{examples_placeholder}\n\nCode to analyze:\n{{ code }}",
+                1  # Only replace first occurrence
+            )
 
     return jinja_template
 
