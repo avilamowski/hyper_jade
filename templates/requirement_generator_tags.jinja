@@ -1,5 +1,11 @@
 Analyze the following programming assignment and generate a list of individual requirements.
 
+IMPORTANT CONTEXT - STUDENT PYTHON KNOWLEDGE:
+The students' Python knowledge is limited to what has been taught in class. Below is a summary of the topics covered in the lectures.
+
+PYTHON KNOWLEDGE FROM LECTURES:
+{{ class_summary }}
+
 INSTRUCTIONS:
 1. Identify all aspects that should be evaluated in the student's code
 2. Break down the assignment into specific requirements
@@ -8,12 +14,12 @@ INSTRUCTIONS:
 5. Each requirement should be clear and specific
 6. Only include up to {{ max_requirements }} requirements
 
-7. For each requirement, infer its type and add a type tag as the first line. The available types are:
+8. For each requirement, infer its type and add a type tag as the first line. The available types are:
 {% for t in types %}
 - [{{ t.value }}] {{ t.description }}
 {% endfor %}
 
-8. CONTEXT DETECTION: Analyze the assignment to identify if requirements apply to specific functions:
+9. CONTEXT DETECTION: Analyze the assignment to identify if requirements apply to specific functions:
    - If the assignment explicitly mentions a function with a specific name (e.g., "function es_par(num)", "def es_par(num)", etc.), include the function name using the <function> tag
    - If no specific function is mentioned, do not include the <function> tag
    - Function context should be included as: `function_name(parameters)` within the <function> tag

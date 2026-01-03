@@ -114,6 +114,7 @@ class RequirementGeneratorAgent:
         self.agent_config = get_agent_config(config, "requirement_generator")
         self.llm = self._setup_llm()
         self.graph = self._build_graph()
+        self.class_summary = self._load_class_summary()
 
     def _setup_llm(self):
         provider = str(self.agent_config.get("provider", "openai")).lower().strip()
@@ -137,6 +138,22 @@ class RequirementGeneratorAgent:
                 model=model_name or "qwen2.5:7b",
                 temperature=temperature,
             )
+    
+    def _load_class_summary(self) -> str:
+        """Load the class summary file that contains Python knowledge from lectures"""
+        try:
+            summary_path = Path("data/clases_summary.txt")
+            if summary_path.exists():
+                with open(summary_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                logger.info(f"Loaded class summary from {summary_path}")
+                return content
+            else:
+                logger.warning(f"Class summary file not found at {summary_path}")
+                return ""
+        except Exception as e:
+            logger.error(f"Error loading class summary: {e}")
+            return ""
 
     
     def generate_requirements(self, assignment: str) -> List[Requirement]:
@@ -178,7 +195,8 @@ class RequirementGeneratorAgent:
         prompt = template.render(
             assignment_description=assignment_description,
             types=types,
-            max_requirements=self.agent_config.get("max_requirements", 10)
+            max_requirements=self.agent_config.get("max_requirements", 10),
+            class_summary=self.class_summary
         )
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
