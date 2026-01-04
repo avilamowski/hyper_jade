@@ -1,10 +1,6 @@
 from typing import List, TypedDict, Annotated
 from enum import Enum
 class PromptType(Enum):
-    CONCEPTUAL = ("conceptual", "Checks if a conceptual understanding or pattern is present in the code.")
-    """
-    Checks if a conceptual understanding or pattern is present in the code, returning a rationale for the answer.
-    """
     REQUIREMENT_PRESENCE = ("requirement_presence", "Checks if a specific requirement is implemented in the code.")
     """ 
     Identifies if a specific requirement is implemented in the code.
@@ -14,6 +10,12 @@ class PromptType(Enum):
     """ 
     Identifies if a specific error is present in the code.
     If is implemented, returns the lines of code that implement the requirement.
+    """
+    STYLISTIC = ("stylistic", "Checks for universal code style violations.")
+    """
+    Identifies stylistic errors in the code that are universal and don't depend on specific assignment requirements.
+    These include poor indentation, bad variable naming, infinite loops, code readability issues, etc.
+    Returns an explanation if a style violation is found.
     """
 
     def __new__(cls, value, description):

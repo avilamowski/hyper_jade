@@ -213,24 +213,24 @@ class CodeCorrectorAgent:
             # Check if template already has examples injected (no placeholders)
             # If it does, we only need to inject the student code
             template_str = generated_prompt["jinja_template"]
-            has_placeholders = "{{ good_examples }}" in template_str or "{{ bad_examples }}" in template_str
+            has_placeholders = "{{ correct_examples }}" in template_str or "{{ erroneous_examples }}" in template_str
             
             if has_placeholders:
                 # Template has placeholders, need to render with examples
                 examples_str = generated_prompt.get("examples", "")
                 if examples_str:
-                    good_examples, bad_examples = split_examples(examples_str)
+                    correct_examples, erroneous_examples = split_examples(examples_str)
                     rendered_prompt = Template(template_str).render(
                         code=student_code,
-                        good_examples=good_examples,
-                        bad_examples=bad_examples,
+                        correct_examples=correct_examples,
+                        erroneous_examples=erroneous_examples,
                     )
                 else:
                     # No examples available, render with empty examples
                     rendered_prompt = Template(template_str).render(
                         code=student_code,
-                        good_examples="",
-                        bad_examples="",
+                        correct_examples="",
+                        erroneous_examples="",
                     )
             else:
                 # Template already has examples injected, only need to inject student code

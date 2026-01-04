@@ -6,7 +6,7 @@ Tu tarea es crear un prompt para *The Analyzer* usando el formato de plantilla J
 Por lo tanto puedes añadir variables jinja usando \{\{ <variable_name> \}\} que desees.
 En principio, siempre debería existir una variable llamada `code` que contendrá el código del estudiante para analizar, preferiblemente al final de la plantilla.
 
-También puedes indicar a *The Analyzer* que retorne resultados específicos usando etiquetas en notación XML, por ejemplo <RESULT>[Explanation]</RESULT> o <RESULT>NO</RESULT>, o <LINES>354-366</LINES>.
+También puedes indicar a *The Analyzer* que retorne resultados específicos usando etiquetas en notación XML, por ejemplo <RESULT>ERROR FOUND</RESULT> con <EXPLANATION>[...]</EXPLANATION>, o <RESULT>NO ERROR</RESULT> con <EXPLANATION>[...]</EXPLANATION>, o <LINES>354-366</LINES>.
 
 El error que *The Analyzer* analizará es el siguiente:
 ERROR:
@@ -18,11 +18,11 @@ DESCRIPCIÓN DE LA CONSIGNA:
 
 EJEMPLOS QUE SE PROPORCIONARÁN (solo para tu referencia - NO copies estos en tu plantilla):
 
-Ejemplos buenos (que deben devolver <RESULT>[Explicación]</RESULT>):
-{{ good_examples }}
+Ejemplos correctos (que deben devolver <RESULT>NO ERROR</RESULT>):
+{{ correct_examples }}
 
-Ejemplos malos (que deben devolver <RESULT>NO</RESULT>):
-{{ bad_examples }}
+Ejemplos erróneos (que deben devolver <RESULT>ERROR FOUND</RESULT> con <EXPLANATION>[...]</EXPLANATION>):
+{{ erroneous_examples }}
 
 IMPORTANTE: Todo el texto del prompt y la salida que produzca *The Analyzer* deben estar en español. El prompt generado por el agente también debe estar en español.
 
@@ -40,18 +40,20 @@ Definición:
 - [Define qué constituye código válido / inválido para este error]
 
 CRÍTICO: Has visto ejemplos arriba que se proporcionarán a *The Analyzer*. Sin embargo, en tu plantilla debes usar DOS marcadores de posición Jinja2 separados:
-- \{\{ good_examples \}\} (con doble llave) para ejemplos que deben devolver <RESULT>[Explicación]</RESULT>
-- \{\{ bad_examples \}\} (con doble llave) para ejemplos que deben devolver <RESULT>NO</RESULT>
+- \{\{ correct_examples \}\} (con doble llave) para ejemplos que deben devolver <RESULT>NO ERROR</RESULT>
+- \{\{ erroneous_examples \}\} (con doble llave) para ejemplos que deben devolver <RESULT>[Explicación]</RESULT>
 NO copies ni reescribas los ejemplos - solo usa estos marcadores de posición que se llenarán automáticamente con los ejemplos reales más tarde.
 
 Instrucciones para *The Analyzer*:
 - *The Analyzer* debe devolver una explicación del error si el código contiene el comportamiento prohibido.
-- *The Analyzer* debe devolver NO si el código no contiene el comportamiento prohibido.
+- *The Analyzer* debe devolver un mensaje de confirmación si el código no contiene el comportamiento prohibido.
 
 El contenido de la respuesta de *The Analyzer* debe estar en español y usar este formato de salida (estricto y exacto):
-<RESULT>[Explicación de qué es el error y por qué ocurre en el código]</RESULT>
+<RESULT>ERROR FOUND</RESULT>
+<EXPLANATION>[Explicación de qué es el error y por qué ocurre en el código]</EXPLANATION>
 o
-<RESULT>NO</RESULT>
+<RESULT>NO ERROR</RESULT>
+<EXPLANATION>[Confirmación de que el código no contiene el comportamiento prohibido]</EXPLANATION>
 
 Código a analizar:
 \{\{ code \}\}
@@ -60,7 +62,7 @@ Código a analizar:
 IMPORTANTE:
 - ESTA ES UNA PLANTILLA para análisis, NO código para implementar.
 - Debes usar "\{\{ code \}\}" (con doble llave escapada) para la variable Jinja2 que contiene el código del estudiante.
-- Has visto ejemplos arriba para referencia, pero en tu plantilla DEBES usar "\{\{ good_examples \}\}" y "\{\{ bad_examples \}\}" (con doble llave escapada) como marcadores de posición - NO copies los ejemplos que viste, solo usa estos marcadores de posición.
+- Has visto ejemplos arriba para referencia, pero en tu plantilla DEBES usar "\{\{ correct_examples \}\}" y "\{\{ erroneous_examples \}\}" (con doble llave escapada) como marcadores de posición - NO copies los ejemplos que viste, solo usa estos marcadores de posición.
 - La plantilla se rellenará con el código del estudiante y los ejemplos más tarde automáticamente.
 - Debes centrarte en el error específico provisto.
 - Los ejemplos que viste son solo para ayudarte a entender qué tipo de ejemplos se proporcionarán - usa esa comprensión para estructurar tu plantilla, pero usa el marcador de posición.
@@ -90,7 +92,7 @@ Ejemplo 2:
         print(i)
         # i nunca se incrementa, por lo que la condición nunca se vuelve falsa
 
-Ejemplos que deben devolver <RESULT>NO</RESULT>:
+Ejemplos que deben devolver <RESULT>NO ERROR</RESULT>:
 Ejemplo 1:
     while True:
         print("Hola")
@@ -104,12 +106,12 @@ Ejemplo 2:
 
 Instrucciones para *The Analyzer*:
 - *The Analyzer* debe devolver una explicación del error si el código contiene el comportamiento prohibido.
-- *The Analyzer* debe devolver NO si el código no contiene el comportamiento prohibido.
+- *The Analyzer* debe devolver NO ERROR si el código no contiene el comportamiento prohibido.
 
 La respuesta de *The Analyzer* debe escribirse con este formato de salida (estricto y exacto):
 <RESULT>[Explicación de qué es el error y por qué ocurre en el código]</RESULT>
 o
-<RESULT>NO</RESULT>
+<RESULT>NO ERROR</RESULT>
 
 Código a analizar:
 \{\{ code \}\}

@@ -6,7 +6,7 @@ Your task is to create a prompt for the *Analyzer* using the format Jinja2 templ
 So you can add jinja variables using \{\{ <variable_name> \}\} that you want.
 In principle, there should always be a variable called `code` that will contain the student code to analyze, preferably at the end of the template.
 
-You can also instruct *The Analyzer* to return specific results using tags with XML notation, like <RESULT>[Explanation]</RESULT> or <RESULT>NO</RESULT>, or <LINES>354-366</LINES>.
+You can also instruct *The Analyzer* to return specific results using tags with XML notation, like <RESULT>ERROR FOUND</RESULT> with <EXPLANATION>[...]</EXPLANATION>, or <RESULT>NO ERROR</RESULT> with <EXPLANATION>[...]</EXPLANATION>, or <LINES>354-366</LINES>.
 
 The error *The Analyzer* will analyze is the following:
 ERROR:
@@ -16,6 +16,14 @@ ERROR:
 The complete assignment for the students is the following:
 ASSIGNMENT DESCRIPTION:
 {{ assignment_description }}
+
+EXAMPLES THAT WILL BE PROVIDED (for your reference only - do NOT copy these into your template):
+
+Correct examples (that should return <RESULT>NO ERROR</RESULT>):
+{{ correct_examples }}
+
+Erroneous examples (that should return <RESULT>ERROR FOUND</RESULT> with <EXPLANATION>[...]</EXPLANATION>):
+{{ erroneous_examples }}
 
 IMPORTANT: The template text below is in English, but the prompt that *The Analyzer* should produce (when asked to generate a prompt or explanation) MUST BE IN SPANISH. In other words: template = English, generated prompt/output = Spanish.
 
@@ -36,14 +44,16 @@ Definition:
 
 *The Analyzer* Instructions:
 - *The Analyzer* should Return an explanation of the error if the code contains the forbidden behavior.
-- *The Analyzer* should Return NO if the code does not contain the forbidden behavior.
+- *The Analyzer* should Return a confirmation message if the code does not contain the forbidden behavior.
 
 CRITICAL: The explanation or prompt that *The Analyzer* generates in response MUST BE WRITTEN IN SPANISH. Do not produce the explanation in English.
 
 *The Analyzer* should write the output with this output format (strict and exact):
-<RESULT>[Explanation of what the error is and why it occurs in the code]</RESULT>
+<RESULT>ERROR FOUND</RESULT>
+<EXPLANATION>[Explanation of what the error is and why it occurs in the code]</EXPLANATION>
 or
-<RESULT>NO</RESULT>
+<RESULT>NO ERROR</RESULT>
+<EXPLANATION>[Confirmation that the code does not contain the forbidden behavior]</EXPLANATION>
 
 Code to analyze:
 \{\{ code \}\}
@@ -81,7 +91,7 @@ Example 2:
         print(i)
         # i is never incremented, so condition never becomes false
 
-Examples that should return <RESULT>NO</RESULT>:
+Examples that should return <RESULT>NO ERROR</RESULT>:
 Example 1:
     while True:
         print("Hello")
@@ -95,14 +105,14 @@ Example 2:
 
 *The Analyzer* Instructions:
 - *The Analyzer* should Return an explanation of the error if the code contains the forbidden behavior.
-- *The Analyzer* should Return NO if the code does not contain the forbidden behavior.
+- *The Analyzer* should Return NO ERROR if the code does not contain the forbidden behavior.
 
 REMEMBER: The explanation that *The Analyzer* writes must be in SPANISH.
 
 *The Analyzer* should write the output with this Output format (strict and exact):
 <RESULT>[Explanation of what the error is and why it occurs in the code]</RESULT>
 or
-<RESULT>NO</RESULT>
+<RESULT>NO ERROR</RESULT>
 
 Code to analyze:
 \{\{ code \}\}

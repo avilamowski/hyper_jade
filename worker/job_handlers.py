@@ -279,14 +279,14 @@ class JobHandlers:
                         # RAG format detected - convert to simple format
                         examples = format_rag_examples_simple(examples)
                     
-                    good_examples, bad_examples = split_examples(examples)
+                    correct_examples, erroneous_examples = split_examples(examples)
                     try:
                         # Clean escaped braces from template (LLM sometimes generates \{\{ instead of {{)
                         cleaned_template = jinja_template.replace(r"\{\{", "{{").replace(r"\}\}", "}}")
                         template = JinjaTemplate(cleaned_template)
                         rendered_prompt = template.render(
-                            good_examples=good_examples,
-                            bad_examples=bad_examples,
+                            correct_examples=correct_examples,
+                            erroneous_examples=erroneous_examples,
                             code="{{ code }}",  # Keep code placeholder for later use
                         )
                     except Exception as render_error:

@@ -1,5 +1,5 @@
 {
   "requirement": "El código usa variables no definidas.",
   "function": "vender_productos",
-  "type": "error_presence"
+  "type": "stylistic"
 }

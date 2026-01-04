@@ -218,7 +218,7 @@ class MLflowLogger:
             result = "UNKNOWN"
             if "<RESULT>YES</RESULT>" in analysis_result:
                 result = "YES"
-            elif "<RESULT>NO</RESULT>" in analysis_result:
+            elif "<RESULT>NO ERROR</RESULT>" in analysis_result:
                 result = "NO"
             
             # Log the result as a metric

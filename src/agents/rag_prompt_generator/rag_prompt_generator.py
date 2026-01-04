@@ -49,19 +49,19 @@ def format_rag_examples_simple(examples: str) -> str:
     """
     Convert RAG examples (with metadata) to simple format (just code).
     Removes metadata like class names, improvements, theory alignment.
-    Preserves the distinction between good and bad examples.
+    Preserves the distinction between correct and erroneous examples.
     
     Args:
         examples: RAG-formatted examples string with metadata
     
     Returns:
-        Simple formatted examples string matching the standard format (Good example X: / Bad Example X:)
+        Simple formatted examples string matching the standard format (Correct example X: / Erroneous Example X:)
     """
-    # Split into individual example blocks by looking for "Good example" or "Bad example" headers
+    # Split into individual example blocks by looking for "Correct example" or "Erroneous Example" headers
     import re
     
     # Find all example blocks with their headers
-    example_pattern = r'((?:Good|Bad) example \d+:.*?)(?=(?:Good|Bad) example \d+:|$)'
+    example_pattern = r'((?:Correct|Erroneous) (?:example|Example) \d+:.*?)(?=(?:Correct|Erroneous) (?:example|Example) \d+:|$)'
     example_blocks = re.findall(example_pattern, examples, re.DOTALL | re.IGNORECASE)
     
     if not example_blocks:
@@ -73,7 +73,7 @@ def format_rag_examples_simple(examples: str) -> str:
             logger.warning("Could not extract code blocks from RAG examples, returning as-is")
             return examples
         
-        # Format all as good examples (old behavior as fallback)
+        # Format all as correct examples (old behavior as fallback)
         formatted_examples = []
         for i, code in enumerate(code_blocks, 1):
             code = code.strip()
@@ -90,18 +90,18 @@ def format_rag_examples_simple(examples: str) -> str:
                 else:
                     indented_lines.append('')
             indented_code = '\n'.join(indented_lines)
-            formatted_examples.append(f"Good example {i}:\n{indented_code}")
+            formatted_examples.append(f"Correct example {i}:\n{indented_code}")
         
         return "\n\n".join(formatted_examples)
     
-    # Process each example block, preserving Good/Bad distinction
+    # Process each example block, preserving Correct/Erroneous distinction
     formatted_examples = []
-    good_count = 0
-    bad_count = 0
+    correct_count = 0
+    erroneous_count = 0
     
     for block in example_blocks:
-        # Extract the header to determine if it's good or bad
-        is_bad = block.strip().lower().startswith('bad')
+        # Extract the header to determine if it's correct or erroneous
+        is_erroneous = 'erroneous' in block.strip().lower()
         
         # Extract code from this block
         code_match = re.search(r'```python\n(.*?)\n```', block, re.DOTALL)
@@ -128,14 +128,14 @@ def format_rag_examples_simple(examples: str) -> str:
             indented_code = '\n'.join(indented_lines)
             
             # Format with appropriate header
-            if is_bad:
-                bad_count += 1
-                formatted_examples.append(f"Bad example {bad_count}:\n{indented_code}")
+            if is_erroneous:
+                erroneous_count += 1
+                formatted_examples.append(f"Erroneous Example {erroneous_count}:\n{indented_code}")
             else:
-                good_count += 1
-                formatted_examples.append(f"Good example {good_count}:\n{indented_code}")
+                correct_count += 1
+                formatted_examples.append(f"Correct example {correct_count}:\n{indented_code}")
     
-    logger.info(f"Formatted {good_count} good examples and {bad_count} bad examples from RAG output")
+    logger.info(f"Formatted {correct_count} correct examples and {erroneous_count} erroneous examples from RAG output")
     return "\n\n".join(formatted_examples)
 
 
@@ -144,12 +144,12 @@ def format_rag_examples_simple(examples: str) -> str:
 async def rag_example_generation_node(requirement: Requirement, agent_config: dict, llm, rag_system, code_generator, assignment_description: str = "") -> str:
     """
     Node for generating examples using RAG system and course theory.
-    Generates both good examples (RAG-enhanced) and bad examples (original).
+    Generates both correct examples (RAG-enhanced) and erroneous examples (original).
     Returns the formatted examples as a string.
     """
     try:
-        # Generate good examples (RAG-enhanced) and bad examples (original)
-        good_examples, bad_examples = await code_generator.generate_enhanced_examples(
+        # Generate correct examples (RAG-enhanced) and erroneous examples (original)
+        correct_examples, erroneous_examples = await code_generator.generate_enhanced_examples(
             requirement=requirement["requirement"],
             num_examples=3,
             max_theory_results=5,
@@ -157,21 +157,21 @@ async def rag_example_generation_node(requirement: Requirement, agent_config: di
             assignment_description=assignment_description
         )
         
-        if not good_examples and not bad_examples:
+        if not correct_examples and not erroneous_examples:
             logger.error("RAG example generation failed: No examples generated")
             return "Error generating examples using RAG system."
         
-        # Format GOOD examples (RAG-enhanced) for the prompt
-        formatted_good_examples = []
-        logger.info(f"Formatting {len(good_examples)} GOOD examples for prompt generation")
-        for i, example in enumerate(good_examples, 1):
+        # Format CORRECT examples (RAG-enhanced) for the prompt
+        formatted_correct_examples = []
+        logger.info(f"Formatting {len(correct_examples)} CORRECT examples for prompt generation")
+        for i, example in enumerate(correct_examples, 1):
             code = example.get("code", "")
             description = example.get("description", f"Example {i}")
             improvements = example.get("improvements", [])
             theory_alignment = example.get("theory_alignment", "")
             class_name = example.get("class_name", "Unknown")
             
-            formatted_example = f"Good example {i}: {description}\n"
+            formatted_example = f"Correct example {i}: {description}\n"
             formatted_example += f"**{class_name}**\n"  # Add class name
             formatted_example += f"```python\n{code}\n```\n"
             
@@ -193,27 +193,27 @@ async def rag_example_generation_node(requirement: Requirement, agent_config: di
                 if theory_alignment_str:
                     formatted_example += f"Theory alignment: {theory_alignment_str}\n"
             
-            formatted_good_examples.append(formatted_example)
+            formatted_correct_examples.append(formatted_example)
         
-        # Format BAD examples (original, not RAG-enhanced)
-        formatted_bad_examples = []
-        logger.info(f"Formatting {len(bad_examples)} BAD examples for prompt generation")
-        for i, example in enumerate(bad_examples, 1):
+        # Format ERRONEOUS examples (original, not RAG-enhanced)
+        formatted_erroneous_examples = []
+        logger.info(f"Formatting {len(erroneous_examples)} ERRONEOUS examples for prompt generation")
+        for i, example in enumerate(erroneous_examples, 1):
             code = example.get("code", "")
             approach = example.get("approach", f"Does not satisfy the requirement")
             
-            formatted_example = f"Bad example {i}:\n"
+            formatted_example = f"Erroneous Example {i}:\n"
             formatted_example += f"```python\n{code}\n```\n"
             formatted_example += f"Why it's incorrect: {approach}\n"
             
-            formatted_bad_examples.append(formatted_example)
+            formatted_erroneous_examples.append(formatted_example)
         
-        # Combine good and bad examples
-        combined_examples = "\n\n".join(formatted_good_examples)
-        if formatted_bad_examples:
-            combined_examples += "\n\n" + "\n\n".join(formatted_bad_examples)
+        # Combine correct and erroneous examples
+        combined_examples = "\n\n".join(formatted_correct_examples)
+        if formatted_erroneous_examples:
+            combined_examples += "\n\n" + "\n\n".join(formatted_erroneous_examples)
         
-        logger.info(f"Combined {len(good_examples)} good + {len(bad_examples)} bad examples")
+        logger.info(f"Combined {len(correct_examples)} correct + {len(erroneous_examples)} erroneous examples")
         
         return combined_examples
         
@@ -247,17 +247,17 @@ def rag_prompt_generation_node(
     template_file = template_map.get(prompt_type.value, template_map.get("default"))
     template = env.get_template(template_file)
     
-    # Split RAG examples into good and bad, same as standard version
-    good_examples, bad_examples = split_examples(examples)
+    # Split RAG examples into correct and erroneous, same as standard version
+    correct_examples, erroneous_examples = split_examples(examples)
     
     # Pass examples as context so LLM understands what examples will be provided,
-    # but instruct it to use {{ good_examples }} and {{ bad_examples }} placeholders
+    # but instruct it to use {{ correct_examples }} and {{ erroneous_examples }} placeholders
     prompt = template.render(
         requirement=requirement_body,
         assignment_description=assignment_description,
         code="{{ code }}",
-        good_examples=good_examples,  # Pass as context
-        bad_examples=bad_examples,   # Pass as context
+        correct_examples=correct_examples,  # Pass as context
+        erroneous_examples=erroneous_examples,   # Pass as context
     )
 
     logger.info("[RAG Node] Invoking LLM for template...")
@@ -312,18 +312,18 @@ def rag_prompt_generation_node(
         if "{{ code }}" not in jinja_template:
             jinja_template += "\n\nCode to analyze:\n{{ code }}"
     
-    # Ensure the template has {{ good_examples }} and {{ bad_examples }} placeholders
+    # Ensure the template has {{ correct_examples }} and {{ erroneous_examples }} placeholders
     # If not present, try to add them in appropriate places
-    has_good = "{{ good_examples }}" in jinja_template or "{{good_examples}}" in jinja_template
-    has_bad = "{{ bad_examples }}" in jinja_template or "{{bad_examples}}" in jinja_template
+    has_good = "{{ correct_examples }}" in jinja_template or "{{correct_examples}}" in jinja_template
+    has_bad = "{{ erroneous_examples }}" in jinja_template or "{{erroneous_examples}}" in jinja_template
     
     # Also check for old {{ examples }} format and suggest replacement
     if "{{ examples }}" in jinja_template or "{{examples}}" in jinja_template:
-        logger.warning("Template uses old {{ examples }} format. Consider updating to use {{ good_examples }} and {{ bad_examples }} separately.")
+        logger.warning("Template uses old {{ examples }} format. Consider updating to use {{ correct_examples }} and {{ erroneous_examples }} separately.")
     
     # If neither placeholder is present, add them before {{ code }}
     if not has_good and not has_bad:
-        examples_placeholder = "{{ good_examples }}\n\n{{ bad_examples }}"
+        examples_placeholder = "{{ correct_examples }}\n\n{{ erroneous_examples }}"
         
         # Check if "Code to analyze:" already exists
         if "Code to analyze:" in jinja_template:

@@ -7,7 +7,7 @@ Por lo tanto puedes añadir variables jinja usando
 {{ "{{ <variable_name> }}" }} que desees.
 En principio, siempre debería existir una variable llamada `code` que contendrá el código del estudiante para analizar, preferiblemente al final de la plantilla.
 
-También puedes indicar a *The Analyzer* que retorne resultados específicos usando etiquetas en notación XML, por ejemplo <RESULT>[Explanation]</RESULT> o <RESULT>NO</RESULT>, o <LINES>354-366</LINES>.
+También puedes indicar a *The Analyzer* que retorne resultados específicos usando etiquetas en notación XML, por ejemplo <RESULT>ERROR FOUND</RESULT> con <EXPLANATION>[...]</EXPLANATION>, o <RESULT>NO ERROR</RESULT> con <EXPLANATION>[...]</EXPLANATION>, o <LINES>354-366</LINES>.
 
 El error que *The Analyzer* analizará es el siguiente:
 ERROR:
@@ -16,6 +16,14 @@ ERROR:
 La consigna completa para los estudiantes es la siguiente:
 DESCRIPCIÓN DE LA CONSIGNA:
 {{ assignment_description }}
+
+EJEMPLOS QUE SE PROPORCIONARÁN (solo para tu referencia - NO copies estos en tu plantilla):
+
+Ejemplos correctos (que deben devolver <RESULT>[Explicación]</RESULT>):
+{{ correct_examples }}
+
+Ejemplos erróneos (que deben devolver <RESULT>ERROR FOUND</RESULT> con <EXPLANATION>[...]</EXPLANATION>):
+{{ erroneous_examples }}
 
 *The Analyzer* debe analizar únicamente el código en base al error provisto, y no ningún otro aspecto de la consigna.
 La plantilla debe seguir ESTA ESTRUCTURA EXACTA (sin las comillas invertidas):
@@ -34,12 +42,14 @@ Definition:
 
 *The Analyzer* Instructions:
 - *The Analyzer* should Return an explanation of the error if the code contains the forbidden behavior.
-- *The Analyzer* should Return NO if the code does not contain the forbidden behavior.
+- *The Analyzer* should Return a confirmation message if the code does not contain the forbidden behavior.
 
 *The Analyzer* should write the output with this output format (strict and exact):
-<RESULT>[Explanation of what the error is and why it occurs in the code]</RESULT>
+<RESULT>ERROR FOUND</RESULT>
+<EXPLANATION>[Explanation of what the error is and why it occurs in the code]</EXPLANATION>
 or
-<RESULT>NO</RESULT>
+<RESULT>NO ERROR</RESULT>
+<EXPLANATION>[Confirmation that the code does not contain the forbidden behavior]</EXPLANATION>
 
 Code to analyze:
 \{\{ code \}\}
@@ -77,7 +87,7 @@ Example 2:
         print(i)
         # i is never incremented, so condition never becomes false
 
-Examples that should return <RESULT>NO</RESULT>:
+Examples that should return <RESULT>NO ERROR</RESULT>:
 Example 1:
     while True:
         print("Hello")
@@ -91,12 +101,12 @@ Example 2:
 
 *The Analyzer* Instructions:
 - *The Analyzer* should Return an explanation of the error if the code contains the forbidden behavior.
-- *The Analyzer* should Return NO if the code does not contain the forbidden behavior.
+- *The Analyzer* should Return NO ERROR if the code does not contain the forbidden behavior.
 
 *The Analyzer* should write the output with this Output format (strict and exact):
 <RESULT>[Explanation of what the error is and why it occurs in the code]</RESULT>
 or
-<RESULT>NO</RESULT>
+<RESULT>NO ERROR</RESULT>
 
 Code to analyze:
 \{\{ code \}\}

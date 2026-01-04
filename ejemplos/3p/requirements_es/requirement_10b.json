@@ -1,5 +1,5 @@
 {
   "requirement": "El código contiene bucles infinitos.",
   "function": "vender_productos",
-  "type": "error_presence"
+  "type": "stylistic"
 }

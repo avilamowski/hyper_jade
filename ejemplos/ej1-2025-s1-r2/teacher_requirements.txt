@@ -1,17 +1,17 @@
-- [conceptual] Requirement 1: The 'validar' function does not correctly check that the text is not empty and only contains valid characters (letters, numbers, spaces, line breaks). Does not return True or False as required.
-- [conceptual] Requirement 2: Does not validate the text before processing.
-- [conceptual] Requirement 3: Does not remove empty lines.
-- [conceptual] Requirement 4: Does not normalize spaces and adds extra space at the end of the line.
-- [conceptual] Requirement 5: Does not correctly enumerate the lines according to the original text.
-- [conceptual] Requirement 6: Does not display the information in the requested format.
-- [conceptual] Requirement 7: Does not validate the text before processing (repeated).
-- [conceptual] Requirement 8: Does not correctly identify numbers in the text (words instead of digits).
-- [conceptual] Requirement 9: The average of the numbers is not calculated correctly or is not displayed with the indicated format.
-- [conceptual] Requirement 10: Does not validate the text before processing (repeated).
-- [conceptual] Requirement 11: Includes numeric words.
-- [conceptual] Requirement 12: Does not sort correctly (by length).
-- [conceptual] Requirement 13: The file 'sin_repeticiones.txt' is not generated when the input text is valid.
-- [conceptual] Requirement 14: Does not respond to the instructions.
-- [conceptual] Requirement 15: Is not correctly modularized (maximum discount 2 points).
-- [conceptual] Requirement 16: Execution errors.
-- [conceptual] Requirement Others: Infinite loops, bad indentation, use of functions/structures not taught, global variables, undefined variables.
+- Requirement 1: The 'validar' function does not correctly check that the text is not empty and only contains valid characters (letters, numbers, spaces, line breaks). Does not return True or False as required.
+- Requirement 2: Does not validate the text before processing.
+- Requirement 3: Does not remove empty lines.
+- Requirement 4: Does not normalize spaces and adds extra space at the end of the line.
+- Requirement 5: Does not correctly enumerate the lines according to the original text.
+- Requirement 6: Does not display the information in the requested format.
+- Requirement 7: Does not validate the text before processing (repeated).
+- Requirement 8: Does not correctly identify numbers in the text (words instead of digits).
+- Requirement 9: The average of the numbers is not calculated correctly or is not displayed with the indicated format.
+- Requirement 10: Does not validate the text before processing (repeated).
+- Requirement 11: Includes numeric words.
+- Requirement 12: Does not sort correctly (by length).
+- Requirement 13: The file 'sin_repeticiones.txt' is not generated when the input text is valid.
+- Requirement 14: Does not respond to the instructions.
+- Requirement 15: Is not correctly modularized (maximum discount 2 points).
+- Requirement 16: Execution errors.
+- Requirement Others: Infinite loops, bad indentation, use of functions/structures not taught, global variables, undefined variables.

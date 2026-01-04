@@ -400,34 +400,34 @@ class CodeExampleGenerator:
                                        dataset: str = "python",
                                        assignment_description: str = "") -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Generate code examples enhanced with course theory.
-        Returns tuple of (good_examples, bad_examples) where only good examples are RAG-enhanced."""
+        Returns tuple of (correct_examples, erroneous_examples) where only correct examples are RAG-enhanced."""
         try:
             logger.info(f"Generating enhanced examples for: {requirement[:50]}...")
             
-            # Step 1: Generate initial examples (both good and bad)
+            # Step 1: Generate initial examples (both correct and erroneous)
             all_examples = await self.code_generator.generate_examples(requirement, num_examples)
             
             if not all_examples:
                 logger.warning("No examples generated, returning empty lists")
                 return [], []
             
-            # Step 2: Separate good and bad examples
+            # Step 2: Separate correct and erroneous examples
             # First, try to use the is_correct flag if it exists
-            good_examples = []
-            bad_examples = []
+            correct_examples = []
+            erroneous_examples = []
             
             for example in all_examples:
                 if 'is_correct' in example:
                     # Use the flag set during parsing
                     if example['is_correct']:
-                        good_examples.append(example)
+                        correct_examples.append(example)
                     else:
-                        bad_examples.append(example)
+                        erroneous_examples.append(example)
                 else:
                     # Fallback to heuristic based on approach text
                     approach = example.get('approach', '').lower()
                     
-                    # Keywords that indicate a bad example
+                    # Keywords that indicate an erroneous example
                     bad_keywords = [
                         'no cumple', 'no satisface', 'viola', 'incorrecto', 'incorrecta',
                         'not satisfy', 'not meet', 'does not', "doesn't", 'violates',
@@ -438,71 +438,71 @@ class CodeExampleGenerator:
                     is_bad = any(keyword in approach for keyword in bad_keywords)
                     
                     if is_bad:
-                        bad_examples.append(example)
+                        erroneous_examples.append(example)
                     else:
-                        good_examples.append(example)
+                        correct_examples.append(example)
             
-            logger.info(f"Separated into {len(good_examples)} good and {len(bad_examples)} bad examples")
+            logger.info(f"Separated into {len(correct_examples)} correct and {len(erroneous_examples)} erroneous examples")
             
             # If separation failed completely, split by position
-            if not good_examples and not bad_examples and all_examples:
+            if not correct_examples and not erroneous_examples and all_examples:
                 mid = len(all_examples) // 2
-                good_examples = all_examples[:mid] if mid > 0 else all_examples
-                bad_examples = all_examples[mid:]
-                logger.warning(f"Heuristic failed, split by position: {len(good_examples)} good, {len(bad_examples)} bad")
+                correct_examples = all_examples[:mid] if mid > 0 else all_examples
+                erroneous_examples = all_examples[mid:]
+                logger.warning(f"Heuristic failed, split by position: {len(correct_examples)} correct, {len(erroneous_examples)} erroneous")
             
-            if not good_examples:
-                logger.warning("No good examples to enhance, returning bad examples only")
-                return [], bad_examples
+            if not correct_examples:
+                logger.warning("No correct examples to enhance, returning erroneous examples only")
+                return [], erroneous_examples
             
-            # Step 3: Get relevant theory (only for good examples)
+            # Step 3: Get relevant theory (only for correct examples)
             theory_sources = await self.theory_improver.get_relevant_theory(
-                self.rag_system, requirement, good_examples, max_theory_results, max_class_number, dataset
+                self.rag_system, requirement, correct_examples, max_theory_results, max_class_number, dataset
             )
             
             if not theory_sources:
                 logger.warning("No theory sources found, returning original examples with default class_name")
                 # Add default class_name to original examples
-                for example in good_examples:
+                for example in correct_examples:
                     example['class_name'] = 'Sin teoría del curso'
-                return good_examples, bad_examples
+                return correct_examples, erroneous_examples
             
-            # Step 4: Improve ONLY good examples with theory
-            logger.info(f"About to improve {len(good_examples)} GOOD examples with theory")
-            improved_good_examples = await self.theory_improver.improve_examples_with_theory(
-                good_examples, requirement, theory_sources, assignment_description
+            # Step 4: Improve ONLY correct examples with theory
+            logger.info(f"About to improve {len(correct_examples)} CORRECT examples with theory")
+            improved_correct_examples = await self.theory_improver.improve_examples_with_theory(
+                correct_examples, requirement, theory_sources, assignment_description
             )
-            logger.info(f"Received {len(improved_good_examples)} improved good examples from improve_examples_with_theory")
+            logger.info(f"Received {len(improved_correct_examples)} improved correct examples from improve_examples_with_theory")
             
             # Log what we got from improvement
-            for idx, ex in enumerate(improved_good_examples, 1):
-                logger.info(f"  Improved good example {idx}: class_name={ex.get('class_name', 'Unknown')}, "
+            for idx, ex in enumerate(improved_correct_examples, 1):
+                logger.info(f"  Improved correct example {idx}: class_name={ex.get('class_name', 'Unknown')}, "
                           f"code_preview={ex.get('code', '')[:100]}..., "
                           f"has_improvements={bool(ex.get('improvements'))}, "
                           f"has_theory_alignment={bool(ex.get('theory_alignment'))}")
             
-            # Step 5: Filter theory-specific elements from good examples
+            # Step 5: Filter theory-specific elements from correct examples
             theory_context = "\n\n".join([
                 f"**{source.get('class_name', 'Unknown')}:**\n{source.get('content', '')}"
                 for source in theory_sources
             ])
             
-            logger.info(f"About to filter {len(improved_good_examples)} improved examples (filtering_enabled={RAG_ENABLE_FILTERING})")
-            filtered_good_examples = await self.theory_filter.filter_theory_specific_elements(
-                improved_good_examples, requirement, theory_context
+            logger.info(f"About to filter {len(improved_correct_examples)} improved examples (filtering_enabled={RAG_ENABLE_FILTERING})")
+            filtered_correct_examples = await self.theory_filter.filter_theory_specific_elements(
+                improved_correct_examples, requirement, theory_context
             )
-            logger.info(f"Received {len(filtered_good_examples)} filtered good examples")
+            logger.info(f"Received {len(filtered_correct_examples)} filtered correct examples")
             
             # Log what we got from filtering
-            for idx, ex in enumerate(filtered_good_examples, 1):
-                logger.info(f"  Filtered good example {idx}: class_name={ex.get('class_name', 'Unknown')}, "
+            for idx, ex in enumerate(filtered_correct_examples, 1):
+                logger.info(f"  Filtered correct example {idx}: class_name={ex.get('class_name', 'Unknown')}, "
                           f"code_preview={ex.get('code', '')[:100]}..., "
                           f"has_improvements={bool(ex.get('improvements'))}, "
                           f"has_theory_alignment={bool(ex.get('theory_alignment'))}")
             
-            logger.info(f"Generated {len(filtered_good_examples)} enhanced good examples and {len(bad_examples)} bad examples")
+            logger.info(f"Generated {len(filtered_correct_examples)} enhanced correct examples and {len(erroneous_examples)} erroneous examples")
             
-            return filtered_good_examples, bad_examples
+            return filtered_correct_examples, erroneous_examples
             
             return filtered_examples
             

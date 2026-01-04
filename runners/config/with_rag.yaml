@@ -23,9 +23,9 @@ agents:
     # model_name: "deepseek-r1:14b"  # Different model for requirement generation
     # provider: "ollama"   # Different provider for requirement generation
     # temperature: 0.2     # Different temperature for requirement generation
-    template: "requirement_generator_tags.jinja"  # Jinja template for requirement generation
-    max_requirements: 10  # Maximum number of requirements to generate
-    
+    template: "requirement_generator_tags.jinja" # Jinja template for requirement generation
+    max_requirements: 10 # Maximum number of requirements to generate
+
   prompt_generator:
     enabled: true
     # Agent-specific model configuration (optional)
@@ -36,11 +36,11 @@ agents:
     example_quantity: 3
     templates:
       examples: "examples.jinja"
-      default: "prompt_generators/requirement_presence.jinja"
-      requirement_presence: "prompt_generators/requirement_presence.jinja"
+      default: "prompt_generators/requirement_explain/requirement_explain.jinja"
+      requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
       error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
-      conceptual: "prompt_generators/conceptual/conceptual.es2es.jinja"
-    
+      stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
+
   code_corrector:
     enabled: true
     detailed_feedback: true
@@ -52,7 +52,7 @@ agents:
     # model_name: "gemini-2.0-flash"
     model_name: "gemini-3-flash-preview"
     temperature: 0.1
-    
+
   group_functions:
     enabled: true
     # Agent-specific model configuration (optional)
@@ -69,14 +69,14 @@ agents:
     # Agent-specific model configuration for the evaluator
     # model_name: "deepseek-r1:14b"  # Model for evaluation (should be high quality)
     # provider: "ollama"         # Provider for evaluation
-    temperature: 0.1           # Low temperature for consistent evaluation
-    enable_teacher_comparison: true  # Enable comparison with teacher examples
+    temperature: 0.1 # Low temperature for consistent evaluation
+    enable_teacher_comparison: true # Enable comparison with teacher examples
     teacher_comparison_criteria:
-      coverage: 1.0           # Do generated requirements cover the same key aspects?
-      specificity: 1.0        # Are requirements as specific and actionable?
-      clarity: 1.0            # Are requirements as clear and unambiguous?
-      completeness: 1.0       # Do requirements address all important points?
-      format: 1.0             # Do requirements follow similar format/structure?
+      coverage: 1.0 # Do generated requirements cover the same key aspects?
+      specificity: 1.0 # Are requirements as specific and actionable?
+      clarity: 1.0 # Are requirements as clear and unambiguous?
+      completeness: 1.0 # Do requirements address all important points?
+      format: 1.0 # Do requirements follow similar format/structure?
     evaluation_criteria:
       requirement_generator:
         completeness: 1.0
@@ -96,9 +96,9 @@ agents:
         clarity: 1.0
         accuracy: 1.0
         actionability: 1.0
-  
+
 # Logging Configuration
 logging:
-  level: "INFO"  # Options: "DEBUG", "INFO", "WARNING", "ERROR"
+  level: "INFO" # Options: "DEBUG", "INFO", "WARNING", "ERROR"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: "assignment_evaluator.log"

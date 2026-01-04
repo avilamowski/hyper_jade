@@ -50,46 +50,119 @@ logger = logging.getLogger(__name__)
 
 def split_examples(examples: str) -> tuple[str, str]:
     """
-    Split examples string into good_examples and bad_examples.
-    Looks for patterns like "Good example" and "Bad Example" (case insensitive).
+    Split examples string into correct_examples and erroneous_examples using XML parsing.
+    Expects XML format with <correct> and <erroneous> tags.
     
     Returns:
-        tuple: (good_examples, bad_examples) as strings
+        tuple: (correct_examples, erroneous_examples) as strings
     """
     import re
     
     # Normalize line endings
     examples = examples.replace('\r\n', '\n').replace('\r', '\n')
     
-    # Try to find the split point between good and bad examples
-    # Look for "Bad Example" or "Bad" patterns (case insensitive)
-    bad_pattern = re.compile(r'(?i)(?:^|\n)\s*(?:Bad\s+Example|Bad\s+example|Ejemplo\s+malo|Ejemplo\s+incorrecto)', re.MULTILINE)
+    # Try to extract <correct> and <erroneous> sections using XML tags
+    correct_match = re.search(r'<correct>(.*?)</correct>', examples, re.DOTALL | re.IGNORECASE)
+    erroneous_match = re.search(r'<erroneous>(.*?)</erroneous>', examples, re.DOTALL | re.IGNORECASE)
     
-    match = bad_pattern.search(examples)
+    if correct_match and erroneous_match:
+        # Successfully found XML tags
+        correct_section = correct_match.group(1).strip()
+        erroneous_section = erroneous_match.group(1).strip()
+        
+        # Parse individual examples from each section
+        correct_examples = _parse_xml_examples(correct_section, "correct")
+        erroneous_examples = _parse_xml_examples(erroneous_section, "erroneous")
+        
+        return correct_examples, erroneous_examples
+    else:
+        # Fallback: try old text-based format for backward compatibility
+        logger.warning("XML tags not found, falling back to text-based parsing")
+        return _split_examples_legacy(examples)
+
+
+def _parse_xml_examples(section: str, example_type: str) -> str:
+    """
+    Parse individual <example> blocks from a section and format them.
+    
+    Args:
+        section: XML content inside <correct> or <erroneous> tags
+        example_type: "correct" or "erroneous"
+    
+    Returns:
+        Formatted string with examples
+    """
+    import re
+    
+    # Find all <example> blocks
+    example_pattern = r'<example>(.*?)</example>'
+    example_blocks = re.findall(example_pattern, section, re.DOTALL | re.IGNORECASE)
+    
+    formatted_examples = []
+    for i, block in enumerate(example_blocks, 1):
+        # Extract code from the example block
+        code_match = re.search(r'<code>(.*?)</code>', block, re.DOTALL | re.IGNORECASE)
+        if code_match:
+            code = code_match.group(1).strip()
+            
+            # Format the example with proper indentation
+            lines = code.split('\n')
+            indented_lines = []
+            for line in lines:
+                if line.strip():
+                    indented_lines.append('    ' + line)
+                else:
+                    indented_lines.append('')
+            indented_code = '\n'.join(indented_lines)
+            
+            # Format with appropriate header
+            if example_type == "correct":
+                formatted_examples.append(f"Correct example {i}:\n{indented_code}")
+            else:
+                formatted_examples.append(f"Erroneous Example {i}:\n{indented_code}")
+    
+    return "\n\n".join(formatted_examples)
+
+
+def _split_examples_legacy(examples: str) -> tuple[str, str]:
+    """
+    Legacy text-based splitting for backward compatibility.
+    Looks for "Correct example" and "Erroneous Example" patterns.
+    
+    Returns:
+        tuple: (correct_examples, erroneous_examples) as strings
+    """
+    import re
+    
+    # Try to find the split point between correct and erroneous examples
+    # Look for "Erroneous Example" pattern (case insensitive)
+    erroneous_pattern = re.compile(r'(?i)(?:^|\n)\s*Erroneous\s+Example', re.MULTILINE)
+    
+    match = erroneous_pattern.search(examples)
     if match:
         split_pos = match.start()
-        good_examples = examples[:split_pos].strip()
-        bad_examples = examples[split_pos:].strip()
+        correct_examples = examples[:split_pos].strip()
+        erroneous_examples = examples[split_pos:].strip()
     else:
-        # If no clear split found, try to split by "Bad" at start of line
+        # If no clear split found, try line-by-line search
         lines = examples.split('\n')
         split_line = None
         for i, line in enumerate(lines):
-            if re.match(r'^\s*(?:Bad\s+Example|Bad\s+example|Ejemplo\s+malo)', line, re.IGNORECASE):
+            if re.match(r'^\s*Erroneous\s+Example', line, re.IGNORECASE):
                 split_line = i
                 break
         
         if split_line:
-            good_examples = '\n'.join(lines[:split_line]).strip()
-            bad_examples = '\n'.join(lines[split_line:]).strip()
+            correct_examples = '\n'.join(lines[:split_line]).strip()
+            erroneous_examples = '\n'.join(lines[split_line:]).strip()
         else:
-            # Fallback: assume all examples are good, or split by some heuristic
-            # For now, return all as good_examples and empty bad_examples
-            logger.warning("Could not find clear split between good and bad examples. Using all as good_examples.")
-            good_examples = examples
-            bad_examples = ""
+            # Fallback: return all as correct_examples and empty erroneous_examples
+            logger.warning("Could not find clear split between correct and erroneous examples. Using all as correct_examples.")
+            correct_examples = examples
+            erroneous_examples = ""
     
-    return good_examples, bad_examples
+    return correct_examples, erroneous_examples
+
 
 
 # --- LangGraph Node: Example Generation ---
@@ -172,17 +245,17 @@ def prompt_generation_node(
     template_file = template_map.get(prompt_type.value, template_map.get("default"))
     template = env.get_template(template_file)
     
-    # Split examples into good and bad for better template structure
-    good_examples, bad_examples = split_examples(examples)
+    # Split examples into correct and erroneous for better template structure
+    correct_examples, erroneous_examples = split_examples(examples)
     
     # Pass examples as context so LLM understands what examples will be provided,
-    # but instruct it to use {{ good_examples }} and {{ bad_examples }} placeholders
+    # but instruct it to use {{ correct_examples }} and {{ erroneous_examples }} placeholders
     prompt = template.render(
         requirement=requirement_body,
         assignment_description=assignment_description,
         code="{{ code }}",
-        good_examples=good_examples,  # Pass as context
-        bad_examples=bad_examples,   # Pass as context
+        correct_examples=correct_examples,  # Pass as context
+        erroneous_examples=erroneous_examples,   # Pass as context
     )
 
     logger.info("[Node] Invoking LLM for template...")
@@ -229,18 +302,18 @@ def prompt_generation_node(
         if "{{ code }}" not in jinja_template:
             jinja_template += "\n\nCode to analyze:\n{{ code }}"
     
-    # Ensure the template has {{ good_examples }} and {{ bad_examples }} placeholders
+    # Ensure the template has {{ correct_examples }} and {{ erroneous_examples }} placeholders
     # If not present, try to add them in appropriate places
-    has_good = "{{ good_examples }}" in jinja_template or "{{good_examples}}" in jinja_template
-    has_bad = "{{ bad_examples }}" in jinja_template or "{{bad_examples}}" in jinja_template
+    has_good = "{{ correct_examples }}" in jinja_template or "{{correct_examples}}" in jinja_template
+    has_bad = "{{ erroneous_examples }}" in jinja_template or "{{erroneous_examples}}" in jinja_template
     
     # Also check for old {{ examples }} format and suggest replacement
     if "{{ examples }}" in jinja_template or "{{examples}}" in jinja_template:
-        logger.warning("Template uses old {{ examples }} format. Consider updating to use {{ good_examples }} and {{ bad_examples }} separately.")
+        logger.warning("Template uses old {{ examples }} format. Consider updating to use {{ correct_examples }} and {{ erroneous_examples }} separately.")
     
     # If neither placeholder is present, add them before {{ code }}
     if not has_good and not has_bad:
-        examples_placeholder = "{{ good_examples }}\n\n{{ bad_examples }}"
+        examples_placeholder = "{{ correct_examples }}\n\n{{ erroneous_examples }}"
         
         # Check if "Code to analyze:" already exists
         if "Code to analyze:" in jinja_template:

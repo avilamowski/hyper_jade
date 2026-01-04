@@ -247,15 +247,28 @@ class SupervisedEvaluator2Step:
         Returns a dict containing parsed scores, explanations, auxiliary metrics, timing, and raw responses.
         """
         # Build generated text similar to single-step evaluator
-        no_pattern = re.compile(r"<RESULT>\s*NO\s*</RESULT>", flags=re.IGNORECASE)
         generated_text_parts = []
         for correction in generated_correction:
             result_text = (correction.get('result') or '').strip()
-            if result_text.upper() == 'NO' or no_pattern.search(result_text):
-                continue
+            
+            # Extract RESULT tag content for filtering
+            result_match = re.search(r"<RESULT>\s*(.+?)\s*</RESULT>", result_text, flags=re.IGNORECASE | re.DOTALL)
+            if result_match:
+                result_content = result_match.group(1).strip().upper()
+                if result_content == 'NO ERROR':
+                    continue  # Skip corrections with no errors
+            
+            # Extract EXPLANATION tag content (this is the feedback)
+            explanation_match = re.search(r"<EXPLANATION>\s*(.+?)\s*</EXPLANATION>", result_text, flags=re.IGNORECASE | re.DOTALL)
+            if explanation_match:
+                explanation_text = explanation_match.group(1).strip()
+            else:
+                # Fallback: use full result_text if no EXPLANATION tag found (backward compatibility)
+                explanation_text = result_text
+            
             requirement_text = correction['requirement']['requirement']
             function_name = correction['requirement'].get('function', '')
-            generated_text_parts.append(f"Requirement: {requirement_text}\nFunction: {function_name}\nFeedback: {result_text}")
+            generated_text_parts.append(f"Requirement: {requirement_text}\nFunction: {function_name}\nFeedback: {explanation_text}")
 
         generated_text = "\n\n".join(generated_text_parts)
 
