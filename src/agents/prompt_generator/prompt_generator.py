@@ -119,7 +119,24 @@ def example_generation_node(requirement: Requirement, agent_config: dict, llm) -
 
     # Fix: Extract content properly based on LLM type
     if hasattr(examples_response, "content"):
-        examples = examples_response.content.strip()
+        content = examples_response.content
+        # Handle case where content is a list (e.g., Gemini)
+        if isinstance(content, list):
+            # Extract text from each part in the list, ignoring extras
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict) and 'text' in item:
+                    text_parts.append(item['text'])
+                elif hasattr(item, 'text'):
+                    text_parts.append(item.text)
+                elif isinstance(item, str):
+                    text_parts.append(item)
+                else:
+                    # Fallback to string conversion
+                    text_parts.append(str(item))
+            examples = "\n".join(text_parts).strip()
+        else:
+            examples = content.strip()
     else:
         examples = str(examples_response).strip()
 
@@ -173,7 +190,24 @@ def prompt_generation_node(
 
     # Fix: Extract content properly based on LLM type
     if hasattr(response, "content"):
-        jinja_template = response.content.strip()
+        content = response.content
+        # Handle case where content is a list (e.g., Gemini)
+        if isinstance(content, list):
+            # Extract text from each part in the list, ignoring extras
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict) and 'text' in item:
+                    text_parts.append(item['text'])
+                elif hasattr(item, 'text'):
+                    text_parts.append(item.text)
+                elif isinstance(item, str):
+                    text_parts.append(item)
+                else:
+                    # Fallback to string conversion
+                    text_parts.append(str(item))
+            jinja_template = "\n".join(text_parts).strip()
+        else:
+            jinja_template = content.strip()
     else:
         jinja_template = str(response).strip()
 

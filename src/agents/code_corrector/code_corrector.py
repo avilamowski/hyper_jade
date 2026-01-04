@@ -120,9 +120,35 @@ class CodeCorrectorAgent:
 
     def _call_llm(self, rendered_prompt: str) -> str:
         def _extract_text(raw):
-            # Prefer .content
+            # Check if raw has .content attribute
             if hasattr(raw, "content"):
-                return raw.content
+                content = raw.content
+                
+                # Handle Gemini's response format: content can be a list of parts
+                # Each part has {'type': 'text', 'text': '...', 'extras': {...}}
+                if isinstance(content, list):
+                    # Extract text from all parts and concatenate
+                    text_parts = []
+                    for part in content:
+                        if isinstance(part, dict) and 'text' in part:
+                            text_parts.append(part['text'])
+                        elif isinstance(part, dict) and part.get('type') == 'text':
+                            # Sometimes the text might be in a different structure
+                            text_parts.append(str(part.get('text', '')))
+                        elif hasattr(part, 'text'):
+                            text_parts.append(part.text)
+                        else:
+                            # Fallback: convert to string
+                            text_parts.append(str(part))
+                    return ''.join(text_parts)
+                
+                # If content is already a string, return it
+                if isinstance(content, str):
+                    return content
+                
+                # Otherwise try to convert to string
+                return str(content)
+            
             # dict-like OpenAI shape
             if isinstance(raw, dict):
                 choices = raw.get("choices")
@@ -130,16 +156,24 @@ class CodeCorrectorAgent:
                     first = choices[0]
                     return (first.get("message", {}) or {}).get("content") or first.get("text") or str(raw)
                 return raw.get("text") or str(raw)
+            
             # fallback to str
             return str(raw)
 
         try:
-            if isinstance(self.llm, ChatOpenAI):
+            # Both ChatOpenAI and ChatGoogleGenerativeAI use the same message format
+            if isinstance(self.llm, (ChatOpenAI, ChatGoogleGenerativeAI)):
                 resp = self.llm.invoke([HumanMessage(content=rendered_prompt)])
                 out_text = _extract_text(resp)
             else:
                 resp = self.llm.invoke(rendered_prompt)
                 out_text = _extract_text(resp)
+
+            # Ensure out_text is a string before passing to _strip_code_fences
+            if out_text is None:
+                out_text = ""
+            elif not isinstance(out_text, str):
+                out_text = str(out_text)
 
             return self._strip_code_fences(out_text)
         except Exception as e:

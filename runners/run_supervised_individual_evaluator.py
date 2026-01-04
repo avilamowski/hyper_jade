@@ -8,6 +8,7 @@ import argparse
 import time
 import logging
 import mlflow
+import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Union
 
@@ -16,6 +17,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.agents.prompt_generator.prompt_generator import PromptGeneratorAgent
+from src.agents.rag_prompt_generator.rag_prompt_generator import RAGPromptGeneratorAgent
 from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.evaluators.supervised_evaluator_aux import AuxiliaryMetricsEvaluator
 from src.evaluators.supervised_evaluator_individual import IndividualMetricsEvaluator
@@ -54,8 +56,13 @@ logger = logging.getLogger(__name__)
 
 
 @traceable(name="generate_prompts", run_type="chain")
-def generate_prompts_traced(prompt_generator: PromptGeneratorAgent, requirements: List[Requirement], assignment_text: str) -> List[GeneratedPrompt]:
-    return prompt_generator.generate_prompts_batch(requirements, assignment_text)
+async def generate_prompts_traced(prompt_generator, requirements: List[Requirement], assignment_text: str) -> List[GeneratedPrompt]:
+    """Generate prompts - handles both standard and RAG prompt generators."""
+    # Check if it's RAG (async) or standard (sync)
+    if isinstance(prompt_generator, RAGPromptGeneratorAgent):
+        return await prompt_generator.generate_prompts_batch(requirements, assignment_text)
+    else:
+        return prompt_generator.generate_prompts_batch(requirements, assignment_text)
 
 
 @traceable(name="submission_correction_and_evaluation", run_type="chain")
@@ -333,7 +340,19 @@ Note: Reference corrections can be provided as either:
         
         # Initialize agents and evaluators
         logger.info("Initializing agents and evaluators...")
-        prompt_generator = PromptGeneratorAgent(config)
+        
+        # Check if RAG is enabled
+        enable_rag = config.get('enable_rag', False)
+        
+        if enable_rag:
+            logger.info("🧠 RAG Mode: ENABLED - Using RAGPromptGeneratorAgent")
+            prompt_generator = RAGPromptGeneratorAgent(config)
+            # RAG requires async initialization
+            asyncio.run(prompt_generator.initialize())
+        else:
+            logger.info("📝 RAG Mode: DISABLED - Using standard PromptGeneratorAgent")
+            prompt_generator = PromptGeneratorAgent(config)
+        
         code_corrector = CodeCorrectorAgent(config)
 
         # Build composite LLM from agent configs
@@ -383,7 +402,11 @@ Note: Reference corrections can be provided as either:
             
             with mlflow_logger.run(run_name="prompt_generation", tags=mlflow_tags):
                 shared.stage = 'prompt_generation'
-                generated_prompts = generate_prompts_traced(prompt_generator, requirements, assignment_text)
+                # Handle async prompt generation for RAG
+                if enable_rag:
+                    generated_prompts = asyncio.run(generate_prompts_traced(prompt_generator, requirements, assignment_text))
+                else:
+                    generated_prompts = asyncio.run(generate_prompts_traced(prompt_generator, requirements, assignment_text))
                 logger.info(f"✓ Generated {len(generated_prompts)} prompts")
 
             logger.info("Step 2: Processing submissions with unified LangSmith traces...")
@@ -443,6 +466,7 @@ Note: Reference corrections can be provided as either:
                         "submission": submission_output_dir.name,
                         "evaluation": evaluation_results
                     })
+
 
             # Print aggregate summary
             logger.info("=" * 60)

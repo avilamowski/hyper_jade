@@ -265,7 +265,24 @@ def rag_prompt_generation_node(
 
     # Fix: Extract content properly based on LLM type
     if hasattr(response, "content"):
-        jinja_template = response.content.strip()
+        content = response.content
+        # Handle case where content is a list (e.g., Gemini)
+        if isinstance(content, list):
+            # Extract text from each part in the list, ignoring extras
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict) and 'text' in item:
+                    text_parts.append(item['text'])
+                elif hasattr(item, 'text'):
+                    text_parts.append(item.text)
+                elif isinstance(item, str):
+                    text_parts.append(item)
+                else:
+                    # Fallback to string conversion
+                    text_parts.append(str(item))
+            jinja_template = "\n".join(text_parts).strip()
+        else:
+            jinja_template = content.strip()
     else:
         jinja_template = str(response).strip()
 
@@ -362,16 +379,31 @@ class RAGPromptGeneratorAgent:
         self.graph = None
 
     def _setup_llm(self):
-        if self.agent_config.get("provider") == "openai":
+        provider = str(self.agent_config.get("provider", "openai")).lower().strip()
+        model_name = self.agent_config.get("model_name", "gpt-4")
+        temperature = float(self.agent_config.get("temperature", 0.1))
+        
+        if provider == "openai":
             return ChatOpenAI(
-                model=self.agent_config.get("model_name", "gpt-4"),
-                temperature=self.agent_config.get("temperature", 0.1),
+                model=model_name,
+                temperature=temperature,
             )
-        else:
-            return OllamaLLM(
-                model=self.agent_config.get("model_name", "qwen2.5:7b"),
-                temperature=self.agent_config.get("temperature", 0.1),
+        
+        if provider in ("gemini", "google", "google-genai"):
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            import os
+            api_key = self.agent_config.get("api_key") or os.environ.get("GOOGLE_API_KEY")
+            return ChatGoogleGenerativeAI(
+                model=model_name or "gemini-pro",
+                temperature=temperature,
+                google_api_key=api_key
             )
+        
+        # Default to Ollama
+        return OllamaLLM(
+            model=model_name or "qwen2.5:7b",
+            temperature=temperature,
+        )
 
     async def initialize(self):
         """Initialize RAG system and code generator."""

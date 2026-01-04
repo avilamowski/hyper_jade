@@ -30,9 +30,9 @@ agents:
     enabled: true
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
-    # model_name: "qwen2.5:7b"  # Different model for prompt generation
-    # provider: "ollama"        # Different provider for prompt generation
-    # temperature: 0.15         # Different temperature for prompt generation
+    provider: "gemini"
+    model_name: "gemini-3-flash-preview"
+    temperature: 0.15
     example_quantity: 3
     templates:
       examples: "examples.jinja"
@@ -47,8 +47,11 @@ agents:
     include_suggestions: true
     include_learning_resources: true
     # Agent-specific model configuration (optional)
-    # Uncomment and modify these lines to use a different model for this agent
-    # model_name: "gpt-4-turbo"  # Different model for code correction
+    # Using Gemini to avoid OpenAI rate limiting
+    provider: "gemini"
+    # model_name: "gemini-2.0-flash"
+    model_name: "gemini-3-flash-preview"
+    temperature: 0.1
     
   group_functions:
     enabled: true

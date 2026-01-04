@@ -311,6 +311,17 @@ class RAGSystem:
             logger.error(f"Failed to initialize RAG system: {e}")
             raise
     
+    def close(self):
+        """Close the Weaviate client connection to prevent resource leaks"""
+        if self.client:
+            try:
+                self.client.close()
+                logger.info("Weaviate client connection closed successfully")
+            except Exception as e:
+                logger.warning(f"Error closing Weaviate client: {e}")
+            finally:
+                self.client = None
+    
     def _create_llm_with_temperature(self, temperature: float):
         """Create an LLM instance with a specific temperature"""
         if self.ai_provider == "openai":

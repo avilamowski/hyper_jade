@@ -20,7 +20,7 @@ EVALUATOR_CONFIG="runners/config/eval_config.yaml"
 mkdir -p "$OUTPUT_DIR"
 
 # Run the evaluator
-python3.12 runners/run_supervised_individual_evaluator.py \
+uv run runners/run_supervised_individual_evaluator.py \
     --assignment "$ASSIGNMENT" \
     --requirements $REQUIREMENTS \
     --submissions $SUBMISSIONS \
