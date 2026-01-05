@@ -5,8 +5,10 @@
 # Global LLM Configuration (used as fallback if agent-specific config is not provided)
 # model_name: "gpt-oss:latest"  # Default model for all agents
 # provider: "ollama"
-model_name: "gpt-4o-mini"
-provider: "openai"
+# model_name: "gpt-4o-mini"
+# provider: "openai"
+model_name: "gemini-2.0-flash"
+provider: "gemini"
 temperature: 0.1
 
 # Agent Configuration

@@ -167,7 +167,7 @@ def _split_examples_legacy(examples: str) -> tuple[str, str]:
 
 # --- LangGraph Node: Example Generation ---
 @traceable(name="example_generation")
-def example_generation_node(requirement: Requirement, agent_config: dict, llm) -> str:
+def example_generation_node(requirement: Requirement, assignment_description: str, classes_summary: str, agent_config: dict, llm) -> str:
     """
     Node for generating examples from a requirement.
     Returns the generated examples as a string.
@@ -184,7 +184,10 @@ def example_generation_node(requirement: Requirement, agent_config: dict, llm) -
     # Use the requirement text from the Requirement object
     requirement_text = requirement["requirement"]
     examples_prompt = examples_template.render(
-        requirement=requirement_text, example_quantity=example_quantity
+        requirement=requirement_text, 
+        example_quantity=example_quantity,
+        assignment_description=assignment_description,
+        classes_summary=classes_summary
     )
 
     logger.info("[Node] Invoking LLM for examples...")
@@ -337,6 +340,7 @@ def prompt_generation_node(
 class PromptGeneratorState(TypedDict):
     # All fields are Annotated to allow concurrent writes
     assignment_description: Annotated[str, keep_last]
+    classes_summary: Annotated[str, keep_last]
     requirements: Annotated[List[Requirement], keep_last]  # List of requirement strings
     
     # Output - use Annotated to allow multiple concurrent writes
@@ -401,11 +405,12 @@ class PromptGeneratorAgent:
         ) -> PromptGeneratorState:
             """Process a single requirement - generate examples and prompt template"""
             assignment_description = state["assignment_description"]
+            classes_summary = state.get("classes_summary", "")
 
             logger.info(f"Processing requirement {index + 1}: {requirement['requirement'][:50]}...")
 
             # Generate examples
-            examples = example_generation_node(requirement, self.agent_config, self.llm)
+            examples = example_generation_node(requirement, assignment_description, classes_summary, self.agent_config, self.llm)
 
             # Generate Jinja2 template
             jinja_template = prompt_generation_node(
@@ -506,6 +511,18 @@ class PromptGeneratorAgent:
         logger.info(
             f"Generating {len(requirements)} prompts in parallel using dynamic graph"
         )
+        
+        # Load classes summary if available
+        classes_summary = ""
+        summary_path = Path("data/clases_summary.txt")
+        if summary_path.exists():
+            try:
+                classes_summary = summary_path.read_text(encoding="utf-8")
+                logger.info(f"Loaded classes summary from {summary_path} ({len(classes_summary)} chars)")
+            except Exception as e:
+                logger.warning(f"Could not read classes summary: {e}")
+        else:
+            logger.info(f"Classes summary file not found at {summary_path}")
 
         # Create dynamic graph for this batch
         self._create_dynamic_graph(requirements)
@@ -513,6 +530,7 @@ class PromptGeneratorAgent:
         # Create state for batch processing
         state: PromptGeneratorState = {
             "assignment_description": assignment_description,
+            "classes_summary": classes_summary,
             "requirements": requirements,
             "generated_prompts": [],
             "extra": {},

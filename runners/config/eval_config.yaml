@@ -35,7 +35,7 @@ supervised_evaluator:
       function: "compute_restraint"
     content_similarity: 
       function: "compute_content_similarity"
-      # Use Ollama for content_similarity specifically
-      model_name: "llama3.2:latest"
-      provider: "ollama"
+      # Use OpenAI for content_similarity (comment out to use Ollama)
+      model_name: "gpt-4o-mini"
+      provider: "openai"
       temperature: 0.1
