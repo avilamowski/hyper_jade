@@ -179,13 +179,20 @@ def example_generation_node(requirement: Requirement, assignment_description: st
     )
     examples_template_file = template_map["examples"]
     examples_template = env.get_template(examples_template_file)
-    example_quantity = agent_config.get("example_quantity")
+    
+    # Support separate quantities for correct and erroneous examples
+    # Default to example_quantity for backward compatibility
+    example_quantity = agent_config.get("example_quantity", 3)
+    correct_example_quantity = agent_config.get("correct_example_quantity", example_quantity)
+    erroneous_example_quantity = agent_config.get("erroneous_example_quantity", example_quantity)
     
     # Use the requirement text from the Requirement object
     requirement_text = requirement["requirement"]
     examples_prompt = examples_template.render(
         requirement=requirement_text, 
-        example_quantity=example_quantity,
+        example_quantity=example_quantity,  # Keep for backward compatibility
+        correct_example_quantity=correct_example_quantity,
+        erroneous_example_quantity=erroneous_example_quantity,
         assignment_description=assignment_description,
         classes_summary=classes_summary
     )
