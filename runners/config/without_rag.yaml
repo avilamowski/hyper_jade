@@ -4,8 +4,8 @@
 # Global LLM Configuration (used as fallback if agent-specific config is not provided)
 # model_name: "gpt-oss:latest"  # Default model for all agents
 # provider: "ollama"
-model_name: "gpt-4o-mini"
-provider: "openai"
+model_name: "gemini-2.0-flash"
+provider: "gemini"
 temperature: 0.1
 
 # RAG Configuration
@@ -31,15 +31,14 @@ agents:
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
     provider: "gemini"
-    # model_name: "gemini-3-flash-preview"
     model_name: "gemini-2.0-flash"
     temperature: 0.15
     example_quantity: 3
     templates:
       examples: "examples.jinja"
-      default: "prompt_generators/requirement_presence.jinja"
+      default: "prompt_generators/requirement_explain/requirement_explain.jinja"
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
-      error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
+      error_presence: "prompt_generators/error_explain/error_explain.en2en.jinja"
       stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
 
   code_corrector:
@@ -50,33 +49,37 @@ agents:
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
     # model_name: "gpt-4-turbo"  # Different model for code correction
-    
+
     # Linter configuration
     linter:
       enabled: false
       provider: "gemini"
       model_name: "gemini-2.0-flash"
       include_categories:
-        - "E"  # Errors
-        - "F"  # Fatal/pyflakes
-        - "W"  # Warnings
+        - "E" # Errors
+        - "F" # Fatal/pyflakes
+        - "W" # Warnings
       exclude_codes:
-        - "E501"  # Line too long
-        - "W291"  # Trailing whitespace
-        - "W292"  # No newline at end of file
-        - "W293"  # Blank line contains whitespace
-        - "E302"  # Expected 2 blank lines
-        - "E303"  # Too many blank lines
-        - "E305"  # Expected 2 blank lines after class or function
-        - "E711"  # Comparison to None should be 'if cond is None:'
-        - "E712"  # Comparison to True/False should be 'if cond:' or 'if not cond:'
-        - "E713"  # Test for membership should be 'not in'
-        - "E714"  # Test for object identity should be 'is not'
-        - "E721"  # Do not compare types, use 'isinstance()'
-        - "E722"  # Do not use bare 'except'
-        - "W503"  # Line break before binary operator
-        - "W504"  # Line break after binary operator
+        - "E501" # Line too long
+        - "W291" # Trailing whitespace
+        - "W292" # No newline at end of file
+        - "W293" # Blank line contains whitespace
+        - "E302" # Expected 2 blank lines
+        - "E303" # Too many blank lines
+        - "E305" # Expected 2 blank lines after class or function
+        - "E711" # Comparison to None should be 'if cond is None:'
+        - "E712" # Comparison to True/False should be 'if cond:' or 'if not cond:'
+        - "E713" # Test for membership should be 'not in'
+        - "E714" # Test for object identity should be 'is not'
+        - "E721" # Do not compare types, use 'isinstance()'
+        - "E722" # Do not use bare 'except'
+        - "W503" # Line break before binary operator
+        - "W504" # Line break after binary operator
       template: "linter/linter_relevance.jinja"
+    # Using Gemini to avoid OpenAI rate limiting
+    provider: "gemini"
+    model_name: "gemini-2.0-flash"
+    temperature: 0.1
 
   group_functions:
     enabled: true

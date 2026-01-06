@@ -2,58 +2,58 @@
 # This configuration is independent of the main hyper_jade configuration
 
 # Main RAG Control
-use_rag: true  # Set to true to enable RAG functionality
+use_rag: true # Set to true to enable RAG functionality
 
 # RAG System Configuration
 rag:
   # Weaviate Configuration
   weaviate:
     url: "http://localhost:8080"
-    
+
   # AI Provider Configuration (inherits from main assignment_config.yaml)
   # Uses the same LLM settings as the main system:
   # - provider: from assignment_config.yaml
-  # - model_name: from assignment_config.yaml  
+  # - model_name: from assignment_config.yaml
   # - temperature: from assignment_config.yaml
   # - OPENAI_API_KEY: environment variable
-    
+
   # Text Splitter Configuration
   text_splitter:
-    strategy: "langchain"  # "cell_based" or "langchain"
+    strategy: "langchain" # "cell_based" or "langchain"
     chunk_size: 1500
     chunk_overlap: 250
     min_chunk_size: 100
-    
+
   # Reranking Configuration
   reranking:
     enabled: true
     model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
     initial_retrieval_count: 15
     final_retrieval_count: 5
-    
+
   # Temperature Configuration
   temperatures:
     example_generation: 0.7
     theory_correction: 0.3
     filtering: 0.1
-  
+
   # Theory Improvement Model Configuration
   theory_improvement:
-    provider: "gemini"  # "openai", "gemini", or "ollama"
-    model_name: "gemini-3-flash-preview"  # Model to use for theory improvement
-    
+    provider: "gemini" # "openai", "gemini", or "ollama"
+    model_name: "gemini-2.0-flash" # Model to use for theory improvement
+
   # Dataset Configuration
   datasets:
     python:
       notebooks_dir: "data/Clases"
     haskell:
       notebooks_dir: "data/learnyouahaskell"
-      
+
   # Debug Configuration
   debug:
     enabled: false
     filtering_enabled: false
-    
+
   # LangSmith Configuration
   langsmith:
     enabled: false

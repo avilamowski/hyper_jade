@@ -275,7 +275,7 @@ class RAGSystem:
                 logger.info("Reranking disabled")
 
             # Initialize LLM based on provider
-            if self.ai_provider == "openai":
+            if self.ai_provider in ("openai", "openai-compatible"):
                 if not self.openai_api_key:
                     raise Exception(
                         "OpenAI API key is required when using OpenAI provider"
@@ -288,8 +288,27 @@ class RAGSystem:
                     temperature=0.7
                 )
                 logger.info(f"Initialized OpenAI LLM with model: {self.openai_model}")
+            elif self.ai_provider in ("gemini", "google", "google-genai"):
+                # Initialize Gemini LLM
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                from .config import RAG_GOOGLE_API_KEY, RAG_GOOGLE_MODEL
+                
+                if not RAG_GOOGLE_API_KEY:
+                    raise Exception("Google API key is required when using Gemini provider")
+                if not RAG_GOOGLE_MODEL:
+                    raise Exception("Google model name is required when using Gemini provider")
+                
+                self.llm = ChatGoogleGenerativeAI(
+                    model=RAG_GOOGLE_MODEL,
+                    temperature=0.7,
+                    google_api_key=RAG_GOOGLE_API_KEY
+                )
+                logger.info(f"Initialized Gemini LLM with model: {RAG_GOOGLE_MODEL}")
             else:
                 # Initialize Ollama LLM
+                if not self.model_name:
+                    raise Exception(f"Model name is required for provider: {self.ai_provider}")
+                    
                 self.llm = OllamaLLM(
                     model=self.model_name,
                     temperature=0.7,
@@ -324,7 +343,7 @@ class RAGSystem:
     
     def _create_llm_with_temperature(self, temperature: float):
         """Create an LLM instance with a specific temperature"""
-        if self.ai_provider == "openai":
+        if self.ai_provider in ("openai", "openai-compatible"):
             if not self.openai_api_key:
                 raise Exception("OpenAI API key is required when using OpenAI provider")
             
@@ -334,8 +353,26 @@ class RAGSystem:
                 base_url=self.openai_base_url,
                 temperature=temperature
             )
+        elif self.ai_provider in ("gemini", "google", "google-genai"):
+            # Initialize Gemini LLM
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            from .config import RAG_GOOGLE_API_KEY, RAG_GOOGLE_MODEL
+            
+            if not RAG_GOOGLE_API_KEY:
+                raise Exception("Google API key is required when using Gemini provider")
+            if not RAG_GOOGLE_MODEL:
+                raise Exception("Google model name is required when using Gemini provider")
+            
+            return ChatGoogleGenerativeAI(
+                model=RAG_GOOGLE_MODEL,
+                temperature=temperature,
+                google_api_key=RAG_GOOGLE_API_KEY
+            )
         else:
             # Initialize Ollama LLM
+            if not self.model_name:
+                raise Exception(f"Model name is required for provider: {self.ai_provider}")
+                
             return OllamaLLM(
                 model=self.model_name,
                 temperature=temperature,

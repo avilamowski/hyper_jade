@@ -20,6 +20,9 @@ EVALUATOR_CONFIG="runners/config/eval_config.yaml"
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
+# Set JADE_AGENT_CONFIG so RAG system uses evaluator config instead of assignment config
+export JADE_AGENT_CONFIG="$EVALUATOR_CONFIG"
+
 # Run the evaluator
 uv run runners/run_supervised_individual_evaluator.py \
     --assignment "$ASSIGNMENT" \

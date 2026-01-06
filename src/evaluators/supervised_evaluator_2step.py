@@ -293,8 +293,8 @@ class SupervisedEvaluator2Step:
 
         # Now render main template including auxiliary metrics block
         main_rendered = self.main_template.render(
-            assignment=assignment or "",
-            requirements=requirements or "",
+            assignment=assignment,
+            requirements=requirements,
             student_code=submission.get('code', ''),
             reference_correction=reference_correction,
             generated_correction=generated_text,

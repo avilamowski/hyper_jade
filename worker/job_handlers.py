@@ -146,8 +146,10 @@ class JobHandlers:
             # Fetch assignment description from API
             assignment = self.api_client.get_assignment(assignment_id)
             assignment_description = assignment.content
-            # Load config (use default path or env var)
-            config_path = os.getenv("JADE_AGENT_CONFIG", "src/config/assignment_config.yaml")
+            # Load config (required environment variable)
+            config_path = os.getenv("JADE_AGENT_CONFIG")
+            if not config_path:
+                raise ValueError("JADE_AGENT_CONFIG environment variable is required but not set")
             config = load_config(config_path)
             agent = RequirementGeneratorAgent(config)
             requirements = agent.generate_requirements(assignment_description)
@@ -206,8 +208,10 @@ class JobHandlers:
                     "type": req.type
                 }
                 requirements.append(req_dict)
-            # Load config
-            config_path = os.getenv("JADE_AGENT_CONFIG", "src/config/assignment_config.yaml")
+            # Load config (required environment variable)
+            config_path = os.getenv("JADE_AGENT_CONFIG")
+            if not config_path:
+                raise ValueError("JADE_AGENT_CONFIG environment variable is required but not set")
             config = load_config(config_path)
             load_langsmith_config()
             
@@ -378,8 +382,10 @@ class JobHandlers:
             # Fetch submission
             submission_obj = self.api_client.get_submission(assignment_id, submission_id)
             submission = {"code": submission_obj.code}
-            # Load config
-            config_path = os.getenv("JADE_AGENT_CONFIG", "src/config/assignment_config.yaml")
+            # Load config (required environment variable)
+            config_path = os.getenv("JADE_AGENT_CONFIG")
+            if not config_path:
+                raise ValueError("JADE_AGENT_CONFIG environment variable is required but not set")
             config = load_config(config_path)
             agent = CodeCorrectorAgent(config)
             # Run correction agent

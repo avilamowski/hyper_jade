@@ -105,7 +105,11 @@ class CodeCorrectorAgent:
 
     def _setup_llm(self):
         provider = str(self.agent_config.get("provider", "openai")).lower().strip()
-        model_name = self.agent_config.get("model_name", "gpt-4o-mini")
+        model_name = self.agent_config.get("model_name")
+        
+        if not model_name:
+            raise ValueError(f"model_name is required in code_corrector configuration")
+        
         temperature = float(self.agent_config.get("temperature", 0.1))
 
         if provider == "openai":
@@ -122,7 +126,7 @@ class CodeCorrectorAgent:
         if provider in ("gemini", "google", "google-genai"):
             api_key = self.agent_config.get("api_key") or os.environ.get("GOOGLE_API_KEY")
             return ChatGoogleGenerativeAI(
-                model=model_name or "gemini-pro",
+                model=model_name,
                 temperature=temperature,
                 google_api_key=api_key
             )

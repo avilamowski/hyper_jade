@@ -21,7 +21,12 @@ class APIClient:
     """REST API client for communicating with the JADE server"""
     
     def __init__(self, base_url: str = None):
-        self.base_url = base_url or os.getenv("JADE_SERVER_URL", "http://localhost:8000")
+        if base_url:
+            self.base_url = base_url
+        else:
+            self.base_url = os.getenv("JADE_SERVER_URL")
+            if not self.base_url:
+                raise ValueError("base_url parameter or JADE_SERVER_URL environment variable is required but not set")
         self.session = requests.Session()
         self.session.headers.update({
             "Content-Type": "application/json",

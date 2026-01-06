@@ -238,8 +238,8 @@ Provide your evaluation in the following format (one criterion per line):
     
     def _setup_llm(self):
         """Setup LLM for evaluation"""
-        provider = self.evaluator_config.get("provider", "openai")
-        model_name = self.evaluator_config.get("model_name", "gpt-4o-mini")
+        provider = self.evaluator_config["provider"]  # Required, no default
+        model_name = self.evaluator_config["model_name"]  # Required, no default
         temperature = self.evaluator_config.get("temperature", 0.1)
 
         if provider == "openai":
@@ -254,8 +254,10 @@ Provide your evaluation in the following format (one criterion per line):
                 base_url=base_url if base_url else None,
             )
         else:
+            if not model_name:
+                raise ValueError("model_name is required for Ollama provider")
             return OllamaLLM(
-                model=model_name or "qwen2.5:7b",
+                model=model_name,
                 temperature=temperature
             )
     

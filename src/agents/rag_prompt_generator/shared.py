@@ -104,12 +104,8 @@ class LLMFactory:
     
     def create_ragas_llm(self):
         """Create an LLM instance for Ragas metrics."""
-        if self.ai_provider == "openai":
-            from ragas.llms.base import llm_factory
-            return llm_factory('gpt-4o-mini')
-        else:
-            from ragas.llms.base import llm_factory
-            return llm_factory(self.model_name)
+        from ragas.llms.base import llm_factory
+        return llm_factory(self.model_name)
 
 
 class XMLParser:

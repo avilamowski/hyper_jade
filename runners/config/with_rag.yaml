@@ -4,8 +4,8 @@
 # Global LLM Configuration (used as fallback if agent-specific config is not provided)
 # model_name: "gpt-oss:latest"  # Default model for all agents
 # provider: "ollama"
-model_name: "gpt-4o-mini"
-provider: "openai"
+model_name: "gemini-2.0-flash"
+provider: "gemini"
 temperature: 0.1
 
 # RAG Configuration
@@ -31,14 +31,14 @@ agents:
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
     provider: "gemini"
-    model_name: "gemini-3-flash-preview"
+    model_name: "gemini-2.0-flash"
     temperature: 0.15
     example_quantity: 3
     templates:
       examples: "examples.jinja"
       default: "prompt_generators/requirement_explain/requirement_explain.jinja"
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
-      error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
+      error_presence: "prompt_generators/error_explain/error_explain.en2en.jinja"
       stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
 
   code_corrector:
@@ -49,8 +49,7 @@ agents:
     # Agent-specific model configuration (optional)
     # Using Gemini to avoid OpenAI rate limiting
     provider: "gemini"
-    # model_name: "gemini-2.0-flash"
-    model_name: "gemini-3-flash-preview"
+    model_name: "gemini-2.0-flash"
     temperature: 0.1
 
   group_functions:

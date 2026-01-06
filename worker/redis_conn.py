@@ -2,8 +2,10 @@ import os
 import redis
 from typing import Optional
 
-# Redis connection configuration
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+# Redis connection configuration (required)
+REDIS_URL = os.getenv("REDIS_URL")
+if not REDIS_URL:
+    raise ValueError("REDIS_URL environment variable is required but not set")
 
 class RedisConnection:
     """Redis connection management for the worker"""

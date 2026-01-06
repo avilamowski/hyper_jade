@@ -17,21 +17,20 @@ def get_agent_config(config: Dict[str, Any], agent_name: str) -> Dict[str, Any]:
         
     Returns:
         Dictionary with agent-specific configuration, falling back to global config
+    
+    Raises:
+        KeyError: If required configuration keys are missing
     """
     # Get agent-specific configuration
-    agent_config = config.get('agents', {}).get(agent_name, {})
+    agents = config.get('agents', {})
+    agent_config = agents.get(agent_name, {})
     
-    # Create merged configuration with global fallbacks
+    # Create merged configuration - agent config overrides global, but no hardcoded defaults
     merged_config = {
-        # Global configuration as fallback
-        'model_name': config.get('model_name', 'gpt-4'),
-        'provider': config.get('provider', 'openai'),
-        'temperature': config.get('temperature', 0.1),
-        
-        # Agent-specific overrides
-        'model_name': agent_config.get('model_name', config.get('model_name', 'gpt-4')),
-        'provider': agent_config.get('provider', config.get('provider', 'openai')),
-        'temperature': agent_config.get('temperature', config.get('temperature', 0.1)),
+        # Global configuration as fallback (required)
+        'model_name': agent_config.get('model_name', config['model_name']),
+        'provider': agent_config.get('provider', config['provider']),
+        'temperature': agent_config.get('temperature', config['temperature']),
         
         # Include all other agent-specific settings
         **agent_config
@@ -49,15 +48,18 @@ def get_global_config(config: Dict[str, Any]) -> Dict[str, Any]:
         
     Returns:
         Dictionary with global configuration
+        
+    Raises:
+        KeyError: If required configuration keys are missing
     """
     return {
-        'model_name': config.get('model_name', 'gpt-4'),
-        'provider': config.get('provider', 'openai'),
-        'temperature': config.get('temperature', 0.1),
-        'enable_rag': config.get('enable_rag', False),
-        'rag_knowledge_base': config.get('rag_knowledge_base'),
-        'output': config.get('output', {}),
-        'logging': config.get('logging', {})
+        'model_name': config['model_name'],
+        'provider': config['provider'],
+        'temperature': config['temperature'],
+        'enable_rag': config.get('enable_rag', False),  # Optional, default False
+        'rag_knowledge_base': config.get('rag_knowledge_base'),  # Optional
+        'output': config.get('output', {}),  # Optional
+        'logging': config.get('logging', {})  # Optional
     }
 
 
