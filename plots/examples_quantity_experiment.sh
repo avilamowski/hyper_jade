@@ -14,7 +14,7 @@ TITLE="Example Quantity Experiment Comparison"
 OUTPUT="comparison_plots_with_std"
 
 # Run the plot generation script
-python3 plots/plot_experiments.py \
+uv run python plots/plot_experiments.py \
     "$BASE_DIR" \
     $CONFIGS \
     --title "$TITLE" \
