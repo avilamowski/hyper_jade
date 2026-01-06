@@ -6,5 +6,6 @@ and provide detailed feedback and corrections.
 """
 
 from .code_corrector import CodeCorrectorAgent
+from .linter_correction_agent import LinterCorrectionAgent
 
-__all__ = ["CodeCorrectorAgent"]
+__all__ = ["CodeCorrectorAgent", "LinterCorrectionAgent"]

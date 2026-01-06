@@ -44,7 +44,14 @@ DOTENV = dotenv_values()
 def _get_group_functions_agent():
     from src.agents.group_functions import GroupFunctionsAgent
     return GroupFunctionsAgent
-    # --------------------------------------------------------------------------- #
+
+
+def _get_linter_correction_agent():
+    from src.agents.code_corrector.linter_correction_agent import LinterCorrectionAgent
+    return LinterCorrectionAgent
+
+
+# --------------------------------------------------------------------------- #
 # LangGraph State
 # --------------------------------------------------------------------------- #
 class CodeCorrectorState(TypedDict):
@@ -84,6 +91,15 @@ class CodeCorrectorAgent:
         if self.group_functions_enabled:
             GroupFunctionsAgent = _get_group_functions_agent()
             self.group_functions_agent = GroupFunctionsAgent(self.config)
+        
+        # Initialize linter if enabled
+        linter_config = self.agent_config.get('linter', {})
+        self.linter_enabled = linter_config.get('enabled', False)
+        self.linter_agent = None
+        if self.linter_enabled:
+            LinterCorrectionAgent = _get_linter_correction_agent()
+            self.linter_agent = LinterCorrectionAgent(self.config)
+            logger.info("Linter correction agent initialized")
         
         self.graph = self._build_graph()
 
@@ -381,6 +397,17 @@ class CodeCorrectorAgent:
 
         # Extract results
         results: List[Correction] = result_state["corrections"]
+        
+        # Add linter corrections if enabled
+        if self.linter_enabled and self.linter_agent:
+            try:
+                linter_corrections = self.linter_agent.generate_linter_corrections(
+                    code=submission["code"]
+                )
+                results.extend(linter_corrections)
+                logger.info(f"Added {len(linter_corrections)} linter corrections")
+            except Exception as e:
+                logger.error(f"Linter correction failed: {e}")
 
         return results
 
