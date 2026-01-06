@@ -14,7 +14,7 @@ TITLE="RAG Impact Comparison"
 OUTPUT="rag_comparison_plots"
 
 # Run the plot generation script
-python3 plots/plot_experiments.py \
+uv run plots/plot_experiments.py \
     "$BASE_DIR" \
     $CONFIGS \
     --title "$TITLE" \

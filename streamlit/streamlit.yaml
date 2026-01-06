@@ -1,0 +1,9 @@
+# Streamlit Comparator Configuration
+# Configure paths relative to project root
+
+# Path to assignment folder containing submissions and consigna
+assignment_path: "ejemplos/3p"
+
+# Path to evaluation outputs directory
+# Structure: outputs_path/{experiment_name}/{timestamp}/{submission}/
+outputs_path: "outputs/evaluation"

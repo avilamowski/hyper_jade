@@ -292,7 +292,9 @@ This will:
                     submission_index=i
                 )
 
-                submission_output_dir = Path(args.output_dir) / f"submission_{i+1}"
+                # Use the submission filename (without extension) for unambiguous identification
+                submission_name = Path(args.submissions[i]).stem
+                submission_output_dir = Path(args.output_dir) / submission_name
                 submission_output_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Extract extra data for persistence
