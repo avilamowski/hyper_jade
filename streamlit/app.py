@@ -64,6 +64,17 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
+    /* Ensure text wraps in expanders */
+    .stExpander div[data-testid="stMarkdownContainer"] {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .stExpander p, .stExpander code {
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -179,10 +190,10 @@ def render_run_data(run_data: dict, run_key: str):
             if corr_list:
                 for corr in corr_list:
                     req = corr.get('requirement', {})
-                    with st.expander(f"**{req.get('function', 'Unknown')}** - {req.get('type', '')}"):
+                    with st.expander(f"**{req.get('function', 'Unknown')}** - {req.get('type', '')}", expanded=True):
                         st.markdown(f"**Requirement:** {req.get('requirement', 'N/A')}")
                         st.markdown("**Result:**")
-                        st.code(corr.get('result', 'No result'), language=None)
+                        st.markdown(corr.get('result', 'No result'))
             else:
                 st.info("No corrections in this run")
         else:
@@ -195,11 +206,14 @@ def render_run_data(run_data: dict, run_key: str):
             if isinstance(metrics, dict):
                 for metric_name, metric_value in metrics.items():
                     if metric_name != 'timings':
-                        with st.expander(f"📈 {metric_name.upper()}"):
+                        with st.expander(f"📈 {metric_name.upper()}", expanded=True):
                             if isinstance(metric_value, str):
-                                st.text(metric_value)
+                                st.markdown(metric_value)
+                            elif isinstance(metric_value, list):
+                                for item in metric_value:
+                                    st.markdown(f"- {item}")
                             else:
-                                st.json(metric_value)
+                                st.markdown(f"```json\n{metric_value}\n```")
             else:
                 st.json(metrics)
         else:
@@ -235,7 +249,7 @@ def render_run_data(run_data: dict, run_key: str):
             if timings:
                 with st.expander("⏱️ Timings"):
                     for name, time_val in timings.items():
-                        st.text(f"{name}: {time_val:.2f}s")
+                        st.markdown(f"**{name}:** {time_val:.2f}s")
         else:
             st.info("No evaluation results available")
 
