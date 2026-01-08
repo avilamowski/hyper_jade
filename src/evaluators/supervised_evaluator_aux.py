@@ -172,6 +172,13 @@ class AuxiliaryMetricsEvaluator:
                 model=model_name,
                 temperature=self.evaluator_config["temperature"]
             )
+        elif provider in ("gemini", "google", "google-genai"):
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            return ChatGoogleGenerativeAI(
+                model=model_name,
+                temperature=self.evaluator_config["temperature"],
+                google_api_key=os.getenv("GOOGLE_API_KEY")
+            )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     

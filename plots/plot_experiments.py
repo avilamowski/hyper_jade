@@ -88,16 +88,29 @@ def calculate_statistics(all_data, configs):
 def create_config_labels(configs):
     """Generate readable labels from configuration names."""
     labels = {}
+    
+    # Special mappings for known experiment types
+    known_labels = {
+        'with_linter': 'With Linter',
+        'without_linter': 'Without Linter',
+        'with_rag': 'With RAG',
+        'without_rag': 'Without RAG',
+    }
+    
     for config in configs:
-        # Try to parse format like "0c_0i" -> "0 Correct\n0 Erroneous"
-        parts = config.split('_')
-        if len(parts) == 2 and parts[0].endswith('c') and parts[1].endswith('i'):
-            correct = parts[0][:-1]
-            erroneous = parts[1][:-1]
-            labels[config] = f'{correct} Correct\n{erroneous} Erroneous'
+        # Check for known labels first
+        if config in known_labels:
+            labels[config] = known_labels[config]
         else:
-            # Use folder name as-is if it doesn't match expected format
-            labels[config] = config.replace('_', ' ').title()
+            # Try to parse format like "0c_0i" -> "0 Correct\n0 Erroneous"
+            parts = config.split('_')
+            if len(parts) == 2 and parts[0].endswith('c') and parts[1].endswith('i'):
+                correct = parts[0][:-1]
+                erroneous = parts[1][:-1]
+                labels[config] = f'{correct} Correct\n{erroneous} Erroneous'
+            else:
+                # Use folder name as-is if it doesn't match expected format
+                labels[config] = config.replace('_', ' ').title()
     
     return labels
 

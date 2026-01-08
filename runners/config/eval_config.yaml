@@ -35,7 +35,7 @@ supervised_evaluator:
       function: "compute_restraint"
     content_similarity:
       function: "compute_content_similarity"
-      # Use OpenAI for content_similarity (comment out to use Ollama)
-      model_name: "gpt-4o-mini"
-      provider: "openai"
+      # Using Gemini Flash 2.0 for content_similarity
+      model_name: "gemini-2.0-flash"
+      provider: "gemini"
       temperature: 0.1

@@ -102,6 +102,43 @@ Extract as:
 - **PARTIAL**: AI mentioned the issue but missed important details or nuances
 - **POOR**: AI barely touched on the issue, major gaps in understanding
 
+## CRITICAL: Semantic Equivalence for Matching
+
+Two corrections are a **MATCH** if they refer to the **same underlying problem**, even if:
+- They use different words or technical terminology
+- One describes the symptom, the other describes the root cause
+- One uses linting error codes (like F405, E501), the other describes the runtime behavior
+- One is more technical, the other is more descriptive
+
+### CONCRETE EXAMPLES - These ARE matches:
+
+**Example 1 - Same typo, different description:**
+- Human: "Error de ejecución porque puso r en vez de 'r'"
+- AI: "Undefined name `r` en la línea 52"
+- MATCH: Both identify the missing quotes around `r`
+
+**Example 2 - Same variable typo:**
+- Human: "La función no guarda los resultados"
+- AI: "Error: `reusltado` no está definido, debería ser `resultado`"
+- MATCH: The typo `reusltado` causes the saving problem
+
+**Example 3 - Linter code matches runtime error:**
+- Human: "Da NameError con sqrt"
+- AI: "F405: `sqrt` may be undefined from star import"
+- MATCH: Both describe the same sqrt availability issue
+
+**Example 4 - Root cause matches symptom:**
+- Human: "A veces da error de índice en la lista"
+- AI: "El bucle usa `range(len(lista)+1)` que accede fuera de rango"
+- MATCH: The off-by-one error explains the IndexError
+
+### These are NOT matches (different issues):
+
+- Human: "No valida que precio sea positivo" vs AI: "Debería usar enumerate"
+- Human: "Error al abrir archivo" vs AI: "Calcula mal el promedio"
+
+**RULE: If both talk about the same variable, same function error, or same operation → MATCH**
+
 ---
 
 # OUTPUT INSTRUCTIONS

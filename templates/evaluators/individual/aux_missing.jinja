@@ -161,6 +161,29 @@ For each issue you find in SECTION D (human feedback), ask yourself:
 - **AI (SECTION E)** says: "No actualiza el stock correctamente"
 - **Decision**: PARTIAL MATCH - AI mentioned part of it → **Use `<matched>` tags in MATCHED section**
 
+## CRITICAL: Semantic Equivalence for MATCH vs MISSING
+
+Before marking something as MISSING, check if the AI mentioned the **same underlying problem** with different words!
+
+**These are MATCHES (not missing):**
+
+- Human: "Error de ejecución porque puso r en vez de 'r'"
+- AI: "Undefined name `r` en la línea 52"
+- **MATCH** - Both identify the missing quotes around `r`
+
+- Human: "Da NameError con sqrt"
+- AI: "F405: `sqrt` may be undefined from star import"
+- **MATCH** - Both describe the same sqrt availability issue
+
+- Human: "A veces da error de índice en la lista"
+- AI: "El bucle usa `range(len(lista)+1)` que accede fuera de rango"
+- **MATCH** - The off-by-one error explains the IndexError
+
+**Only MISSING if the AI talks about something completely different:**
+
+- Human: "No valida precio positivo" vs AI only talks about file reading → MISSING
+- Human: "Bucle infinito en procesar()" vs AI only talks about modularization → MISSING
+
 ## How to Extract from XML (SECTION B):
 
 Given this XML in SECTION B:

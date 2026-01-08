@@ -220,6 +220,13 @@ def compute_content_similarity(
         elif provider == "ollama":
             from langchain_ollama.llms import OllamaLLM
             llm = OllamaLLM(model=model_name, temperature=temperature)
+        elif provider in ("gemini", "google", "google-genai"):
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            llm = ChatGoogleGenerativeAI(
+                model=model_name,
+                temperature=temperature,
+                google_api_key=os.getenv("GOOGLE_API_KEY")
+            )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     
@@ -526,6 +533,13 @@ def compute_precision(
         elif provider == "ollama":
             from langchain_ollama.llms import OllamaLLM
             llm = OllamaLLM(model=model_name, temperature=temperature)
+        elif provider in ("gemini", "google", "google-genai"):
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            llm = ChatGoogleGenerativeAI(
+                model=model_name,
+                temperature=temperature,
+                google_api_key=os.getenv("GOOGLE_API_KEY")
+            )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
     

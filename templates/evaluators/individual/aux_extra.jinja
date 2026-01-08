@@ -124,6 +124,55 @@ AI correction: <generated>El código no valida que el parámetro 'cantidad' sea 
 - **SOMEWHAT_RELEVANT**: The comment is related to code quality or good practices but not central to the assignment requirements
 - **IRRELEVANT**: The comment is off-topic, overly pedantic, or unrelated to the assignment objectives
 
+## CRITICAL: Semantic Equivalence Check - DO THIS FIRST
+
+**STOP! Before marking ANYTHING as EXTRA, you MUST check if it matches something the human said!**
+
+Two corrections refer to the **SAME underlying problem** if they talk about:
+- The same variable, function, or line of code
+- The same type of error (even if described differently)
+- The same bug (even if one gives the symptom and the other the cause)
+
+### CONCRETE EXAMPLES - NOT EXTRA (these match human feedback):
+
+**Example 1 - Same typo error:**
+- Human: "Error de ejecución porque puso r en vez de 'r'"
+- AI: "Undefined name `r` en la línea 52. Se usa la variable r pero no está definida."
+- VERDICT: **NOT EXTRA** - Both talk about the same missing quotes error!
+
+**Example 2 - Same variable typo:**
+- Human: "La función no guarda los resultados"
+- AI: "La variable `reusltado` no está definida, debería ser `resultado`"
+- VERDICT: **NOT EXTRA** - The typo IS why results aren't saved!
+
+**Example 3 - Same import problem:**
+- Human: "Da NameError con sqrt"
+- AI: "F405: `sqrt` may be undefined due to star import from math"
+- VERDICT: **NOT EXTRA** - Both describe the same sqrt/import issue!
+
+**Example 4 - Root cause of human's observation:**
+- Human: "A veces da error de índice en la lista"
+- AI: "El bucle usa `range(len(lista)+1)` que accede fuera de rango"
+- VERDICT: **NOT EXTRA** - The off-by-one error explains the IndexError!
+
+### EXAMPLES THAT ARE EXTRA (no connection to human feedback):
+
+**Example 5 - Completely different issue:**
+- Human: "No valida que el precio sea positivo"
+- AI: "El código debería usar enumerate en vez de range(len())"
+- VERDICT: **EXTRA** - Validation vs iteration style are unrelated issues
+
+**Example 6 - New issue not mentioned:**
+- Human: "Error al abrir el archivo"
+- AI: "La función calcula mal el promedio"
+- VERDICT: **EXTRA** - File operations vs calculations are different problems
+
+### DECISION RULE:
+
+Ask yourself: "Does the AI's comment relate to ANYTHING the human mentioned?"
+- If the human mentioned the same variable, same function error, same file operation problem → **NOT EXTRA**
+- If the AI talks about something the human never touched on → **EXTRA**
+
 ---
 
 # OUTPUT INSTRUCTIONS
@@ -187,6 +236,8 @@ EXTRA_COUNT: <number>
 </AUXILIARY_METRIC_COUNT>
 
 Where <number> is the total count of extra requirements/comments you identified above. If there are no extras, use 0.
+
+**Remember**: Only count items that have NO semantic equivalence with the human feedback. If the AI mentioned something that relates to the same underlying problem the human mentioned (even with different words), it should NOT be counted as EXTRA.
 
 Example:
 <AUXILIARY_METRIC_COUNT>
