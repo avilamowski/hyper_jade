@@ -13,6 +13,7 @@ from utils import (
     get_submission_data, 
     get_available_runs, 
     get_run_data,
+    get_prompts_data,
     format_timestamp
 )
 
@@ -181,7 +182,7 @@ def render_run_data(run_data: dict, run_key: str):
             st.rerun()
     
     # Tabs for different data types
-    tab1, tab2, tab3 = st.tabs(["📝 Corrections", "📊 Metrics", "🎯 Evaluation"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📝 Corrections", "📊 Metrics", "🎯 Evaluation", "🧠 Prompts"])
     
     with tab1:
         corrections = run_data.get('generated_corrections')
@@ -252,6 +253,34 @@ def render_run_data(run_data: dict, run_key: str):
                         st.markdown(f"**{name}:** {time_val:.2f}s")
         else:
             st.info("No evaluation results available")
+    
+    with tab4:
+        # Load prompts data (prompts are at timestamp level, not submission level)
+        exp_type, timestamp = run_key.split('/')
+        prompts = get_prompts_data(st.session_state.config, exp_type, timestamp)
+        
+        if prompts:
+            st.markdown(f"**{len(prompts)} prompts generated**")
+            for prompt in prompts:
+                req = prompt.get('requirement', {})
+                func_name = req.get('function', 'Unknown')
+                req_type = req.get('type', '')
+                
+                with st.expander(f"**{func_name}** - {req_type}", expanded=False):
+                    st.markdown(f"**Requirement:** {req.get('requirement', 'N/A')}")
+                    
+                    # Show the jinja template
+                    st.markdown("**Generated Template:**")
+                    template = prompt.get('jinja_template', 'No template')
+                    st.markdown(template)
+                    
+                    # Show examples if available
+                    examples = prompt.get('examples', '')
+                    if examples:
+                        with st.expander("📚 Examples Used", expanded=False):
+                            st.markdown(examples)
+        else:
+            st.info("No prompts data available for this run")
 
 
 def render_submission_page():

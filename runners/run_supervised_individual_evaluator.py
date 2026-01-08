@@ -408,6 +408,28 @@ Note: Reference corrections can be provided as either:
                 else:
                     generated_prompts = asyncio.run(generate_prompts_traced(prompt_generator, requirements, assignment_text))
                 logger.info(f"✓ Generated {len(generated_prompts)} prompts")
+                
+                # Save generated prompts to prompts folder
+                prompts_dir = Path(args.output_dir) / "prompts"
+                prompts_dir.mkdir(parents=True, exist_ok=True)
+                
+                for j, prompt in enumerate(generated_prompts):
+                    prompt_data = {
+                        "requirement": {
+                            "requirement": prompt["requirement"]["requirement"],
+                            "function": prompt["requirement"]["function"],
+                            "type": prompt["requirement"]["type"].value if hasattr(prompt["requirement"]["type"], "value") else str(prompt["requirement"]["type"])
+                        },
+                        "jinja_template": prompt["jinja_template"],
+                        "examples": prompt.get("examples", ""),
+                        "index": prompt.get("index", j),
+                        "timestamp": time.time()
+                    }
+                    prompt_file = prompts_dir / f"prompt_{j+1:02d}_{prompt['requirement']['function']}.json"
+                    with open(prompt_file, 'w', encoding='utf-8') as f:
+                        json.dump(prompt_data, f, indent=2, ensure_ascii=False)
+                
+                logger.info(f"✓ Saved {len(generated_prompts)} prompts to {prompts_dir}")
 
             logger.info("Step 2: Processing submissions with unified LangSmith traces...")
             all_evals = []

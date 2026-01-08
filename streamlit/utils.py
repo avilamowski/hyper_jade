@@ -207,3 +207,38 @@ def format_timestamp(timestamp: str) -> str:
         time_part = timestamp[9:15]
         return f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]} {time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
     return timestamp
+
+
+def get_prompts_data(
+    config: Dict[str, Any], 
+    experiment_name: str, 
+    timestamp: str
+) -> Optional[List[Dict[str, Any]]]:
+    """
+    Load prompts data for a specific experiment/timestamp.
+    Prompts are stored at the timestamp level (not per submission).
+    
+    Returns list of prompt dicts, each with:
+        - requirement: Dict with requirement, function, type
+        - jinja_template: The generated prompt template
+        - examples: The examples used
+        - index: The prompt index
+    """
+    project_root = get_project_root()
+    prompts_path = project_root / config['outputs_path'] / experiment_name / timestamp / "prompts"
+    
+    if not prompts_path.exists():
+        return None
+    
+    prompts = []
+    for prompt_file in sorted(prompts_path.glob("*.json")):
+        try:
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                prompt_data = json.load(f)
+                prompt_data['filename'] = prompt_file.name
+                prompts.append(prompt_data)
+        except Exception as e:
+            continue
+    
+    return prompts if prompts else None
+
