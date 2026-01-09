@@ -103,7 +103,7 @@ echo "============================================================"
 echo "🔍 PHASE 2: Running WITHOUT LINTER ($NUM_RUNS runs)"
 echo "============================================================"
 for run in $(seq 1 $NUM_RUNS); do
-    run_evaluation "without_linter" "runners/config/without_linter.yaml" $run
+    run_evaluation \"without_linter\" \"runners/config/plain.yaml\" $run
 done
 
 # Calculate elapsed time

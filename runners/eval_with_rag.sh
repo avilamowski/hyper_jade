@@ -7,9 +7,9 @@
 ASSIGNMENT="ejemplos/3p/consigna.txt"
 REQUIREMENTS="ejemplos/3p/requirements_es/*.json"
 # REQUIREMENTS="ejemplos/3p/requirements/requirement_06.json ejemplos/3p/requirements/requirement_07.json"
-# SUBMISSIONS="ejemplos/3p/alu1.py ejemplos/3p/alu2.py ejemplos/3p/alu3.py ejemplos/3p/alu4.py ejemplos/3p/alu5.py"
-SUBMISSIONS="ejemplos/3p/alu1.py ejemplos/3p/alu2.py ejemplos/3p/alu3.py"
-REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json ejemplos/3p/alu2.json ejemplos/3p/alu3.json"
+SUBMISSIONS="ejemplos/3p/*.py"
+# SUBMISSIONS="ejemplos/3p/alu1.py ejemplos/3p/alu2.py ejemplos/3p/alu3.py"
+REFERENCE_CORRECTIONS="ejemplos/3p/*.json"
 # SUBMISSIONS="ejemplos/3p/alu1.py"
 # REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json"
 # Add a timestamp so multiple runs don't overwrite each other. Format: YYYYMMDDTHHMMSS
