@@ -177,7 +177,17 @@ def example_generation_node(requirement: Requirement, assignment_description: st
     env = Environment(
         loader=FileSystemLoader("templates"), autoescape=select_autoescape(["jinja"])
     )
-    examples_template_file = template_map["examples"]
+    
+    # Get requirement type to select appropriate examples template
+    requirement_type = requirement.get("type")
+    if hasattr(requirement_type, 'value'):
+        requirement_type_str = requirement_type.value
+    else:
+        requirement_type_str = str(requirement_type) if requirement_type else None
+    
+    # Select examples template based on type (with fallback to default)
+    examples_template_key = f"examples_{requirement_type_str}" if requirement_type_str else "examples"
+    examples_template_file = template_map.get(examples_template_key, template_map.get("examples", "examples.jinja"))
     examples_template = env.get_template(examples_template_file)
     
     # Support separate quantities for correct and erroneous examples
@@ -188,8 +198,9 @@ def example_generation_node(requirement: Requirement, assignment_description: st
     
     # Use the requirement text from the Requirement object
     requirement_text = requirement["requirement"]
+    
     examples_prompt = examples_template.render(
-        requirement=requirement_text, 
+        requirement=requirement_text,
         example_quantity=example_quantity,  # Keep for backward compatibility
         correct_example_quantity=correct_example_quantity,
         erroneous_example_quantity=erroneous_example_quantity,

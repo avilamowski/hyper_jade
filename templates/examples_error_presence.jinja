@@ -1,0 +1,73 @@
+You are a programming teacher that is helping students identify errors in their code.
+The following describes an ERROR that students commonly make:
+[{{ requirement }}]
+
+{% if assignment_description %}
+Assignment context:
+{{ assignment_description }}
+{% endif %}
+
+{% if classes_summary %}
+Class summary:
+{{ classes_summary }}
+{% endif %}
+
+Your task is to provide {{correct_example_quantity}} examples of python code fragments that do NOT have this error (correct code){% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples of python code fragments that DO have this error (incorrect code){% endif %}.
+Just provide the relevant code fragments, not the full program.
+
+You MUST use the following XML structure for your output:
+
+<correct>
+    <example>
+        <description>Brief description of why this code is correct (does NOT have the error)</description>
+        <code>
+def read_positive_number():
+    value = int(input("Enter a number: "))
+    if value <= 0:
+        raise ValueError("Number must be positive")
+    return value
+        </code>
+    </example>
+    
+    <example>
+        <description>Brief description of why this code is correct (does NOT have the error)</description>
+        <code>
+def read_positive_number():
+    value = int(input())
+    while value <= 0:
+        print("Error: must be positive")
+        value = int(input())
+    return value
+        </code>
+    </example>
+</correct>
+
+<erroneous>
+    <example>
+        <description>Brief description of what error this code has</description>
+        <code>
+def read_positive_number():
+    value = int(input("Enter a number: "))
+    return value
+        </code>
+    </example>
+    
+    <example>
+        <description>Brief description of what error this code has</description>
+        <code>
+def read_positive_number():
+    return int(input())
+        </code>
+    </example>
+</erroneous>
+
+IMPORTANT: 
+- Use EXACTLY the XML tags shown: <correct>, <erroneous>, <example>, <description>, <code>
+- Generate {{correct_example_quantity}} examples in the <correct> section (code WITHOUT the error){% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples in the <erroneous> section (code WITH the error){% endif %}
+- Keep code fragments concise and focused on the error being checked
+- **CRITICAL:** 
+  - <correct> examples must be code that AVOIDS the error described above
+  - <erroneous> examples must be code that CONTAINS the error described above
+
+Remember, the error to check for is:
+[{{ requirement }}]
