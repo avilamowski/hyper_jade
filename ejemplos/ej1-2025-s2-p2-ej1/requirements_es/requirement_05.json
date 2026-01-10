@@ -1,0 +1,5 @@
+{
+  "requirement": "No identifica los apellidos más largos.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

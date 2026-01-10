@@ -1,0 +1,5 @@
+{
+  "requirement": "No calcula el promedio correctamente o no redondea a 2 decimales.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

@@ -1,0 +1,12 @@
+- Requirement 1: Recursantes - Does not calculate the average correctly or does not round to 2 decimals.
+- Requirement 2: Recursantes - Does not correctly determine students who fail (average <= 3).
+- Requirement 3: Recursantes - Does not show the expected output format (Nombre Apellido - Promedio: X.XX).
+- Requirement 4: Recursantes - Does not print the separator bar every three students.
+- Requirement 5: Segundo parcial - Does not identify the longest surnames.
+- Requirement 6: Segundo parcial - Does not correctly relate surnames to their grades.
+- Requirement 7: Segundo parcial - Does not show the expected output format (Apellido - Nota 2P: X).
+- Requirement 8: Posible promocion - Does not correctly identify the promotion case (average > 7 with one exam between 6 inclusive and 7 exclusive).
+- Requirement 9: Posible promocion - Does not correctly add students to the output list.
+- Requirement 10: Posible promocion - Does not order alphabetically in descending order or show correct format.
+- Requirement 11: Does not solve the assignment requirements.
+- Requirement 12: Execution errors, infinite loops, bad indentation, or use of structures not covered in class.

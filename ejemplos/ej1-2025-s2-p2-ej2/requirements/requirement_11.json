@@ -1,0 +1,5 @@
+{
+  "requirement": "Updates the inventory file when it should not (hacer_pedido).",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

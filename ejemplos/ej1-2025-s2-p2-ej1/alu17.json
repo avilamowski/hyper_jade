@@ -1,0 +1,6 @@
+[
+  "Segundo parcial - No muestra el formato esperado - El código imprime un guion \"-\" antes de cada apellido. El formato esperado es \"Apellido - Nota 2P: X\" sin guion al inicio.",
+  "Segundo parcial - Texto del encabezado incorrecto - El código imprime \"Notas del segundo parcial de apellidos mas largos:\" pero el formato esperado es \"Notas del 2do parcial de apellidos más largos\" (sin dos puntos, \"2do\" en lugar de \"segundo\", \"más\" con tilde, y sin salto de línea).",
+  "Posible promoción - Texto del encabezado incorrecto - El código imprime \"Alumnos que deben verificar posible promocion:\" pero el formato esperado es \"Alumnos que se debe revisar posible promoción:\" (diferente redacción, \"promoción\" con tilde, y sin salto de línea).",
+  "Caso especial - Mensaje con formato incorrecto - El código imprime \"No hay notas cargadas.\" (con punto) pero el formato esperado es \"No hay notas cargadas\" (sin punto)."
+]

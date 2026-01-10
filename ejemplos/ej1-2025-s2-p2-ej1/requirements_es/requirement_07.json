@@ -1,0 +1,5 @@
+{
+  "requirement": "No muestra el formato esperado de salida para apellidos más largos.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

@@ -1,0 +1,5 @@
+{
+  "requirement": "No ignora productos de la venta que no existen en el inventario.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

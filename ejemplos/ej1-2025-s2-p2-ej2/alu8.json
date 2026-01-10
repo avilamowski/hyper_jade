@@ -1,0 +1,7 @@
+[
+  "Error 5: La función `costo` imprime el resultado y no lo retorna.",
+  "Error 2: No maneja la ausencia de `venta.txt` como se pide. La consigna indica que en `costo` debe retornar `0.0`. Aquí se captura `FileNotFoundError` en `leer_txt`, se imprime, y se retorna `None`, lo que luego rompe en el flujo posterior.",
+  "Error 7: Lógica de cálculo incorrecta. Se descuenta stock antes de calcular, se compara con cantidades ya modificadas, y ante faltante se multiplica por una cantidad negativa. Además, el parseo de cantidades de `venta.txt` suma dígitos en vez de formar el número, y no se acumulan repeticiones de productos.",
+  "Error 3: No se ignoran correctamente productos inexistentes en inventario. En lugar de ignorarlos por ítem, se usa una bandera global `hacer_cuenta` que puede desactivar el cálculo completo.",
+  "Error 14: No sigue la consigna: falta la función pública `hacer_pedido`, hay ejecución y E/S al importar el módulo, y nombres/auxiliares confusos para un parseo simple."
+]

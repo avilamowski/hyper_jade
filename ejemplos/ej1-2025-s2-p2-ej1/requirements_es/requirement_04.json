@@ -1,0 +1,5 @@
+{
+  "requirement": "No imprime la barra separadora cada tres alumnos.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

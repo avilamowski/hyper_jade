@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not correctly identify the promotion case.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

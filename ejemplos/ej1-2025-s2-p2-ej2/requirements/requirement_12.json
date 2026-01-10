@@ -1,0 +1,5 @@
+{
+  "requirement": "Finds the product list but prints instead of returning it.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

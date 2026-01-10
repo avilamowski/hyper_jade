@@ -1,0 +1,5 @@
+{
+  "requirement": "No obtiene la lista correcta de productos a reponer.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

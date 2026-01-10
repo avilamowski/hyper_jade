@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not calculate reposition based only on inventory when venta.txt does not exist.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

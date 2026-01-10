@@ -1,0 +1,5 @@
+{
+  "requirement": "Generates execution errors.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

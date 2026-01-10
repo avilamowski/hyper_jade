@@ -1,0 +1,5 @@
+- Recursantes - No calcula el promedio correctamente - La función `calcular_promedio` no redondea el promedio a 2 decimales. Debe usar `round(aux, 2)` antes de agregarlo a la lista.
+- Recursantes - No imprime la línea separadora correctamente - La línea separadora se imprime incorrectamente. La condición `if count % 3 == 0 and count` se evalúa antes de verificar si el alumno es recursante, y además se imprime múltiples veces. Debe imprimirse después de imprimir cada grupo de 3 alumnos recursantes, no antes.
+- Segundo parcial - No imprime con el formato correcto - El texto dice "notas de apellidos mas largos del segundo parcial" cuando debería ser "Notas del 2do parcial de apellidos más largos" (mayúscula inicial, "2do" en lugar de "segundo", "más" con acento).
+- Posible promoción - No ordena correctamente - La función `orden2` ordena de forma ascendente (de A a Z) cuando debería ordenar de forma descendente (de Z a A). La condición `if nom[m] > nom[m + 1]` ordena ascendente. Para ordenar descendente debe ser `if nom[m] < nom[m + 1]`.
+- Posible promoción - No muestra el formato esperado

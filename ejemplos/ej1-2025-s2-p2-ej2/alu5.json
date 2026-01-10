@@ -1,0 +1,13 @@
+[
+  "Error 15: Uso de símbolos/funciones no definidas e importaciones faltantes.",
+  "Error 15: `split_custom` retorna un `int` en lugar de una lista, y su lógica de split mezcla separadores de `:` y `\\n` en una misma pasada.",
+  "Error 2: No maneja la ausencia de `venta.txt` como lo exige la consigna para `costo`: debería retornar `0.0`.",
+  "Error 4: No se propaga la excepción cuando falta el archivo de inventario; en la práctica el bloque `except ...` termina abarcando más de lo necesario.",
+  "Error 7: Cálculo incorrecto de costo y manejo inconsistente de productos repetidos/cantidades.",
+  "Error 5: Se imprime el costo y además se retorna. Imprimir no está prohibido, pero la consigna espera el valor de retorno sin efectos extra.",
+  "Error 14: Estructura del `except` incorrecta y efectos laterales al importar el módulo.",
+  "Error 1: Falta de modularización y reutilización de lógica común (parsing de CSV, parsing de TXT y acumulación).",
+  "Error 6: No se detecta escritura sobre `inventario.csv` (correcto).",
+  "Error 3: Ignorar productos inexistentes en inventario.",
+  "Error 8: Falta la función pública `hacer_pedido(inventario_csv, venta_txt, cantidad_final) -> list[str]`."
+]

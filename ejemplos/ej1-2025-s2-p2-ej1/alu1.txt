@@ -1,0 +1,3 @@
+- Recursantes - No calcula el promedio correctamente - `calcular_promedio` obtiene la media, pero nunca redondea a dos decimales como exige la consigna, por lo que el mismo valor inexacto se reutiliza en todo el flujo.
+- Posible promoción - No ordena alfabéticamente en forma descendente - `ordenar_alfabeticamente` solo realiza un intercambio entre pares adyacentes y, además, ordena ascendente. La lista final no queda ordenada de Z a A por nombre como pide la consigna.
+- Generales - No resuelve la consigna completa - Cuando las listas están vacías no se muestra el mensaje exclusivo `"No hay notas cargadas"`. El `try/except` nunca lanza excepción y se imprimen encabezados vacíos en lugar del mensaje requerido.

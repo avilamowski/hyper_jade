@@ -1,0 +1,5 @@
+{
+  "requirement": "Genera errores de ejecución.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

@@ -1,0 +1,4 @@
+[
+  "Segundo Parcial - Formato con líneas nuevas innecesarias - En la línea 51, el formato incluye líneas nuevas (`\\n`) antes y después de cada impresión, lo que genera salida con espacios en blanco innecesarios. El formato debe ser más compacto.",
+  "Errores de ejecución - Inconsistencia de nombres de parámetros - En la función `mostrar_cursada` (línea 86), el parámetro se llama `notas2`, pero en la línea 88 se usa `notas2p` (que no existe como parámetro local) y en la línea 91 también se usa `notas2p`. Esto causa un error `NameError: name 'notas2p' is not defined` cuando se llama la función con listas vacías `mostrar_cursada([], [], [], [])`, ya que no hay variable global `notas2p` disponible en ese contexto. El parámetro debería llamarse `notas2p` consistentemente en la definición de la función (línea 86) y también usarse como `notas2p` en todas las referencias dentro de la función (líneas 88, 91)."
+]

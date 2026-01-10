@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not correctly determine students who fail (average <= 3).",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

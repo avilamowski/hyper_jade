@@ -1,0 +1,9 @@
+- Error 2: No se maneja correctamente la ausencia de `venta.txt`. En `abrir_manejo_csv_txt` se captura `FileNotFoundError` al abrir el archivo de venta pero solo se imprime un mensaje y no se devuelve una estructura válida ni se implementa el comportamiento pedido (en `costo` debería devolverse `0.0` y en `hacer_pedido` debería calcularse solo con el inventario).
+- Error 4: No se deja propagar la excepción cuando falta el archivo de inventario. La consigna indica explícitamente que si `inventario.csv` no existe, la excepción debe propagarse.
+- Error 5: Las funciones principales imprimen el resultado en pantalla en lugar de devolverlo.
+- Error 7: Cálculo incorrecto del costo por uso inadecuado de tipos y parsing de la venta.
+- Error 9: En `hacer_pedido` no se contempla correctamente el caso en que `venta.txt` no existe; la consigna exige calcular la reposición solo con el inventario en ese caso.
+- Error 12: La lista de reposición se muestra en pantalla pero no se devuelve.
+- Error 13: La lista de productos a reponer puede no ser la correcta debido a errores previos en el parsing de `venta.txt` y al manejo de errores de archivos.
+- Error 14: Hay varias desviaciones de la consigna y malas prácticas de diseño.
+- Error 15: El diseño actual puede generar errores de ejecución adicionales no contemplados.

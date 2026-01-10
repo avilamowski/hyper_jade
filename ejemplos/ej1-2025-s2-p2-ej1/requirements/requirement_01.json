@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not calculate the average correctly or does not round to 2 decimals.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

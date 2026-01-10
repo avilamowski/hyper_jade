@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not correctly relate surnames to their grades.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

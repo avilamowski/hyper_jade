@@ -1,0 +1,5 @@
+{
+  "requirement": "No retorna lista vacía cuando todos los productos tienen suficiente stock.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

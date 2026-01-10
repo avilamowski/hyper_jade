@@ -1,0 +1,4 @@
+[
+  "Posible promoción - Condición mal implementada - El promedio se filtra con `>= 7` (debería ser `> 7`) y además obliga a que el otro parcial sea `>= 7`, descartando alumnos válidos cuyo otro parcial puede ser menor a 7.",
+  "Posible promoción - Orden alfabético incorrecto - `ordenar_custom` ordena ascendente (A→Z) y se reutiliza para la lista de promoción, pero la consigna exige orden descendente por nombre (Z→A). Se verificó con un caso donde “Zoe Zulu” debería aparecer antes que “Ana Alpha” y sucede lo contrario."
+]

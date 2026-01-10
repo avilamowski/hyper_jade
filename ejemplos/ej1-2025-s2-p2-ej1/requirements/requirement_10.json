@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not order promotion students alphabetically in descending order.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

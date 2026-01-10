@@ -1,0 +1,5 @@
+{
+  "requirement": "Execution errors, infinite loops, bad indentation, or use of structures not covered in class.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

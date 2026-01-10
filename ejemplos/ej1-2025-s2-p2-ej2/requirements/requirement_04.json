@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not propagate exception when inventario.csv is missing.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

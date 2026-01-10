@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not follow the assignment. Uses bad practices.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not identify the longest surnames.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

@@ -1,0 +1,5 @@
+{
+  "requirement": "No resuelve los requerimientos de la consigna.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

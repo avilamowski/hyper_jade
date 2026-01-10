@@ -1,0 +1,5 @@
+[
+  "Recursantes - No calcula el promedio correctamente - El código calcula `prom = (n1 + n2) / 2` pero no redondea a 2 decimales. Debe usar `round(prom, 2)` al calcular o al imprimir el promedio. Por ejemplo, si las notas son 1.333 y 2.666, el promedio sin redondear puede tener errores de precisión de punto flotante.",
+  "Posible promoción - No ordena alfabéticamente por nombre descendente - El código imprime los alumnos en el orden en que aparecen en la lista original, pero debe ordenarlos alfabéticamente por nombre en orden descendente (de Z a A). Por ejemplo, si hay \"Ana\", \"Zoe\", \"Luis\", deben mostrarse como \"Zoe\", \"Luis\", \"Ana\".",
+  "Errores de ejecución - Sintaxis incorrecta en manejo de excepciones - La línea `except IndexError or NameError or ValueError:` es sintaxis incorrecta en Python. El operador `or` no funciona así en las cláusulas except. Debe usar una tupla: `except (IndexError, NameError, ValueError):` o múltiples cláusulas except."
+]

@@ -1,0 +1,5 @@
+{
+  "requirement": "Actualiza el archivo de inventario cuando no debería.",
+  "function": "costo",
+  "type": "error_presence"
+}

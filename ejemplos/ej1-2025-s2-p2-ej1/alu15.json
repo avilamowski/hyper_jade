@@ -1,0 +1,6 @@
+[
+  "Recursantes - No imprime la línea separadora correctamente",
+  "Posible promoción - No agrega los alumnos a una lista para procesarlos - El código imprime directamente los alumnos que cumplen la condición sin crear una lista intermedia. Esto impide ordenarlos correctamente antes de mostrarlos.",
+  "Posible promoción - No ordena alfabéticamente por nombre descendente - Los alumnos que pueden promocionar deben mostrarse ordenados alfabéticamente por nombre en orden descendente (de Z a A). El código actual no realiza ningún ordenamiento.",
+  "(adicional): Posible promoción - No muestra el formato esperado - El texto inicial dice \"los alumnos que puede promocionar son\" cuando debe ser \"Alumnos que se debe revisar posible promoción:\""
+]

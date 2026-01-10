@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not ignore products that do not exist in the inventory.",
+  "function": "costo",
+  "type": "error_presence"
+}

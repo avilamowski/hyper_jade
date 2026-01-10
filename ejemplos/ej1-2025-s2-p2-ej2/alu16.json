@@ -1,0 +1,10 @@
+[
+  "Cálculo incorrecto / uso incorrecto de parámetros",
+  "Error 7: En las funciones `costo` (líneas 65, 67) y `hacer_pedido` (líneas 88, 90) se utilizan strings literales `'inventario_csv'` y `'ventas_txt'` en lugar de los parámetros `inventario_csv` y `venta_txt`. Esto hace que el código ignore completamente los argumentos pasados y siempre intente leer archivos con esos nombres fijos. Como consecuencia, el cálculo siempre falla o utiliza datos incorrectos.",
+  "No contempla correctamente el caso de que todos los productos ya alcancen `cantidad_final`",
+  "Error 8: La función `hacer_pedido` calcula correctamente el stock remanente después de la venta y lo compara con `cantidad_final`, pero no tiene una verificación explícita al inicio que retorne `[]` si todos los productos ya tienen stock suficiente. Aunque la lógica implícita podría producir `[]` si ningún producto necesita reposición, no hay una validación temprana que verifique explícitamente este caso según la consigna.",
+  "Indentación incorrecta, ciclo sin fin o uso inapropiado de contenido no incluido",
+  "Error 15: En las líneas 110-116 hay un bloque de código de prueba que se ejecuta al importar el módulo. En la línea 113, se hace referencia a la variable `cantidad_final` que no está definida, lo que generará un `NameError` al ejecutar el archivo. Además, en la línea 111 se redefine la variable `costo` (que es el nombre de la función) con el resultado de llamarla, lo cual puede causar confusión.",
+  "Manejo parcial de ausencia de `venta.txt`",
+  "Error 2: Aunque el código maneja la excepción `FileNotFoundError` cuando `venta.txt` no existe (en `costo` retorna `0.0` y en `hacer_pedido` calcula con inventario), el problema es que utiliza strings literales en lugar de parámetros, por lo que el manejo nunca se activa correctamente según los parámetros pasados."
+]

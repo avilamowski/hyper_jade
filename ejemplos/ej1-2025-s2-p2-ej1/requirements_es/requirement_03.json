@@ -1,0 +1,5 @@
+{
+  "requirement": "No muestra el formato esperado de salida para recursantes.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

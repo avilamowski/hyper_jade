@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not print the separator bar every three students.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

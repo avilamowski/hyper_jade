@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not obtain the correct list of products to restock.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

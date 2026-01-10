@@ -1,0 +1,3 @@
+[
+  "Recursantes - La línea separadora no respeta la consigna - `estructura_recursante` compara `(i / 3) == True`, por lo que solo inserta el separador antes del cuarto recursante y nunca después del sexto, noveno, etc. Además imprime `\"----------\"` (10 guiones) en lugar de la cadena obligatoria de 28 guiones (`\"----------------------------\"`)."
+]

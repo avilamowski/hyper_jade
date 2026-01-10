@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not handle the absence of the venta.txt file (costo should return 0.0).",
+  "function": "costo",
+  "type": "error_presence"
+}

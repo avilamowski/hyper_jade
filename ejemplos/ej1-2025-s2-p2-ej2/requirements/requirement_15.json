@@ -1,0 +1,5 @@
+{
+  "requirement": "Bad indentation, infinite loop, or inappropriate use of content not covered in class.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

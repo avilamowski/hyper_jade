@@ -1,0 +1,5 @@
+{
+  "requirement": "No relaciona correctamente los apellidos con sus notas.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

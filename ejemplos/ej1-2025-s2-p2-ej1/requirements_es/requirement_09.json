@@ -1,0 +1,5 @@
+{
+  "requirement": "No agrega correctamente los alumnos a la lista de posible promoción.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

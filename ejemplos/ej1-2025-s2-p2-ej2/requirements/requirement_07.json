@@ -1,0 +1,5 @@
+{
+  "requirement": "Calculates the cost incorrectly.",
+  "function": "costo",
+  "type": "error_presence"
+}

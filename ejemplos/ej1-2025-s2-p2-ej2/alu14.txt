@@ -1,0 +1,11 @@
+- Error 2: El manejo de la ausencia de `venta.txt` está parcialmente implementado pero con problemas. La función `limpiar_datos_txt` retorna `"0.0", "0.0"` (strings) en lugar de valores que permitan distinguir el error, y `costo` retorna `"0.0"` (string) cuando debería retornar `0.0` (float).
+- Error 3: La función `costo` no implementa la lógica para ignorar productos inexistentes en el inventario. No hay verificación de si los productos de la venta existen en el inventario antes de procesarlos.
+- Error 5: La función `costo` retorna un valor, pero siempre es 0 porque no implementa el cálculo. La función `hacer_pedido` intenta retornar una variable no definida.
+- Error 7: El cálculo del costo no está implementado. La función `costo` siempre retorna 0 sin procesar los productos de la venta ni calcular el precio total.
+- Error 8: La función `hacer_pedido` no está implementada. No calcula el stock remanente después de la venta ni compara con `cantidad_final` para determinar qué productos reponer.
+- Error 9: La función `hacer_pedido` no maneja el caso cuando `venta.txt` no existe. Debería calcular la reposición basándose solo en el inventario actual.
+- Error 10: La función `hacer_pedido` no está implementada, por lo que no puede ignorar productos del pedido que no existen en el inventario.
+- Error 13: La función `hacer_pedido` no calcula correctamente la lista de productos a reponer porque no está implementada.
+- Error 15: Hay errores de ejecución: la variable `lista_productos_en_inventario` no está definida en `hacer_pedido`, y el parsing de números en `limpiar_datos_txt` solo captura un dígito por producto.
+- Otros: El parsing de `venta.txt` tiene problemas: no acumula correctamente los dígitos de números multi-dígito, y el parsing de productos puede incluir caracteres no deseados. Además, hay un espacio en el encoding de `limpiar_datos_csv` que podría causar problemas.
+- Error 1: Aunque hay funciones auxiliares, no se reutiliza lógica común entre `costo` y `hacer_pedido`. Ambas necesitan procesar ventas y comparar con inventario, pero cada una debería usar funciones compartidas para esto.

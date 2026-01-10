@@ -1,0 +1,5 @@
+{
+  "requirement": "No determina correctamente los alumnos recursantes (promedio <= 3).",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

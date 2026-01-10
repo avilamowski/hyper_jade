@@ -1,0 +1,5 @@
+{
+  "requirement": "No sigue la consigna. Aplica malas prácticas.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

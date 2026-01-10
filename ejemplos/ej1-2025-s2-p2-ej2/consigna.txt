@@ -1,0 +1,68 @@
+Ejercicio: Gestión de Pedidos
+
+Desarrollá dos funciones en Python que procesan pedidos a partir de un inventario.
+
+Archivos de entrada
+
+inventario.csv
+
+Contiene nombre, precio unitario por producto (float) y la cantidad existente de cada producto (int). No tiene productos repetidos ni requiere validar tipos. Ejemplo:
+
+lapiz,50.0,10
+cuaderno,250.0,5
+goma,30.0,20
+
+venta.txt
+
+Cada línea tiene el formato "producto:cantidad". Puede repetir productos y no requiere validar tipos. Ejemplo:
+
+lapiz:8
+cuaderno:5
+goma:3
+lapiz:1
+
+Los archivos no tienen espacios ni encabezados.
+
+Funciones requeridas
+
+costo(inventario_csv, venta_txt) -> float
+
+Devuelve el costo total de los productos que se pudieron vender.
+
+- Ignorar productos del pedido que no estén en el inventario.
+- Si la cantidad pedida supera el stock, vender solo lo disponible.
+- Si el archivo de venta no existe, retornar 0.0.
+- No modificar el inventario después de la venta.
+
+hacer_pedido(inventario_csv, venta_txt, cantidad_final) -> list[str]
+
+Devuelve los nombres de los productos que deben reponerse para alcanzar cantidad_final después de la venta.
+
+- Si cantidad_final es menor o igual al stock existente tras la venta para todos los productos, retornar [].
+- Si el archivo de venta no existe, calcular la reposición solo con el inventario.
+- Ignorar productos del pedido ausentes en el inventario.
+- cantidad_final siempre es mayor a cero.
+
+Consideraciones generales
+
+- Si el archivo de inventario no existe, dejar que se propague la excepción.
+- Buscar y reutilizar lógica común entre las dos funciones.
+
+Ejemplo
+
+inventario.csv
+
+lapiz,50.0,2
+cuaderno,250.0,20
+goma,30.0,7
+
+venta.txt
+
+lapiz:2
+cuaderno:2
+goma:5
+lapiz:1
+lapicera:4
+
+costo("inventario.csv", "venta.txt") => 750.0
+hacer_pedido("inventario.csv", "venta.txt", 10) => ["lapiz", "goma"]

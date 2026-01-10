@@ -1,0 +1,1 @@
+- Posible promoción - No ordena descendentemente - El código ordena alfabéticamente de A a Z (ascendente) pero debería ordenar de Z a A (descendente). La comparación está invertida.

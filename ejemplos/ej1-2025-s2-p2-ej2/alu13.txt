@@ -1,0 +1,8 @@
+- Error 14: No sigue la consigna. Falta la implementación completa de las funciones pedidas y la lógica asociada.
+- Error 5: La consigna exige retornar valores (no imprimir). Al no existir implementación, no hay retornos ni cálculos.
+- Error 2: No maneja la ausencia de `venta.txt` como exige la consigna (en `costo` debe retornar `0.0`; en `hacer_pedido` debe calcular con inventario).
+- Error 4: La consigna indica que la ausencia del archivo de inventario debe propagar la excepción. Sin implementación, no se cumple ni puede verificarse.
+- Error 7: No existe lógica de cálculo: en `costo`, vender solo hasta el stock, ignorar productos inexistentes; en `hacer_pedido`, calcular stock remanente y comparar contra `cantidad_final`.
+- Error 1: Falta de modularización y reutilización de lógica común entre `costo` y `hacer_pedido` (parseo de archivos, normalización de datos).
+- Error 8: No contempla el caso en que todos los productos ya alcanzan `cantidad_final` tras la venta (debe retornar `[]`).
+- Error 6: La consigna prohíbe modificar archivos de inventario. Si se implementa, debe respetarse.

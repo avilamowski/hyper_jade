@@ -1,0 +1,13 @@
+[
+  "Recursantes - No calcula el promedio correctamente - El promedio se obtiene en `promedio` y `promedio_listas` sin redondear a 2 decimales como exige la consigna.",
+  "Recursantes - No muestra el formato esperado - `nombres_recursa` guarda nombre, apellido y promedio en posiciones contiguas de una misma lista y `mostrar_recursante` imprime índices equivocados, repite alumnos y no usa el formato `Nombre Apellido - Promedio: X.XX`.",
+  "Recursantes - No imprime la línea separadora cada 3 alumnos - El contador se incrementa por elemento en lugar de por alumno; al manejar una lista lineal el cálculo `contador % 3` nunca coincide con alumnos completos y la línea no aparece en la posición indicada.",
+  "Segundo parcial - No identifica los apellidos más largos - `ordenar` usa `range(apellidos)` en lugar de `range(len(apellidos))`, provocando un `TypeError` antes de medir longitudes y nunca detecta cuál es el apellido más largo.",
+  "Segundo parcial - No relaciona correctamente las notas - La función anterior tampoco mantiene el paralelismo con `notas2p`; al fallar la iteración no puede emparejar cada apellido largo con su nota correspondiente.",
+  "Segundo parcial - Formato incorrecto - En `mostrar_notas` se recorre `for i in apellido:` y se imprime el texto literal `\"apellido[i]\"` en lugar del apellido real, además de intentar indexar `nota[i]` usando una cadena, por lo que nunca se respeta `Apellido - Nota 2P: X`.",
+  "Posible promoción - Condición incorrecta - `revisar_prom` compara `promedio >= 7` cuando la consigna requiere `promedio > 7`, omitiendo los casos válidos estrictos.",
+  "Posible promoción - Lista mal gestionada - Aunque arma `nombres_revisar`, la función retorna `nombres`, perdiendo la información filtrada y dejando la sección sin datos.",
+  "Posible promoción - Sin orden ni salida - Nunca ordena los aprobados en forma descendente ni los imprime con el encabezado solicitado, por lo que la tercera sección no aparece.",
+  "Consigna general - No resuelve la consigna - `mostrar_cursada` no muestra todas las secciones correctamente y depende de funciones que no cumplen los requisitos, por lo que la salida completa difiere del formato esperado.",
+  "Errores de ejecución - Se invoca `apellido_y_notas` que no existe, se usa `ordenar(apellidos, notas2p)` como si `apellidos` fuera entero, y en el bloque principal se referencian `nombres`, `apellidos`, `notas1p`, `notas2p` sin definir, causando fallos al ejecutar los casos de prueba."
+]

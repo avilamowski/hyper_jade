@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not show the expected output format for students who fail.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

@@ -1,0 +1,5 @@
+{
+  "requirement": "Calculates correctly but prints instead of returning the value.",
+  "function": "costo",
+  "type": "error_presence"
+}

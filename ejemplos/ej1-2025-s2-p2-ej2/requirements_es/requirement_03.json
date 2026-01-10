@@ -1,0 +1,5 @@
+{
+  "requirement": "No ignora productos que no existen en el inventario.",
+  "function": "costo",
+  "type": "error_presence"
+}

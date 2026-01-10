@@ -1,0 +1,5 @@
+{
+  "requirement": "Calcula correctamente pero imprime en lugar de retornar.",
+  "function": "costo",
+  "type": "error_presence"
+}

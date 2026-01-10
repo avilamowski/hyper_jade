@@ -1,0 +1,5 @@
+{
+  "requirement": "No modulariza ni reutiliza código entre funciones.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

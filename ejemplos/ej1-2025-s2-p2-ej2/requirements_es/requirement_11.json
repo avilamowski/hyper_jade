@@ -1,0 +1,5 @@
+{
+  "requirement": "Actualiza el archivo de inventario cuando no debería (hacer_pedido).",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

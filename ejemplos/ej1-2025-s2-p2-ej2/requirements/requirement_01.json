@@ -1,0 +1,5 @@
+{
+  "requirement": "Functions are not separated for each task or code is not reused.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

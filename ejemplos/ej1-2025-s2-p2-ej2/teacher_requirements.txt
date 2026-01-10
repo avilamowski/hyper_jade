@@ -1,0 +1,16 @@
+- Requirement 1: Modularization - Functions are not separated for each task or code is not reused.
+- Requirement 2: Does not handle the absence of the venta.txt file (costo should return 0.0).
+- Requirement 3: Does not ignore products that do not exist in the inventory.
+- Requirement 4: Does not propagate exception when inventario.csv is missing.
+- Requirement 5: Calculates correctly but prints instead of returning the value.
+- Requirement 6: Updates the inventory file when it should not.
+- Requirement 7: Calculates the cost incorrectly.
+- Requirement 8: Does not return [] when cantidad_final is less than or equal to the existing stock for all products.
+- Requirement 9: Does not calculate reposition based only on inventory when venta.txt does not exist.
+- Requirement 10: Does not ignore products from the sale that do not exist in the inventory.
+- Requirement 11: Updates the inventory file when it should not (hacer_pedido).
+- Requirement 12: Finds the product list but prints instead of returning it.
+- Requirement 13: Does not obtain the correct list of products to restock.
+- Requirement 14: Does not follow the assignment. Uses bad practices.
+- Requirement 15: Bad indentation, infinite loop, or inappropriate use of content not covered in class.
+- Requirement 16: Generates execution errors.

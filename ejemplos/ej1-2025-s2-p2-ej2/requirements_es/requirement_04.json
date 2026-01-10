@@ -1,0 +1,5 @@
+{
+  "requirement": "No propaga la excepción cuando falta inventario.csv.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

@@ -1,0 +1,12 @@
+- Error 15: Errores de sintaxis e indentación que impiden la ejecución (bloque `try` mal indentado, llamadas a funciones inexistentes, uso de variables sin definir, condiciones sin `:`).
+- Error 1: Falta de modularización y reutilización de lógica; parsing de `venta.txt` e `inventario.csv` no están extraídos en funciones reutilizables correctas.
+- Error 2: Manejo incorrecto de `venta.txt` inexistente. En `costo` debe retornar `0.0`; en `hacer_pedido` debe calcular en base solo al inventario.
+- Error 4: No se propaga la excepción cuando falta el archivo de inventario; la consigna exige no capturarla.
+- Error 5: Se imprimen resultados en vez de retornarlos.
+- Error 7: Cálculo del costo incorrecto: no se limita por stock, no ignora productos fuera del inventario, multiplica listas/variables incorrectas.
+- Error 3: No se ignoran productos inexistentes de `venta.txt`; se asume índice alineado y se comparan posiciones en lugar de nombres.
+- Error 8: `hacer_pedido` no contempla devolver `[]` cuando tras la venta todos alcanzan `cantidad_final`.
+- Error 9: No contempla `venta.txt` inexistente para reposición: debería basarse en inventario (venta vacía).
+- Error 12: Muestra resultados por `print` y no devuelve lista/valor (aplica en distintos puntos).
+- Error 14: Malas prácticas: hardcodeo de rutas (`"inventario.csv"`, `"venta.txt"`), nombres de parámetros que sombrean funciones, uso de `split_custom` inapropiado, depender de orden al comparar listas, variables no usadas, función `cantidad_final` que colisiona con nombre de parámetro.
+- Error 13: Lista de reposición incorrecta o ausente: no calcula remanente tras la venta, no compara con `cantidad_final` por producto, ni ignora ausentes.

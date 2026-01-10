@@ -1,0 +1,5 @@
+{
+  "requirement": "No identifica correctamente el caso de posible promoción.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

@@ -1,0 +1,7 @@
+[
+  "Recursantes - No calcula el promedio correctamente - El promedio no se redondea a 2 decimales. En la función `promedio`, el cálculo es correcto pero falta aplicar `round(promedio, 2)`.",
+  "Recursantes - No imprime la línea separadora correctamente - La línea separadora tiene 20 guiones (\"--------------------\") pero debe tener exactamente 28 guiones (\"----------------------------\").",
+  "Segundo parcial - No imprime con el formato esperado - *",
+  "Posible promoción - No identifica correctamente la condición - *",
+  "Posible promoción - No ordena correctamente - La función `ordenar_alf` ordena de forma ascendente (A a Z) pero debe ordenar de forma descendente (Z a A). La condición `if nombres[i] > nombres[j]` ordena ascendente, debería ser `if nombres[i] < nombres[j]` para ordenar descendente."
+]

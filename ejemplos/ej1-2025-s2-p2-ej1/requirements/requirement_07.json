@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not show the expected output format for longest surnames.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

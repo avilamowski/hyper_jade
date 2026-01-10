@@ -1,0 +1,5 @@
+[
+  "Recursantes - No calcula el promedio correctamente - En la línea 9, el promedio se calcula como `(notas1p[i] + notas2p[i]) / 2` pero no se redondea a 2 decimales. Debe usar `round(promedio, 2)` o formatear con 2 decimales.",
+  "Recursantes - No determina correctamente los alumnos recursantes - En la línea 13, la condición es `((notas1p[i] + notas2p[i]) / 2) < 4` pero debería ser `<= 3` según la consigna (promedio ≤ 3). Aunque funcionalmente `< 4` incluye valores ≤ 3, es más claro y correcto usar `<= 3`.",
+  "Recursantes - La lógica de la línea separadora es incorrecta - La lógica del contador en las líneas 5, 10-12, 15 está invertida. El separador debe imprimirse ANTES del 4to, 7mo, etc. alumno, no cuando el contador llega a 0. Además, el contador se decrementa después de imprimir, lo que causa que el separador aparezca en el lugar incorrecto."
+]

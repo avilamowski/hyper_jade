@@ -1,0 +1,5 @@
+{
+  "requirement": "Encuentra la lista de productos pero imprime en lugar de retornar.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

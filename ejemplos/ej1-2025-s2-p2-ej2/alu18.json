@@ -1,0 +1,9 @@
+[
+  "Error 4: La función `abro_archivo_csv` captura la excepción `FileNotFoundError` cuando no existe el archivo de inventario e imprime un mensaje, pero según la consigna la excepción debe propagarse (no capturarse).",
+  "Error 2: Cuando `venta.txt` no existe, `abro_archivo_txt` captura la excepción, imprime un mensaje, pero luego retorna valores indefinidos o incorrectos. Esto hace que `costo` no pueda retornar `0.0` correctamente, y `hacer_pedido` no puede calcular basándose solo en el inventario.",
+  "Error 7: La función `costo` tiene lógica incorrecta en el cálculo. Itera sobre los productos del inventario en lugar de iterar sobre las ventas, lo que puede llevar a cálculos erróneos. Además, la lógica de acumulación de `cant` y la construcción de `lista_cant` es confusa y puede no reflejar correctamente las ventas realizadas.",
+  "Error 5: La función `costo` retorna una tupla `(costo_total, lista_cant)` pero según la consigna debe retornar solo un `float` con el costo total.",
+  "Error 15: Hay un error de sintaxis/ejecución: en la línea 113 se usa `lista_poducto_txt` (con \"o\" en lugar de \"o\") cuando la variable correcta es `lista_producto_txt` (definida en línea 104).",
+  "Error 13: La función `hacer_pedido` depende de que `costo` retorne una tupla con `lista_cant_actual`, pero `costo` debería retornar solo un float. Además, la lógica para determinar qué productos reponer parece incorrecta, ya que usa `lista_cant_actual` que viene de `costo`, pero `lista_cant_actual` puede no tener el mismo orden o longitud que `lista_nombre_csv`.",
+  "Error 8: La función `hacer_pedido` no verifica correctamente si todos los productos ya alcanzan `cantidad_final` tras la venta. La lógica actual puede retornar una lista vacía solo si no hay productos que cumplan la condición, pero no verifica explícitamente el caso donde todos ya alcanzan el objetivo."
+]

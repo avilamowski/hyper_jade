@@ -1,0 +1,13 @@
+[
+  "Error 4: No se propaga la excepción cuando falta el archivo de inventario.",
+  "Error 5: Se imprime el resultado pero no se devuelve el valor en `costo`; además, la firma no coincide con lo solicitado.",
+  "Error 6: Se modifica el inventario persistente en `hacer_pedido`.",
+  "Error 7: Lógica de cálculo/reposición incorrecta o incompleta.",
+  "Error 8: No contempla devolver `[]` cuando todos alcanzan `cantidad_final` tras la venta.",
+  "Error 9: No contempla `venta.txt` inexistente para reposición; devuelve todo el inventario o falla.",
+  "Error 10: Tratamiento de productos ausentes no está definido correctamente en `hacer_pedido` y en `costo` se usa flujo interactivo en vez de archivo.",
+  "Error 2: No maneja ausencia de `venta.txt` correctamente. En `costo` debería retornar `0.0`.",
+  "Error 12: Se muestra en pantalla pero no se retorna la lista en `hacer_pedido`.",
+  "Error 14: Uso de I/O interactiva, ejecución al importar el módulo, firmas incorrectas, nombres confusos y mezcla de responsabilidades.",
+  "Error 15: Errores de ejecución potenciales y parsing defectuoso."
+]

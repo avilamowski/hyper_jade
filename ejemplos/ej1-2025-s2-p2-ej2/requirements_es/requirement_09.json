@@ -1,0 +1,5 @@
+{
+  "requirement": "No calcula reposición basándose solo en el inventario cuando venta.txt no existe.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

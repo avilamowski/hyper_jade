@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not correctly add students to the promotion output list.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

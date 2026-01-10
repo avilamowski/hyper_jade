@@ -1,0 +1,6 @@
+[
+  "Error 4: No se propaga la excepción cuando falta el archivo de inventario.",
+  "Error 2: Manejo incorrecto de `venta.txt` inexistente. En `costo` debería retornar `0.0`; en `hacer_pedido` debería calcular la reposición solo con el inventario.",
+  "Error 13: Lista de reposición incorrecta: solo considera productos presentes en la venta, ignorando el resto del inventario que podría estar por debajo de `cantidad_final`.",
+  "Error 14: Se modifican estructuras de entrada sin necesidad y hay impresiones innecesarias que contaminan la salida."
+]

@@ -1,0 +1,3 @@
+- Recursantes - No imprime la línea separadora cada 3 alumnos - El separador se imprime para todo alumno a partir del cuarto porque sólo se comprueba `cont > 3`, en lugar de cada grupo de tres recursantes (`cont % 3 == 0` antes del 4.º, 7.º, etc.).
+- Posible promoción - Lista mal gestionada - `posible_promocion` no construye una lista con los alumnos candidatos para procesarlos; sólo imprime mientras recorre, lo que impide reutilizar los datos y contradice la consigna.
+- Posible promoción - No ordena ni muestra correctamente - Además de no guardar los alumnos, nunca se los ordena alfabéticamente en orden descendente como exige la consigna; se imprimen en el orden original de entrada.

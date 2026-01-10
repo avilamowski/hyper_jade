@@ -1,0 +1,5 @@
+{
+  "requirement": "Mala indentación, ciclo infinito o uso inapropiado de contenido no visto en clase.",
+  "function": "costo,hacer_pedido",
+  "type": "error_presence"
+}

@@ -1,0 +1,5 @@
+{
+  "requirement": "Does not ignore products from the sale that do not exist in the inventory.",
+  "function": "hacer_pedido",
+  "type": "error_presence"
+}

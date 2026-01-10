@@ -1,0 +1,8 @@
+- Error 15: Errores de sintaxis y ejecución que impiden correr el script.
+- Error 1: Falta de modularización y reutilización. No se definen funciones auxiliares para lectura/parsing; se reimplementa parsing de forma manual y frágil.
+- Error 2: No maneja la ausencia de `venta.txt` como exige la consigna: en `costo` debe retornar `0.0` sin error.
+- Error 4: No se propaga la excepción cuando falta el archivo de inventario (debe propagarse).
+- Error 7: Cálculo incorrecto del costo por múltiples fallas: parsing erróneo, tipos no convertidos, variable `t` sin definir, acumulación de ventas inexistente, operaciones aritméticas entre strings, y condiciones lógicas incorrectas.
+- Error 3: No se garantiza ignorar productos que no existen en el inventario al calcular el costo.
+- Error 8: Falta la función `hacer_pedido` y, por lo tanto, no se calcula la lista de reposición ni se manejan los casos borde indicados (cuando ya se cumple `cantidad_final`, cuando falta `venta.txt`, ignorar productos ausentes).
+- Error 14: Malas prácticas y acoplamiento:

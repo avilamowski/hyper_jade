@@ -1,0 +1,5 @@
+{
+  "requirement": "No ordena alfabéticamente en orden descendente los alumnos de promoción.",
+  "function": "mostrar_cursada",
+  "type": "error_presence"
+}

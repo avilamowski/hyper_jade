@@ -1,0 +1,5 @@
+{
+  "requirement": "No maneja la ausencia del archivo venta.txt (costo debería retornar 0.0).",
+  "function": "costo",
+  "type": "error_presence"
+}
