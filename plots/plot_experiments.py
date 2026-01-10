@@ -95,6 +95,11 @@ def create_config_labels(configs):
         'without_linter': 'Without Linter',
         'with_rag': 'With RAG',
         'without_rag': 'Without RAG',
+        # Model comparison labels
+        'gpt4o_mini': 'GPT-4o-mini',
+        'gemini_2_0_flash': 'Gemini 2.0 Flash',
+        'gemini_2_5_pro': 'Gemini 2.5 Pro',
+        'gemini_3_flash_preview': 'Gemini 3 Flash',
     }
     
     for config in configs:

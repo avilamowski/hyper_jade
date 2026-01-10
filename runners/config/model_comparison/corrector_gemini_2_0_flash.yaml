@@ -1,0 +1,108 @@
+# Configuration for Model Comparison Experiment
+# Code corrector using: gemini-2.0-flash
+# All other agents using: gemini-2.0-flash
+
+# Global LLM Configuration
+model_name: "gemini-2.0-flash"
+provider: "gemini"
+temperature: 0.1
+
+# RAG Configuration
+enable_rag: false
+rag_knowledge_base: null
+
+# Agent Configuration
+agents:
+  requirement_generator:
+    enabled: true
+    template: "requirement_generator_tags.jinja"
+    max_requirements: 10
+
+  prompt_generator:
+    enabled: true
+    provider: "gemini"
+    model_name: "gemini-2.0-flash"
+    temperature: 0.15
+    example_quantity: 3
+    templates:
+      examples: "examples.jinja"
+      default: "prompt_generators/requirement_presence.jinja"
+      requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
+      error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
+      stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
+
+  code_corrector:
+    enabled: true
+    detailed_feedback: true
+    include_suggestions: true
+    include_learning_resources: true
+    # CODE CORRECTOR MODEL - gemini-2.0-flash
+    provider: "gemini"
+    model_name: "gemini-2.0-flash"
+    temperature: 0.1
+    
+    # Linter configuration
+    linter:
+      enabled: true
+      provider: "gemini"
+      model_name: "gemini-2.0-flash"
+      include_categories:
+        - "E"  # Errors
+        - "F"  # Fatal/pyflakes
+        - "W"  # Warnings
+      exclude_codes:
+        - "E501"  # Line too long
+        - "W291"  # Trailing whitespace
+        - "W292"  # No newline at end of file
+        - "W293"  # Blank line contains whitespace
+        - "E302"  # Expected 2 blank lines
+        - "E303"  # Too many blank lines
+        - "E305"  # Expected 2 blank lines after class or function
+        - "E711"  # Comparison to None should be 'if cond is None:'
+        - "E712"  # Comparison to True/False should be 'if cond:' or 'if not cond:'
+        - "E713"  # Test for membership should be 'not in'
+        - "E714"  # Test for object identity should be 'is not'
+        - "E721"  # Do not compare types, use 'isinstance()'
+        - "E722"  # Do not use bare 'except'
+        - "W503"  # Line break before binary operator
+        - "W504"  # Line break after binary operator
+      template: "linter/linter_relevance.jinja"
+
+  group_functions:
+    enabled: true
+
+  agent_evaluator:
+    enabled: false
+    temperature: 0.1
+    enable_teacher_comparison: true
+    teacher_comparison_criteria:
+      coverage: 1.0
+      specificity: 1.0
+      clarity: 1.0
+      completeness: 1.0
+      format: 1.0
+    evaluation_criteria:
+      requirement_generator:
+        completeness: 1.0
+        clarity: 1.0
+        specificity: 1.0
+        coherence: 1.0
+        independence: 1.0
+      prompt_generator:
+        template_completeness: 1.0
+        clarity: 1.0
+        specificity: 1.0
+        code_analysis_focus: 1.0
+        jinja2_syntax: 1.0
+      code_corrector:
+        requirement_coverage: 1.0
+        analysis_depth: 1.0
+        clarity: 1.0
+        accuracy: 1.0
+        actionability: 1.0
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "assignment_evaluator.log"
