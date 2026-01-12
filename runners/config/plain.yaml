@@ -35,6 +35,7 @@ agents:
     example_quantity: 3
     templates:
       examples: "examples.jinja"
+      examples_error_presence: "examples_error_presence.jinja"
       default: "prompt_generators/requirement_explain/requirement_explain.jinja"
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
       error_presence: "prompt_generators/error_explain/error_explain.en2en.jinja"
