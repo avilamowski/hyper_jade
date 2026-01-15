@@ -1,10 +1,12 @@
 # Configuration for Model Comparison Experiment: gpt-4o-mini
 # 3 Correct, 3 Incorrect examples
 # WITHOUT RAG, WITHOUT FUNCTION ANALYZER
+# requirement_generator & prompt_generator: gpt-4o-mini
+# code_corrector: gemini-2.0-flash (fixed)
 
-# Global LLM Configuration
-model_name: "gpt-4o-mini"
-provider: "openai"
+# Global LLM Configuration (fallback)
+model_name: "gemini-2.0-flash"
+provider: "gemini"
 temperature: 0.1
 
 # Disable RAG
@@ -16,6 +18,10 @@ agents:
     enabled: true
     template: "requirement_generator_tags.jinja"
     max_requirements: 10
+    # VARIES BY EXPERIMENT: gpt-4o-mini
+    provider: "openai"
+    model_name: "gpt-4o-mini"
+    temperature: 0.1
 
   prompt_generator:
     enabled: true
@@ -29,12 +35,20 @@ agents:
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
       error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
       stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
+    # VARIES BY EXPERIMENT: gpt-4o-mini
+    provider: "openai"
+    model_name: "gpt-4o-mini"
+    temperature: 0.1
 
   code_corrector:
     enabled: true
     detailed_feedback: true
     include_suggestions: true
     include_learning_resources: true
+    # FIXED: gemini-2.0-flash for all experiments
+    provider: "gemini"
+    model_name: "gemini-2.0-flash"
+    temperature: 0.1
 
   group_functions:
     enabled: false  # DISABLED: Do NOT use AST-based function grouping

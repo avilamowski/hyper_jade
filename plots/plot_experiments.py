@@ -240,8 +240,6 @@ def plot_comparison(base_dir, configs, plot_title=None, output_filename='compari
             std = stats[config][metric]['std']
             n = stats[config][metric]['n']
             print(f"  {metric_titles[metric]:25s}: {mean:.3f} ± {std:.3f} (n={n})")
-    
-    plt.show()
 
 
 def main():
