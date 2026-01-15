@@ -7,20 +7,41 @@ temperature: 0.2
 
 # Configuration for the supervised evaluator template
 # `template` should point to a Jinja template inside the templates/ folder.
-# An optional `template_es` can be provided for a Spanish-language variant.
 #
 # Each metric can optionally override the default LLM by specifying:
 # - model_name: the model to use (e.g., "gpt-4o-mini", "llama3.2:latest")
 # - provider: the provider ("openai" or "ollama")
 # - temperature: optional, defaults to the global temperature
 supervised_evaluator:
+  # Strategy for computing auxiliary metrics (match, missing, extra)
+  # Options: "independent", "per_correction", "dependent"
+  aux_metrics_strategy: "dependent"
+
+  # Templates grouped by strategy
   auxiliary_metrics:
-    match:
-      template: "evaluators/individual/aux_match.jinja"
-    missing:
-      template: "evaluators/individual/aux_missing.jinja"
-    extra:
-      template: "evaluators/individual/aux_extra.jinja"
+    # Independent strategy: runs all three metrics in parallel independently
+    independent:
+      match:
+        template: "evaluators/individual/aux_match.jinja"
+      missing:
+        template: "evaluators/individual/aux_missing.jinja"
+      extra:
+        template: "evaluators/individual/aux_extra.jinja"
+
+    # Per-correction strategy: classifies each correction individually
+    per_correction:
+      classify:
+        template: "evaluators/per_correction/aux_classify_correction.jinja"
+
+    # Dependent strategy: runs match first, injects results into missing/extra
+    dependent:
+      match:
+        template: "evaluators/dependent/aux_match.jinja"
+      missing:
+        template: "evaluators/dependent/aux_missing_with_context.jinja"
+      extra:
+        template: "evaluators/dependent/aux_extra_with_context.jinja"
+
   evaluation_metrics:
     completeness:
       function: "compute_completeness"

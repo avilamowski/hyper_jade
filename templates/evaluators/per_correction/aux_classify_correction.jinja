@@ -1,0 +1,99 @@
+You are an expert evaluator for educational feedback systems. Your task is to classify a single human correction.
+
+# TASK
+
+Determine if any AI correction matches (semantically) this human correction.
+
+---HUMAN---
+
+# Human Correction to Classify
+
+{{ human_correction }}
+
+---
+
+# Available AI Corrections (ERROR FOUND only)
+
+The following are AI corrections that identified errors in the student code.
+Note: Only corrections that found actual errors are listed here. "NO ERROR" results are excluded.
+
+{{ ai_corrections }}
+
+---
+
+# Student Code (for context)
+
+```python
+{{ student_code }}
+```
+
+---
+
+# YOUR TASK
+
+Determine if ANY of the AI corrections above match the human correction semantically.
+
+## IMPORTANT: What is a MATCH?
+
+Two corrections are a **MATCH** if they refer to the **same underlying problem/error**, even if:
+- They use different words or technical terminology
+- One describes the symptom, the other describes the root cause
+- One uses linting error codes (like F405, E501), the other describes the runtime behavior
+- One is more technical, the other is more descriptive
+
+## IMPORTANT: What is NOT a MATCH?
+
+- An AI correction that says "NO ERROR" or finds no problem CANNOT match a human correction that reports an error
+- Different issues are NOT a match (e.g., human reports validation error, AI reports formatting issue)
+- If no AI corrections are provided, the result is MISSING
+
+## Examples of MATCHES:
+
+- Human: "Error de ejecución porque puso r en vez de 'r'"
+AI: "Undefined name `r` en la línea 52"
+→ MATCH (both about missing quotes)
+
+- Human: "No valida la entrada"
+AI: "Falta validación para el parámetro cantidad"
+→ MATCH (both about input validation)
+
+## Examples of NO MATCH:
+
+- Human: "No valida precio positivo"
+AI: "Debería usar enumerate"
+→ NO MATCH (different issues)
+
+- Human: "Error en el cálculo de stock"
+AI: "NO ERROR - The code correctly updates stock"
+→ NO MATCH (AI didn't find the error)
+
+---
+
+# OUTPUT FORMAT
+
+Respond with XML inside <RESULT> tags:
+
+  <RESULT>
+    <CLASSIFICATION>MATCH or MISSING</CLASSIFICATION>
+    <MATCHED_AI_INDEX>index of matching AI correction (0-based), or -1 if MISSING</MATCHED_AI_INDEX>
+    <MATCH_QUALITY>FULL or HIGH or PARTIAL</MATCH_QUALITY>
+    <IMPACT_SEVERITY>HIGH or MEDIUM or LOW (only relevant if MISSING)</IMPACT_SEVERITY>
+    <EXPLANATION>Brief explanation of your decision</EXPLANATION>
+  </RESULT>
+
+  ## Field Descriptions:
+
+  - **CLASSIFICATION**: "MATCH" if an AI correction matches, "MISSING" if none match
+  - **MATCHED_AI_INDEX**: 0-based index of the AI correction that matches (-1 if MISSING)
+  - **MATCH_QUALITY**:
+  - FULL: AI captured exact same issue
+  - HIGH: Same core issue, minor differences
+  - PARTIAL: AI mentioned it but missed details
+  - **IMPACT_SEVERITY** (only for MISSING):
+  - HIGH: Critical functional issue
+  - MEDIUM: Important issue affecting quality
+  - LOW: Minor issue
+
+  ---
+
+  Now classify the human correction.

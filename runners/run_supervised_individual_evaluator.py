@@ -88,8 +88,9 @@ def process_submission_traced(
             submission_corrections = code_corrector.correct_code_batch(generated_prompts, submission, assignment_text)
         
         # Combine all corrections into a single text
+        # Include <requirement> tag so auxiliary metrics can match based on requirement content
         generated_correction_text = "\n\n".join([
-            f"## {corr['requirement']['function']}\n{corr['result']}"
+            f"## {corr['requirement']['function']}\n<requirement>{corr['requirement']['requirement']}</requirement>\n{corr['result']}"
             for corr in submission_corrections
         ])
         

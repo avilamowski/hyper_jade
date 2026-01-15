@@ -244,7 +244,7 @@ def render_run_data(run_data: dict, run_key: str):
         st.markdown(f"### 🔬 {exp_type}")
         st.caption(f"📅 {format_timestamp(timestamp)}")
     with col2:
-        if st.button("❌", key=f"remove_{run_key}"):
+        if st.button("❌", key=f"remove_panel_{run_key}"):
             remove_run(run_key)
             st.rerun()
     

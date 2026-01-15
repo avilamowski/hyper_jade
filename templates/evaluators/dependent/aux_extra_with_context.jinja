@@ -1,0 +1,121 @@
+You are an expert evaluator for educational feedback systems.
+
+# YOUR MISSION
+
+Find issues that the AI mentioned BUT the human teacher did NOT mention.
+
+**CRITICAL**: You have already been given the MATCHED corrections. You MUST NOT include any of those in your EXTRA
+output.
+
+---
+
+# ALREADY MATCHED CORRECTIONS (DO NOT INCLUDE AS EXTRA)
+
+The following AI corrections have ALREADY been matched to human corrections.
+**You MUST NOT flag any of these as EXTRA:**
+
+{{ matched_corrections }}
+
+---
+
+# INPUT DATA
+
+===================================================================================================================================
+## SECTION A: Assignment Context
+===================================================================================================================================
+**Assignment Description (if provided):**
+```
+{{ assignment }}
+```
+
+===================================================================================================================================
+## SECTION B: Requirements / Rubric (Reference Only)
+===================================================================================================================================
+**This section contains possible requirements in XML format:**
+
+{{ requirements }}
+
+===================================================================================================================================
+## SECTION C: Student Code
+===================================================================================================================================
+```python
+{{ student_code }}
+```
+
+===================================================================================================================================
+## SECTION D: Human Reference Correction (Teacher's Feedback)
+===================================================================================================================================
+```
+{{ reference_correction }}
+```
+
+===================================================================================================================================
+## SECTION E: AI-Generated Correction (AI's Feedback)
+===================================================================================================================================
+```
+{{ generated_correction }}
+```
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+# YOUR TASK: Identify EXTRA REQUIREMENTS/COMMENTS ONLY
+
+**REMEMBER**: The matched corrections listed above are ALREADY accounted for. Do NOT include them again.
+
+Find issues that:
+1. The AI mentioned in SECTION E
+2. The HUMAN did NOT mention in SECTION D
+3. Are NOT in the ALREADY MATCHED list above
+
+---
+
+# OUTPUT FORMAT
+
+{% raw %}
+<OUTPUT>
+    ### EXTRA REQUIREMENTS (AI mentioned but human didn't):
+
+    **[Number].**
+    **AI correction:** <generated>[Exact quote from SECTION E]</generated>
+    **Relevance:** [RELEVANT/SOMEWHAT_RELEVANT/IRRELEVANT]
+    **Relevance Explanation:** [Brief explanation of why this relevance level]
+
+    <AUXILIARY_METRIC_COUNT>
+        EXTRA_COUNT: <number>
+    </AUXILIARY_METRIC_COUNT>
+</OUTPUT>
+{% endraw %}
+
+If there are no extra corrections (AI only mentioned what human mentioned):
+
+{% raw %}
+<OUTPUT>
+    ### EXTRA REQUIREMENTS (AI mentioned but human didn't):
+
+    NO EXTRA REQUIREMENTS - AI STAYED FOCUSED ON HUMAN ISSUES
+
+    <AUXILIARY_METRIC_COUNT>
+        EXTRA_COUNT: 0
+    </AUXILIARY_METRIC_COUNT>
+</OUTPUT>
+{% endraw %}
+
+---
+
+## Relevance Guidelines:
+
+- **RELEVANT**: The extra comment addresses a legitimate issue related to the assignment
+- **SOMEWHAT_RELEVANT**: Related to code quality but not central to assignment requirements
+- **IRRELEVANT**: Off-topic, overly pedantic, or unrelated to assignment objectives
+
+---
+
+# CRITICAL REMINDERS
+
+⚠️ **DO NOT include anything from the ALREADY MATCHED list** - those have been handled
+
+⚠️ **Only report AI corrections that the HUMAN completely didn't mention**
+
+⚠️ **Your output MUST be wrapped in <OUTPUT> tags**
+
+    END

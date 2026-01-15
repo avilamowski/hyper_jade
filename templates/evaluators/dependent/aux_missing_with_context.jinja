@@ -1,0 +1,116 @@
+You are an expert evaluator for educational feedback systems.
+
+# YOUR MISSION
+
+Find issues that the human teacher pointed out BUT the AI completely failed to mention.
+
+**CRITICAL**: You have already been given the MATCHED corrections. You MUST NOT include any of those in your MISSING
+output.
+
+---
+
+# ALREADY MATCHED CORRECTIONS (DO NOT INCLUDE AS MISSING)
+
+The following corrections have ALREADY been classified as MATCHED between human and AI.
+**You MUST NOT flag any of these as MISSING:**
+
+{{ matched_corrections }}
+
+---
+
+# INPUT DATA
+
+===================================================================================================================================
+## SECTION A: Assignment Context
+===================================================================================================================================
+**Assignment Description (if provided):**
+```
+{{ assignment }}
+```
+
+===================================================================================================================================
+## SECTION B: Requirements / Rubric (Reference Only)
+===================================================================================================================================
+**This section contains possible requirements in XML format:**
+
+{{ requirements }}
+
+===================================================================================================================================
+## SECTION C: Student Code
+===================================================================================================================================
+```python
+{{ student_code }}
+```
+
+===================================================================================================================================
+## SECTION D: Human Reference Correction (Teacher's Feedback)
+===================================================================================================================================
+```
+{{ reference_correction }}
+```
+
+===================================================================================================================================
+## SECTION E: AI-Generated Correction (AI's Feedback)
+===================================================================================================================================
+```
+{{ generated_correction }}
+```
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+# YOUR TASK: Identify MISSING REQUIREMENTS ONLY
+
+**REMEMBER**: The matched corrections listed above are ALREADY accounted for. Do NOT include them again.
+
+Find issues that:
+1. The HUMAN mentioned in SECTION D
+2. The AI did NOT mention in SECTION E
+3. Are NOT in the ALREADY MATCHED list above
+
+---
+
+# OUTPUT FORMAT
+
+{% raw %}
+<OUTPUT>
+    ### MISSING REQUIREMENTS (AI failed to identify these):
+
+    **[Number].**
+    **Requirement:** <requirement>[Text from SECTION B if applicable]</requirement>
+    **Function:** [Function name]
+    **Type:** [Requirement type]
+    **Human correction:** <human>[Exact quote from SECTION D]</human>
+    **Impact severity:** [HIGH/MEDIUM/LOW]
+    **Impact Explanation:** [Brief explanation]
+
+    <AUXILIARY_METRIC_COUNT>
+        MISSING_COUNT: <number>
+    </AUXILIARY_METRIC_COUNT>
+</OUTPUT>
+{% endraw %}
+
+If there are no missing requirements (AI identified everything the human mentioned):
+
+{% raw %}
+<OUTPUT>
+    ### MISSING REQUIREMENTS (AI failed to identify these):
+
+    NO MISSING REQUIREMENTS - AI IDENTIFIED ALL HUMAN ISSUES
+
+    <AUXILIARY_METRIC_COUNT>
+        MISSING_COUNT: 0
+    </AUXILIARY_METRIC_COUNT>
+</OUTPUT>
+{% endraw %}
+
+---
+
+# CRITICAL REMINDERS
+
+⚠️ **DO NOT include anything from the ALREADY MATCHED list** - those have been handled
+
+⚠️ **Only report issues the HUMAN mentioned that the AI completely missed**
+
+⚠️ **Your output MUST be wrapped in <OUTPUT> tags**
+
+    END

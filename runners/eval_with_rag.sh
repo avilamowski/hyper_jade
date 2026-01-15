@@ -3,6 +3,9 @@
 # Simple supervised individual evaluator runner for ejemplos/3p
 # Modify the file lists below to choose which files to evaluate
 
+# Parse command line argument for number of iterations (default: 1)
+ITERATIONS=${1:-1}
+
 # Define which files to use (modify these lists as needed)
 ASSIGNMENT="ejemplos/3p/consigna.txt"
 REQUIREMENTS="ejemplos/3p/requirements_es/*.json"
@@ -12,25 +15,46 @@ SUBMISSIONS="ejemplos/3p/*.py"
 REFERENCE_CORRECTIONS="ejemplos/3p/*.json"
 # SUBMISSIONS="ejemplos/3p/alu1.py"
 # REFERENCE_CORRECTIONS="ejemplos/3p/alu1.json"
-# Add a timestamp so multiple runs don't overwrite each other. Format: YYYYMMDDTHHMMSS
-TIMESTAMP=$(date +"%Y%m%dT%H%M%S")
-OUTPUT_DIR="outputs/evaluation/with_rag/${TIMESTAMP}"
 SYSTEM_CONFIG="runners/config/with_rag.yaml"
 EVALUATOR_CONFIG="runners/config/eval_config.yaml"
-# Create output directory
-mkdir -p "$OUTPUT_DIR"
 
 # Set JADE_AGENT_CONFIG so RAG system uses evaluator config instead of assignment config
 export JADE_AGENT_CONFIG="$EVALUATOR_CONFIG"
 
-# Run the evaluator
-uv run runners/run_supervised_individual_evaluator.py \
-    --assignment "$ASSIGNMENT" \
-    --requirements $REQUIREMENTS \
-    --submissions $SUBMISSIONS \
-    --reference-corrections $REFERENCE_CORRECTIONS \
-    --output-dir "$OUTPUT_DIR" \
-    --config "$SYSTEM_CONFIG" \
-    --evaluator-config "$EVALUATOR_CONFIG" \
-    --experiment-name "with_rag_${TIMESTAMP}" \
-    --verbose
+echo "Running evaluation $ITERATIONS time(s)..."
+
+for i in $(seq 1 $ITERATIONS); do
+    echo ""
+    echo "============================================================"
+    echo "ITERATION $i of $ITERATIONS"
+    echo "============================================================"
+    
+    # Add a timestamp so multiple runs don't overwrite each other. Format: YYYYMMDDTHHMMSS
+    TIMESTAMP=$(date +"%Y%m%dT%H%M%S")
+    OUTPUT_DIR="outputs/evaluation/with_rag/${TIMESTAMP}"
+    
+    # Create output directory
+    mkdir -p "$OUTPUT_DIR"
+    
+    # Run the evaluator
+    uv run runners/run_supervised_individual_evaluator.py \
+        --assignment "$ASSIGNMENT" \
+        --requirements $REQUIREMENTS \
+        --submissions $SUBMISSIONS \
+        --reference-corrections $REFERENCE_CORRECTIONS \
+        --output-dir "$OUTPUT_DIR" \
+        --config "$SYSTEM_CONFIG" \
+        --evaluator-config "$EVALUATOR_CONFIG" \
+        --experiment-name "with_rag_${TIMESTAMP}" \
+        --verbose
+    
+    # Small delay between iterations to ensure unique timestamps
+    if [ $i -lt $ITERATIONS ]; then
+        sleep 2
+    fi
+done
+
+echo ""
+echo "============================================================"
+echo "Completed $ITERATIONS evaluation run(s)"
+echo "============================================================"

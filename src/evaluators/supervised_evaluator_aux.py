@@ -1,8 +1,9 @@
 """
 Auxiliary Metrics Evaluator (LangGraph Parallel Version)
 
-Computes auxiliary metrics (MATCH, MISSING, EXTRA) in parallel using LangGraph.
-Each auxiliary metric runs as a separate node, and results are aggregated.
+Computes auxiliary metrics (MATCH, MISSING, EXTRA) using configurable strategies.
+Default strategy runs metrics in parallel using LangGraph.
+Alternative strategies (per_correction, dependent) provide more robust classification.
 """
 
 from __future__ import annotations
@@ -43,9 +44,12 @@ class AuxiliaryMetricsState(TypedDict):
 
 class AuxiliaryMetricsEvaluator:
     """
-    Evaluator for computing auxiliary metrics using LangGraph.
+    Evaluator for computing auxiliary metrics using configurable strategies.
     
-    Computes MATCH, MISSING, and EXTRA metrics in parallel, then aggregates results.
+    Strategies:
+    - 'independent' (default): Runs MATCH, MISSING, EXTRA in parallel using LangGraph
+    - 'per_correction': Classifies each correction individually, then aggregates
+    - 'dependent': Runs MATCH first, injects results into MISSING/EXTRA prompts
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None, llm: Optional[Any] = None):
@@ -78,16 +82,38 @@ class AuxiliaryMetricsEvaluator:
         
         # Load auxiliary metric configurations from config
         supervised_cfg = self.config.get("supervised_evaluator", {})
-        self.aux_metric_configs = supervised_cfg.get("auxiliary_metrics", {})
+        self.all_aux_metric_configs = supervised_cfg.get("auxiliary_metrics", {})
         
-        if not self.aux_metric_configs:
+        if not self.all_aux_metric_configs:
             raise ValueError(
                 "No auxiliary_metrics found in config. "
-                "Expected format: supervised_evaluator.auxiliary_metrics with metric definitions"
+                "Expected format: supervised_evaluator.auxiliary_metrics with strategy definitions"
             )
         
-        # Build the graph
-        self.graph = self._build_graph()
+        # Load strategy from config (default: independent)
+        self.strategy_name = supervised_cfg.get("aux_metrics_strategy", "independent")
+        
+        # Get templates for the selected strategy
+        self.aux_metric_configs = self.all_aux_metric_configs.get(self.strategy_name, {})
+        if not self.aux_metric_configs:
+            raise ValueError(
+                f"No templates found for strategy '{self.strategy_name}'. "
+                f"Available strategies: {list(self.all_aux_metric_configs.keys())}"
+            )
+        
+        self.strategy = self._create_strategy(self.strategy_name)
+        logger.info(f"AuxiliaryMetricsEvaluator using strategy: {self.strategy_name}")
+        
+        # Build the graph (used by independent strategy)
+        if self.strategy_name == "independent":
+            self.graph = self._build_graph()
+        else:
+            self.graph = None
+    
+    def _create_strategy(self, name: str):
+        """Create a strategy instance by name."""
+        from .aux_metrics_strategies import get_strategy
+        return get_strategy(name, self)
     
     @staticmethod
     def _format_requirements_as_xml(requirements: List[Requirement]) -> str:
@@ -359,7 +385,9 @@ class AuxiliaryMetricsEvaluator:
         metrics_to_compute: Optional[List[str]] = None
     ) -> Dict[str, str]:
         """
-        Compute all configured auxiliary metrics using LangGraph.
+        Compute all configured auxiliary metrics.
+        
+        Uses the configured strategy (independent, per_correction, or dependent).
         
         Args:
             generated_text: AI-generated correction text
@@ -373,7 +401,7 @@ class AuxiliaryMetricsEvaluator:
         Returns:
             Dictionary mapping metric names to their plain text outputs
         """
-        logger.info("Computing auxiliary metrics via LangGraph")
+        logger.info(f"Computing auxiliary metrics via strategy: {self.strategy_name}")
         
         # Convert requirements to list if it's a string (backward compatibility)
         if isinstance(requirements, str):
@@ -391,6 +419,21 @@ class AuxiliaryMetricsEvaluator:
         else:
             requirements_list = requirements
         
+        # Use non-independent strategies directly
+        if self.strategy_name != "independent":
+            t0 = time.time()
+            result = self.strategy.compute(
+                generated_text=generated_text,
+                reference_text=reference_text,
+                student_code=submission.get('code', ''),
+                assignment=assignment or "",
+                requirements=requirements_list
+            )
+            elapsed = time.time() - t0
+            logger.info(f"Strategy {self.strategy_name} completed in {elapsed:.2f}s")
+            return result
+        
+        # Independent strategy: use LangGraph
         # Prepare initial state
         initial_state: AuxiliaryMetricsState = {
             "assignment": assignment or "",
