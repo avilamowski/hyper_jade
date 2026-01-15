@@ -187,8 +187,10 @@ class RequirementGeneratorAgent:
         types = [t for t in PromptType if t.value in templates_cfg.keys()]
 
         template_name = self.agent_config.get("template")
+        # Use absolute path for templates directory (go up 3 levels: agents/requirement_generator/requirement_generator.py -> hyper_jade)
+        templates_dir = Path(__file__).parent.parent.parent.parent / "templates"
         env = Environment(
-            loader=FileSystemLoader("templates"),
+            loader=FileSystemLoader(str(templates_dir)),
             autoescape=select_autoescape(["jinja"])
         )
         template = env.get_template(template_name)
@@ -200,7 +202,13 @@ class RequirementGeneratorAgent:
         )
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
-        raw_content = getattr(response, "content", str(response)).strip()
+        
+        # Handle different response formats (string or list)
+        raw_content = getattr(response, "content", str(response))
+        if isinstance(raw_content, list):
+            # If content is a list, extract text from each part and join
+            raw_content = " ".join([str(part) if not hasattr(part, 'text') else part.text for part in raw_content])
+        raw_content = raw_content.strip()
         
         # Parse and extract requirements from LLM response using XML tags format
         requirements = self._parse_requirements_from_llm_response(raw_content)
