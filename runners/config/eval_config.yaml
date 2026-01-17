@@ -15,7 +15,7 @@ temperature: 0.2
 supervised_evaluator:
   # Strategy for computing auxiliary metrics (match, missing, extra)
   # Options: "independent", "per_correction", "dependent"
-  aux_metrics_strategy: "dependent"
+  aux_metrics_strategy: "per_correction"
 
   # Templates grouped by strategy
   auxiliary_metrics:
