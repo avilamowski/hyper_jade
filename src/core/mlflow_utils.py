@@ -8,9 +8,13 @@ import logging
 import time
 import yaml
 import json
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from langsmith import Client as LangSmithClient
+from langsmith.run_helpers import get_current_run_tree
 
 logger = logging.getLogger(__name__)
 
@@ -329,6 +333,151 @@ class MLflowLogger:
             
         except Exception as e:
             logger.warning(f"Could not log evaluation summary: {e}")
+
+def get_run_token_usage_and_cost(trace_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get token usage and cost information from LangSmith trace.
+    
+    This function retrieves token usage and cost from a specific LangSmith trace.
+    Requires trace_id to avoid race conditions when running parallel evaluations.
+    
+    Args:
+        trace_id: LangSmith trace ID (required). If None, tries to get from current context.
+    
+    Returns:
+        Dictionary with token usage and cost information:
+        {
+            "total_input_tokens": int,
+            "total_output_tokens": int,
+            "total_tokens": int,
+            "estimated_cost_usd": float,
+            "model_info": list of model/provider info,
+            "trace_count": int
+        }
+    """
+    result = {
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "total_tokens": 0,
+        "estimated_cost_usd": 0.0,
+        "model_info": [],
+        "trace_count": 0
+    }
+    
+    if not os.environ.get("LANGSMITH_API_KEY"):
+        logger.warning("LangSmith API key not configured - cannot get token usage")
+        return result
+    
+    # Try to get trace_id from current context if not provided
+    if trace_id is None:
+        try:
+            current_run = get_current_run_tree()
+            if current_run and hasattr(current_run, 'trace_id'):
+                trace_id = str(current_run.trace_id)
+                logger.debug(f"Got trace_id from current context: {trace_id}")
+            else:
+                logger.warning("No trace_id provided and could not get from context")
+                return result
+        except Exception as e:
+            logger.warning(f"Could not get trace_id from context: {e}")
+            return result
+    
+    if not trace_id:
+        logger.warning("trace_id is required but not provided")
+        return result
+    
+    try:
+        langsmith_client = LangSmithClient()
+        project_name = os.environ.get("LANGSMITH_PROJECT", "default")
+        
+        logger.info(f"🔍 Searching LangSmith for token usage (trace_id: {trace_id})")
+        
+        # Flush any pending traces to ensure they're available
+        try:
+            langsmith_client.flush()
+            logger.debug("Flushed LangSmith client to ensure traces are available")
+        except Exception as e:
+            logger.debug(f"Could not flush LangSmith client: {e}")
+        
+        # Search for run by trace_id
+        run = None
+        try:
+            # First try: search for runs with this trace_id
+            runs_with_trace = list(langsmith_client.list_runs(
+                project_name=project_name,
+                trace_id=trace_id,
+                is_root=True,
+                limit=1
+            ))
+            if runs_with_trace:
+                run = runs_with_trace[0]
+                logger.debug(f"Found run by trace_id search: {trace_id}")
+        except Exception as e:
+            logger.debug(f"Could not search by trace_id: {e}")
+        
+        # Second try: read run directly (trace_id might be the run_id itself)
+        if run is None:
+            try:
+                run = langsmith_client.read_run(trace_id, load_child_runs=False)
+                logger.debug(f"Found run by direct trace_id lookup: {trace_id}")
+            except Exception as e:
+                logger.warning(f"Could not read run by trace_id {trace_id}: {e}")
+                return result
+        
+        # Process run - data is in the root run itself (based on test script)
+        if run is None:
+            logger.warning(f"Could not find run for trace_id: {trace_id}")
+            return result
+        
+        try:
+            # Ensure we have full run data
+            if not hasattr(run, 'total_tokens'):
+                run = langsmith_client.read_run(run.id, load_child_runs=False)
+            
+            result["trace_count"] = 1
+            
+            # Extract tokens (directly available in run)
+            input_tokens = getattr(run, 'prompt_tokens', 0) or getattr(run, 'input_tokens', 0) or 0
+            output_tokens = getattr(run, 'completion_tokens', 0) or getattr(run, 'output_tokens', 0) or 0
+            total_tokens = getattr(run, 'total_tokens', 0) or (input_tokens + output_tokens) or 0
+            
+            # Extract cost (Decimal type, convert to float)
+            total_cost = getattr(run, 'total_cost', None)
+            if total_cost is not None:
+                # Convert Decimal to float
+                if hasattr(total_cost, '__float__'):
+                    total_cost = float(total_cost)
+                else:
+                    total_cost = float(total_cost)
+            else:
+                total_cost = 0.0
+            
+            # Set results
+            result["total_input_tokens"] = input_tokens
+            result["total_output_tokens"] = output_tokens
+            result["total_tokens"] = total_tokens
+            result["estimated_cost_usd"] = total_cost
+            
+            # Store info
+            if total_tokens > 0:
+                result["model_info"].append({
+                    "run_id": str(run.id),
+                    "run_name": run.name or "unknown",
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cost_usd": total_cost
+                })
+            
+            logger.info(f"✅ LangSmith run '{run.name}': {total_tokens} tokens, ${total_cost:.6f}")
+            
+        except Exception as e:
+            logger.warning(f"Error processing LangSmith run: {e}")
+            return result
+        
+    except Exception as e:
+        logger.warning(f"Error getting token usage from LangSmith: {e}")
+    
+    return result
 
 # Global MLflow logger instance
 mlflow_logger = MLflowLogger()

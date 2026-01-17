@@ -22,7 +22,7 @@ from src.agents.code_corrector.code_corrector import CodeCorrectorAgent
 from src.evaluators.supervised_evaluator_aux import AuxiliaryMetricsEvaluator
 from src.evaluators.supervised_evaluator_individual import IndividualMetricsEvaluator
 from src.config import load_config, get_agent_config, load_langsmith_config
-from src.core.mlflow_utils import mlflow_logger
+from src.core.mlflow_utils import mlflow_logger, get_run_token_usage_and_cost
 from src.models import Requirement, GeneratedPrompt, Submission, Correction, PromptType, ReferenceCorrection
 from src.agents.utils.composite_llm import CompositeLLM
 
@@ -236,6 +236,7 @@ def save_results(output_path: str, corrections: List[Correction], evaluation_res
         "timings": evaluation_results.get("timings", {}),
         "timestamp": time.time()
     }
+    
     with open(evaluation_path, 'w', encoding='utf-8') as f:
         json.dump(eval_data, f, indent=2, ensure_ascii=False)
     
@@ -390,6 +391,15 @@ Note: Reference corrections can be provided as either:
         # Wrap entire pipeline in a single LangSmith trace
         with trace(name="supervised_individual_evaluation_pipeline", run_type="chain") as pipeline_context:
             pipeline_context.add_tags(pipeline_tags)
+            # Get trace_id from context for accurate run identification (avoids race conditions)
+            pipeline_trace_id = None
+            try:
+                from langsmith.run_helpers import get_current_run_tree
+                current_run = get_current_run_tree()
+                if current_run and hasattr(current_run, 'trace_id'):
+                    pipeline_trace_id = str(current_run.trace_id)
+            except Exception:
+                pass
             
             # Step 1: Generate prompts for all requirements
             logger.info("Step 1: Generating prompts (one dedicated MLflow run)...")
@@ -401,7 +411,7 @@ Note: Reference corrections can be provided as either:
             if args.experiment_name:
                 mlflow_tags["experiment_name"] = args.experiment_name
             
-            with mlflow_logger.run(run_name="prompt_generation", tags=mlflow_tags):
+            with mlflow_logger.run(run_name="prompt_generation", tags=mlflow_tags) as prompt_run_id:
                 shared.stage = 'prompt_generation'
                 # Handle async prompt generation for RAG
                 if enable_rag:
@@ -409,6 +419,15 @@ Note: Reference corrections can be provided as either:
                 else:
                     generated_prompts = asyncio.run(generate_prompts_traced(prompt_generator, requirements, assignment_text))
                 logger.info(f"✓ Generated {len(generated_prompts)} prompts")
+                
+                # Get token usage and cost for prompt generation from LangSmith
+                # Add a delay to ensure LangSmith traces are available
+                time.sleep(5)  # Wait 5 seconds for traces to be flushed to LangSmith
+                
+                prompt_cost_info = get_run_token_usage_and_cost(trace_id=pipeline_trace_id)
+                if prompt_cost_info.get("total_tokens", 0) > 0:
+                    mlflow_logger.log_metric('prompt_gen_total_tokens', float(prompt_cost_info.get("total_tokens", 0)))
+                    mlflow_logger.log_metric('prompt_gen_estimated_cost_usd', float(prompt_cost_info.get("estimated_cost_usd", 0.0)))
                 
                 # Save generated prompts to prompts folder
                 prompts_dir = Path(args.output_dir) / "prompts"
@@ -443,7 +462,7 @@ Note: Reference corrections can be provided as either:
                 if args.experiment_name:
                     submission_mlflow_tags["experiment_name"] = args.experiment_name
                 
-                with mlflow_logger.run(run_name=f"supervised_individual_evaluation_{i+1}", tags=submission_mlflow_tags):
+                with mlflow_logger.run(run_name=f"supervised_individual_evaluation_{i+1}", tags=submission_mlflow_tags) as run_id:
                     logger.info(f"Processing submission {i+1}/{len(submissions)}")
                     shared.stage = 'code_correction'
                     submission_corrections, evaluation_results = process_submission_traced(
@@ -493,6 +512,12 @@ Note: Reference corrections can be provided as either:
                     })
 
 
+            # Get token usage and cost information from LangSmith (once at the end)
+            logger.info("Getting token usage and cost from LangSmith...")
+            time.sleep(5)  # Wait 5 seconds for traces to be flushed to LangSmith
+            
+            cost_info = get_run_token_usage_and_cost(trace_id=pipeline_trace_id)
+            
             # Print aggregate summary
             logger.info("=" * 60)
             logger.info("SUMMARY")
@@ -515,6 +540,19 @@ Note: Reference corrections can be provided as either:
                 "metric_averages": {},
                 "timestamp": time.time()
             }
+            
+            # Add token usage and cost to aggregate metrics
+            if cost_info.get("total_tokens", 0) > 0:
+                aggregate_metrics["token_usage"] = {
+                    "total_input_tokens": cost_info.get("total_input_tokens", 0),
+                    "total_output_tokens": cost_info.get("total_output_tokens", 0),
+                    "total_tokens": cost_info.get("total_tokens", 0),
+                    "estimated_cost_usd": cost_info.get("estimated_cost_usd", 0.0),
+                    "model_info": cost_info.get("model_info", []),
+                    "trace_count": cost_info.get("trace_count", 0)
+                }
+                logger.info(f"Total token usage: {cost_info.get('total_tokens', 0)} tokens")
+                logger.info(f"Total estimated cost: ${cost_info.get('estimated_cost_usd', 0.0):.6f}")
             
             if overall_scores:
                 avg_overall = sum(overall_scores) / len(overall_scores)
