@@ -91,6 +91,13 @@ agents:
     # provider: "openai"         # Different provider for code correction
     # temperature: 0.05          # Different temperature for code correction
 
+  error_locator:
+    enabled: true  # Enable to locate specific code fragments for errors
+    provider: "google"
+    model_name: "gemini-2.0-flash"
+    temperature: 0.1
+
+
   # Agent Evaluator Configuration
   agent_evaluator:
     enabled: false

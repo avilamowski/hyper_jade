@@ -40,31 +40,54 @@ logger = logging.getLogger(__name__)
 load_dotenv(override=True)
 DOTENV = dotenv_values()
 
+
 # Import GroupFunctionsAgent lazily to avoid circular imports
 def _get_group_functions_agent():
     from src.agents.group_functions import GroupFunctionsAgent
+
     return GroupFunctionsAgent
 
 
 def _get_linter_correction_agent():
     from src.agents.code_corrector.linter_correction_agent import LinterCorrectionAgent
+
     return LinterCorrectionAgent
+
+
+def _get_error_locator_agent():
+    from src.agents.error_locator import ErrorLocatorAgent
+
+    return ErrorLocatorAgent
 
 
 # --------------------------------------------------------------------------- #
 # LangGraph State
 # --------------------------------------------------------------------------- #
+
+
+def merge_corrections(
+    left: List[Correction], right: List[Correction]
+) -> List[Correction]:
+    """
+    Custom reducer for corrections that preserves all fields including optional ones.
+    This is necessary because TypedDict's concat may drop optional fields.
+    """
+    return left + right
+
+
 class CodeCorrectorState(TypedDict):
     # Input data
     assignment_description: Annotated[str, keep_last]
-    requirements: Annotated[List[Requirement], keep_last]  
-    generated_prompts: Annotated[List[GeneratedPrompt], keep_last] 
+    requirements: Annotated[List[Requirement], keep_last]
+    generated_prompts: Annotated[List[GeneratedPrompt], keep_last]
     submission: Annotated[Submission, keep_last]
-    grouped_code: Annotated[Optional[List[Dict[str, Any]]], keep_last]  # Optional grouped functions
-    
-    # Output - use Annotated to allow multiple concurrent writes
-    corrections: Annotated[List[Correction], concat]
-    
+    grouped_code: Annotated[
+        Optional[List[Dict[str, Any]]], keep_last
+    ]  # Optional grouped functions
+
+    # Output - use custom reducer to preserve all fields (including optional locations)
+    corrections: Annotated[List[Correction], merge_corrections]
+
     # Extra field for additional metadata/data that can be loaded any time
     extra: Annotated[Optional[Dict[str, Any]], keep_last]
 
@@ -82,34 +105,43 @@ class CodeCorrectorAgent:
         self.config = config or {}
         self.agent_config = get_agent_config(self.config, "code_corrector")
         self.llm = self._setup_llm()
-        
+
         # Initialize group_functions if enabled
-        group_functions_config = get_agent_config(self.config, 'group_functions')
-        self.group_functions_enabled = group_functions_config.get('enabled', False)
+        group_functions_config = get_agent_config(self.config, "group_functions")
+        self.group_functions_enabled = group_functions_config.get("enabled", False)
         self.group_functions_agent = None
-        
+
         if self.group_functions_enabled:
             GroupFunctionsAgent = _get_group_functions_agent()
             self.group_functions_agent = GroupFunctionsAgent(self.config)
-        
+
         # Initialize linter if enabled
-        linter_config = self.agent_config.get('linter', {})
-        self.linter_enabled = linter_config.get('enabled', False)
+        linter_config = self.agent_config.get("linter", {})
+        self.linter_enabled = linter_config.get("enabled", False)
         self.linter_agent = None
         if self.linter_enabled:
             LinterCorrectionAgent = _get_linter_correction_agent()
             self.linter_agent = LinterCorrectionAgent(self.config)
             logger.info("Linter correction agent initialized")
-        
+
+        # Initialize error locator if enabled
+        error_locator_config = get_agent_config(self.config, "error_locator")
+        self.error_locator_enabled = error_locator_config.get("enabled", False)
+        self.error_locator_agent = None
+        if self.error_locator_enabled:
+            ErrorLocatorAgent = _get_error_locator_agent()
+            self.error_locator_agent = ErrorLocatorAgent(self.config)
+            logger.info("Error locator agent initialized")
+
         self.graph = self._build_graph()
 
     def _setup_llm(self):
         provider = str(self.agent_config.get("provider", "openai")).lower().strip()
         model_name = self.agent_config.get("model_name")
-        
+
         if not model_name:
             raise ValueError(f"model_name is required in code_corrector configuration")
-        
+
         temperature = float(self.agent_config.get("temperature", 0.1))
 
         if provider == "openai":
@@ -124,11 +156,11 @@ class CodeCorrectorAgent:
             )
 
         if provider in ("gemini", "google", "google-genai"):
-            api_key = self.agent_config.get("api_key") or os.environ.get("GOOGLE_API_KEY")
+            api_key = self.agent_config.get("api_key") or os.environ.get(
+                "GOOGLE_API_KEY"
+            )
             return ChatGoogleGenerativeAI(
-                model=model_name,
-                temperature=temperature,
-                google_api_key=api_key
+                model=model_name, temperature=temperature, google_api_key=api_key
             )
 
         return OllamaLLM(model=model_name, temperature=temperature)
@@ -143,40 +175,44 @@ class CodeCorrectorAgent:
             # Check if raw has .content attribute
             if hasattr(raw, "content"):
                 content = raw.content
-                
+
                 # Handle Gemini's response format: content can be a list of parts
                 # Each part has {'type': 'text', 'text': '...', 'extras': {...}}
                 if isinstance(content, list):
                     # Extract text from all parts and concatenate
                     text_parts = []
                     for part in content:
-                        if isinstance(part, dict) and 'text' in part:
-                            text_parts.append(part['text'])
-                        elif isinstance(part, dict) and part.get('type') == 'text':
+                        if isinstance(part, dict) and "text" in part:
+                            text_parts.append(part["text"])
+                        elif isinstance(part, dict) and part.get("type") == "text":
                             # Sometimes the text might be in a different structure
-                            text_parts.append(str(part.get('text', '')))
-                        elif hasattr(part, 'text'):
+                            text_parts.append(str(part.get("text", "")))
+                        elif hasattr(part, "text"):
                             text_parts.append(part.text)
                         else:
                             # Fallback: convert to string
                             text_parts.append(str(part))
-                    return ''.join(text_parts)
-                
+                    return "".join(text_parts)
+
                 # If content is already a string, return it
                 if isinstance(content, str):
                     return content
-                
+
                 # Otherwise try to convert to string
                 return str(content)
-            
+
             # dict-like OpenAI shape
             if isinstance(raw, dict):
                 choices = raw.get("choices")
                 if choices and isinstance(choices, list) and len(choices) > 0:
                     first = choices[0]
-                    return (first.get("message", {}) or {}).get("content") or first.get("text") or str(raw)
+                    return (
+                        (first.get("message", {}) or {}).get("content")
+                        or first.get("text")
+                        or str(raw)
+                    )
                 return raw.get("text") or str(raw)
-            
+
             # fallback to str
             return str(raw)
 
@@ -201,27 +237,35 @@ class CodeCorrectorAgent:
 
     # -------------------------- LangGraph Nodes ----------------------------- #
 
-    def _create_correction_processor(self, generated_prompt: GeneratedPrompt, index: int):
+    def _create_correction_processor(
+        self, generated_prompt: GeneratedPrompt, index: int
+    ):
         """Create a node function for processing a specific generated prompt"""
 
         def process_correction_node(state: CodeCorrectorState) -> CodeCorrectorState:
             """Process a single correction - render template and invoke LLM"""
             submission = state["submission"]
             grouped_code = state.get("grouped_code", [])
-            
+
             # Determine which code to use
             if grouped_code:
                 # Try to find grouped code for this requirement's function
-                requirement_function = generated_prompt["requirement"].get("function", "")
+                requirement_function = generated_prompt["requirement"].get(
+                    "function", ""
+                )
                 # Clean function name: "validar(texto)" -> "validar"
-                requirement_function_clean = requirement_function.split('(')[0].strip() if requirement_function else ""
+                requirement_function_clean = (
+                    requirement_function.split("(")[0].strip()
+                    if requirement_function
+                    else ""
+                )
                 matched_group = None
-                
+
                 for group in grouped_code:
                     if group.get("function_name") == requirement_function_clean:
                         matched_group = group
                         break
-                
+
                 if matched_group:
                     student_code = matched_group["code"]
                 else:
@@ -233,8 +277,11 @@ class CodeCorrectorAgent:
             # Check if template already has examples injected (no placeholders)
             # If it does, we only need to inject the student code
             template_str = generated_prompt["jinja_template"]
-            has_placeholders = "{{ correct_examples }}" in template_str or "{{ erroneous_examples }}" in template_str
-            
+            has_placeholders = (
+                "{{ correct_examples }}" in template_str
+                or "{{ erroneous_examples }}" in template_str
+            )
+
             if has_placeholders:
                 # Template has placeholders, need to render with examples
                 examples_str = generated_prompt.get("examples", "")
@@ -261,10 +308,11 @@ class CodeCorrectorAgent:
             # Call LLM for analysis
             analysis = self._call_llm(rendered_prompt)
 
-            # Store correction result
+            # Store correction result with original index for trace matching
             correction: Correction = {
                 "requirement": generated_prompt["requirement"],
                 "result": analysis,
+                "_original_index": index,  # Track original position for error locator
             }
 
             # Use the aggregation function for concurrent writes
@@ -315,10 +363,10 @@ class CodeCorrectorAgent:
     # -------------------------- Public API ---------------------------------- #
 
     def correct_code(
-        self, 
-        generated_prompt: GeneratedPrompt, 
+        self,
+        generated_prompt: GeneratedPrompt,
         submission: Submission,
-        assignment_description: str = ""
+        assignment_description: str = "",
     ) -> Correction:
         """
         Generate a single correction from a generated prompt and submission.
@@ -337,11 +385,11 @@ class CodeCorrectorAgent:
         return results[0]
 
     def correct_code_batch(
-        self, 
-        generated_prompts: List[GeneratedPrompt], 
+        self,
+        generated_prompts: List[GeneratedPrompt],
         submission: Submission,
         assignment_description: str = "",
-        submission_name: Optional[str] = None
+        submission_name: Optional[str] = None,
     ) -> List[Correction]:
         """
         Generate multiple corrections in parallel from a list of generated prompts.
@@ -363,25 +411,29 @@ class CodeCorrectorAgent:
                 # Parse function name from "function_name(params)" format
                 if func_name:
                     # Extract just the function name, removing parameters
-                    func_name_clean = func_name.split('(')[0].strip()
+                    func_name_clean = func_name.split("(")[0].strip()
                     if func_name_clean:
                         function_names.add(func_name_clean)
-            
+
             # Only group if we have function names
             if function_names:
-                submissions_for_grouping = [{
-                    "name": submission_name or "submission",
-                    "code": submission["code"]
-                }]
-                
+                submissions_for_grouping = [
+                    {
+                        "name": submission_name or "submission",
+                        "code": submission["code"],
+                    }
+                ]
+
                 # Use group_code_by_functions (already @traceable)
                 grouped_code = self.group_functions_agent.group_code_by_functions(
                     function_names=list(function_names),
-                    submissions=submissions_for_grouping
+                    submissions=submissions_for_grouping,
                 )
-                
-                logger.info(f"Grouped {len(grouped_code)} function segments for {len(function_names)} functions")
-        
+
+                logger.info(
+                    f"Grouped {len(grouped_code)} function segments for {len(function_names)} functions"
+                )
+
         # Create dynamic graph for this batch
         self._create_dynamic_graph(generated_prompts)
 
@@ -401,7 +453,7 @@ class CodeCorrectorAgent:
 
         # Extract results
         results: List[Correction] = result_state["corrections"]
-        
+
         # Add linter corrections if enabled
         if self.linter_enabled and self.linter_agent:
             try:
@@ -412,6 +464,19 @@ class CodeCorrectorAgent:
                 logger.info(f"Added {len(linter_corrections)} linter corrections")
             except Exception as e:
                 logger.error(f"Linter correction failed: {e}")
+
+        # Add error locations if enabled (after graph to preserve TypedDict optional fields)
+        if self.error_locator_enabled and self.error_locator_agent:
+            try:
+                results = self.error_locator_agent.locate_errors_batch(
+                    results, submission["code"]
+                )
+                located_count = len([c for c in results if c.get("locations")])
+                logger.info(
+                    f"Error locator added locations to {located_count} corrections"
+                )
+            except Exception as e:
+                logger.error(f"Error locator failed: {e}")
 
         return results
 

@@ -1,12 +1,20 @@
-from typing import List, TypedDict, Annotated
+from typing import List, TypedDict, Optional
 from enum import Enum
+
+
 class PromptType(Enum):
-    REQUIREMENT_PRESENCE = ("requirement_presence", "Checks if a specific requirement is implemented in the code.")
+    REQUIREMENT_PRESENCE = (
+        "requirement_presence",
+        "Checks if a specific requirement is implemented in the code.",
+    )
     """ 
     Identifies if a specific requirement is implemented in the code.
     If is implemented, returns the lines of code that implement the requirement.
     """
-    ERROR_PRESENCE = ("error_presence", "Checks if a forbidden or erroneous pattern is present in the code.")
+    ERROR_PRESENCE = (
+        "error_presence",
+        "Checks if a forbidden or erroneous pattern is present in the code.",
+    )
     """ 
     Identifies if a specific error is present in the code.
     If is implemented, returns the lines of code that implement the requirement.
@@ -42,9 +50,21 @@ class Submission(TypedDict):
     code: str
 
 
-class Correction(TypedDict):
+class ErrorLocation(TypedDict):
+    """Location of an error in the code."""
+
+    lines: str  # e.g., "45-52" or "45"
+    fragment: str  # The actual code fragment
+
+
+class Correction(TypedDict, total=False):
+    """Correction result from code analysis."""
+
     requirement: Requirement
     result: str
+    # Optional fields added by ErrorLocatorAgent
+    locations: Optional[List[ErrorLocation]]
+    location_explanation: Optional[str]
 
 
 class GroupedCode(TypedDict):
@@ -56,4 +76,5 @@ class GroupedCode(TypedDict):
 
 class ReferenceCorrection(TypedDict):
     """Reference correction containing a list of correction items"""
+
     corrections: List[str]

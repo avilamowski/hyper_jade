@@ -6,4 +6,5 @@ from .models import (
     Correction,
     GroupedCode,
     ReferenceCorrection,
+    ErrorLocation,
 )
