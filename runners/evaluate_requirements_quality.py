@@ -190,65 +190,59 @@ def evaluate_all_requirements():
         print(f"Dataset: {dataset}")
         print(f"Teacher requirements: {len(teacher_requirements)}")
         
-        # Get all student folders
-        student_folders = [d for d in dataset_path.iterdir() if d.is_dir() and d.name.startswith("alu")]
-        
-        for student_folder in sorted(student_folders):
-            print(f"\n  Student: {student_folder.name}")
+        # Procesar cada modelo para este dataset
+        for model in MODELS:
+            req_file = dataset_path / f"requirements_{model}.txt"
             
-            for model in MODELS:
-                req_file = student_folder / f"requirements_{model}.txt"
+            if not req_file.exists():
+                print(f"  {model}: File not found")
+                continue
+            
+            requirements = parse_requirements_file(req_file)
+            print(f"\n  {model}: {len(requirements)} requirements")
+            
+            for req in requirements:
+                print(f"    Evaluating requirement {req['id']}...", end=" ", flush=True)
                 
-                if not req_file.exists():
-                    print(f"    {model}: File not found")
-                    continue
+                eval_result = evaluate_requirement(req, teacher_requirements, dataset)
                 
-                requirements = parse_requirements_file(req_file)
-                print(f"    {model}: {len(requirements)} requirements")
+                # Update counters
+                all_results["by_model"][model]["total"] += 1
                 
-                for req in requirements:
-                    print(f"      Evaluating requirement {req['id']}...", end=" ", flush=True)
+                is_duplicated = False
+                if eval_result["related_to_teacher"]:
+                    all_results["by_model"][model]["related_to_teacher"] += 1
+                    # Track unique teacher requirements
+                    teacher_req_key = (dataset, eval_result["related_teacher_req_number"])
                     
-                    eval_result = evaluate_requirement(req, teacher_requirements, dataset)
+                    # Check if this teacher requirement was already seen (= duplicated)
+                    if teacher_req_key in all_results["by_model"][model]["unique_teacher_requirements"]:
+                        is_duplicated = True
+                    else:
+                        all_results["by_model"][model]["unique_teacher_requirements"].add(teacher_req_key)
                     
-                    # Update counters
-                    all_results["by_model"][model]["total"] += 1
-                    
-                    is_duplicated = False
-                    if eval_result["related_to_teacher"]:
-                        all_results["by_model"][model]["related_to_teacher"] += 1
-                        # Track unique teacher requirements
-                        teacher_req_key = (dataset, eval_result["related_teacher_req_number"])
-                        
-                        # Check if this teacher requirement was already seen (= duplicated)
-                        if teacher_req_key in all_results["by_model"][model]["unique_teacher_requirements"]:
-                            is_duplicated = True
-                        else:
-                            all_results["by_model"][model]["unique_teacher_requirements"].add(teacher_req_key)
-                        
-                        # Count occurrences
-                        if teacher_req_key not in all_results["by_model"][model]["teacher_req_counts"]:
-                            all_results["by_model"][model]["teacher_req_counts"][teacher_req_key] = 0
-                        all_results["by_model"][model]["teacher_req_counts"][teacher_req_key] += 1
-                    
-                    # Store detailed result
-                    all_results["detailed"].append({
-                        "dataset": dataset,
-                        "student": student_folder.name,
-                        "model": model,
-                        "requirement_id": req["id"],
-                        "requirement_type": req["type"],
-                        "requirement_function": req["function"],
-                        "requirement_description": req["description"],
-                        "related_to_teacher": eval_result["related_to_teacher"],
-                        "is_duplicated": is_duplicated,
-                        "related_teacher_req_number": eval_result["related_teacher_req_number"],
-                        "related_teacher_req_text": eval_result["related_teacher_req_text"],
-                        "reasoning": eval_result["reasoning"]
-                    })
-                    
-                    status = "✓" if eval_result["related_to_teacher"] else "○"
-                    print(status)
+                    # Count occurrences
+                    if teacher_req_key not in all_results["by_model"][model]["teacher_req_counts"]:
+                        all_results["by_model"][model]["teacher_req_counts"][teacher_req_key] = 0
+                    all_results["by_model"][model]["teacher_req_counts"][teacher_req_key] += 1
+                
+                # Store detailed result
+                all_results["detailed"].append({
+                    "dataset": dataset,
+                    "model": model,
+                    "requirement_id": req["id"],
+                    "requirement_type": req["type"],
+                    "requirement_function": req["function"],
+                    "requirement_description": req["description"],
+                    "related_to_teacher": eval_result["related_to_teacher"],
+                    "is_duplicated": is_duplicated,
+                    "related_teacher_req_number": eval_result["related_teacher_req_number"],
+                    "related_teacher_req_text": eval_result["related_teacher_req_text"],
+                    "reasoning": eval_result["reasoning"]
+                })
+                
+                status = "✓" if eval_result["related_to_teacher"] else "○"
+                print(status)
     
     return all_results
 

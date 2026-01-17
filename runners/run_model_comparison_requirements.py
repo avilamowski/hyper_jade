@@ -1,11 +1,9 @@
 """
 Script para comparar diferentes modelos en la generación de requerimientos.
-Selecciona alumnos al azar y genera requerimientos con múltiples modelos para análisis manual.
+Genera requerimientos UNA VEZ por ejercicio (no por alumno) con múltiples modelos para análisis manual.
 """
 import sys
 import os
-import random
-import json
 from pathlib import Path
 
 # Add src to path
@@ -28,29 +26,6 @@ DATASETS = [
     "ej1-2025-s2-p2-ej1",
     "ej1-2025-s2-p2-ej2",
 ]
-
-# Cantidad de alumnos a seleccionar por dataset
-NUM_STUDENTS = 5
-
-# Seed para reproducibilidad
-RANDOM_SEED = 42
-
-
-def get_students_from_dataset(dataset_path: Path):
-    """Obtiene lista de alumnos disponibles en un dataset."""
-    students = []
-    for file in dataset_path.glob("alu*.json"):
-        student_id = file.stem  # alu1, alu3, etc.
-        students.append(student_id)
-    return sorted(students)
-
-
-def select_random_students(students, num_students, seed):
-    """Selecciona alumnos al azar."""
-    random.seed(seed)
-    if len(students) <= num_students:
-        return students
-    return sorted(random.sample(students, num_students))
 
 
 def load_consigna(dataset_path: Path):
@@ -91,20 +66,15 @@ def generate_requirements_with_model(model_config: dict, consigna: str, base_con
         return None
 
 
-def save_results(output_dir: Path, dataset_name: str, student_id: str, 
-                model_name: str, requirements: str):
-    """Guarda los resultados generados."""
+def save_results(output_dir: Path, dataset_name: str, model_name: str, requirements: str):
+    """Guarda los requerimientos generados (una vez por ejercicio, no por alumno)."""
     # Crear directorio por dataset
     dataset_dir = output_dir / dataset_name
     dataset_dir.mkdir(parents=True, exist_ok=True)
     
-    # Crear directorio por alumno
-    student_dir = dataset_dir / student_id
-    student_dir.mkdir(exist_ok=True)
-    
-    # Guardar requirements por modelo
+    # Guardar requirements por modelo directamente en el directorio del dataset
     model_filename = model_name.replace("/", "_").replace(" ", "_")
-    output_file = student_dir / f"requirements_{model_filename}.txt"
+    output_file = dataset_dir / f"requirements_{model_filename}.txt"
     
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(f"Model: {model_name}\n")
@@ -157,8 +127,7 @@ def main():
     for model in MODELS:
         print(f"  - {model['name']} ({model['provider']}: {model['model_name']})")
     print(f"\nDatasets: {DATASETS}")
-    print(f"Cantidad de alumnos por dataset: {NUM_STUDENTS}")
-    print(f"Seed: {RANDOM_SEED}")
+    print("\nNOTA: Los requerimientos se generan UNA VEZ por ejercicio (no por alumno)")
     
     # Procesar cada dataset
     for dataset_name in DATASETS:
@@ -168,35 +137,22 @@ def main():
         
         dataset_path = base_path / dataset_name
         
-        # Obtener y seleccionar alumnos
-        all_students = get_students_from_dataset(dataset_path)
-        selected_students = select_random_students(all_students, NUM_STUDENTS, RANDOM_SEED)
-        
-        print(f"\nAlumnos seleccionados: {selected_students}")
-        
         # Copiar teacher requirements
         copy_teacher_requirements(output_dir, dataset_path, dataset_name)
         
         # Cargar consigna
         consigna = load_consigna(dataset_path)
         
-        # Procesar cada alumno
-        for student_id in selected_students:
-            print(f"\n{'-'*80}")
-            print(f"Procesando {student_id}...")
-            print(f"{'-'*80}")
+        # Generar con cada modelo
+        for model_config in MODELS:
+            requirements = generate_requirements_with_model(
+                model_config=model_config,
+                consigna=consigna,
+                base_config=base_config
+            )
             
-            # Generar con cada modelo
-            for model_config in MODELS:
-                requirements = generate_requirements_with_model(
-                    model_config=model_config,
-                    consigna=consigna,
-                    base_config=base_config
-                )
-                
-                if requirements:
-                    save_results(output_dir, dataset_name, student_id, 
-                               model_config["name"], requirements)
+            if requirements:
+                save_results(output_dir, dataset_name, model_config["name"], requirements)
     
     print(f"\n{'='*80}")
     print("PROCESO COMPLETADO")
@@ -206,13 +162,14 @@ def main():
     print("  outputs/model_requirements_comparison/")
     print("    ├── ej1-2025-s2-p2-ej1/")
     print("    │   ├── teacher_requirements.txt")
-    print("    │   ├── alu1/")
-    print("    │   │   ├── requirements_gpt-4o-mini.txt")
-    print("    │   │   ├── requirements_gemini-2.0-flash.txt")
-    print("    │   │   └── requirements_gemini-3-pro.txt")
-    print("    │   └── ...")
+    print("    │   ├── requirements_gpt-4o-mini.txt")
+    print("    │   ├── requirements_gemini-2.0-flash.txt")
+    print("    │   └── requirements_gemini-3-pro.txt")
     print("    └── ej1-2025-s2-p2-ej2/")
-    print("        └── ...")
+    print("        ├── teacher_requirements.txt")
+    print("        ├── requirements_gpt-4o-mini.txt")
+    print("        ├── requirements_gemini-2.0-flash.txt")
+    print("        └── requirements_gemini-3-pro.txt")
     print("\nAhora puedes revisar manualmente los requerimientos y compararlos con los del docente.")
 
 

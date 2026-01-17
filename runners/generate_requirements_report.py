@@ -26,22 +26,19 @@ def generate_text_report(results: dict):
         f.write("REPORTE DE EVALUACIÓN DE REQUERIMIENTOS\n")
         f.write("="*80 + "\n\n")
         
-        # Group by dataset and student
+        # Group by dataset
         by_dataset = {}
         for detail in results["detailed"]:
             dataset = detail["dataset"]
-            student = detail["student"]
-            key = (dataset, student)
             
-            if key not in by_dataset:
-                by_dataset[key] = []
-            by_dataset[key].append(detail)
+            if dataset not in by_dataset:
+                by_dataset[dataset] = []
+            by_dataset[dataset].append(detail)
         
-        # Generate report for each dataset/student/model
-        for (dataset, student), details in sorted(by_dataset.items()):
+        # Generate report for each dataset/model
+        for dataset, details in sorted(by_dataset.items()):
             f.write(f"\n{'='*80}\n")
             f.write(f"EJERCICIO: {dataset}\n")
-            f.write(f"ALUMNO: {student}\n")
             f.write(f"{'='*80}\n\n")
             
             # Group by model
@@ -265,21 +262,19 @@ def generate_html_report(results: dict):
     </div>
 """
     
-    # Group by dataset and student
+    # Group by dataset
     by_dataset = {}
     for detail in results["detailed"]:
         dataset = detail["dataset"]
-        student = detail["student"]
-        key = (dataset, student)
         
-        if key not in by_dataset:
-            by_dataset[key] = []
-        by_dataset[key].append(detail)
+        if dataset not in by_dataset:
+            by_dataset[dataset] = []
+        by_dataset[dataset].append(detail)
     
-    # Generate report for each dataset/student/model
-    for (dataset, student), details in sorted(by_dataset.items()):
+    # Generate report for each dataset/model
+    for dataset, details in sorted(by_dataset.items()):
         html += f"""
-    <h2>📝 {dataset} - {student}</h2>
+    <h2>📝 {dataset}</h2>
 """
         
         # Group by model
