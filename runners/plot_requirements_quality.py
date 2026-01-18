@@ -28,6 +28,18 @@ def create_quantity_chart(results: dict):
         datasets[dataset][detail["model"]].append(detail)
     
     for dataset_name, model_data in sorted(datasets.items()):
+        # Remove "ej1-" prefix from display name
+        display_name = dataset_name.replace('ej1-', '')
+        
+        # Cargar criterios del docente (total esperado)
+        teacher_reqs_path = OUTPUT_BASE / dataset_name / "teacher_requirements.txt"
+        max_criteria = 0
+        if teacher_reqs_path.exists():
+            with open(teacher_reqs_path, 'r') as f:
+                for line in f:
+                    if line.strip().startswith('- Requirement'):
+                        max_criteria += 1
+        
         models = list(model_data.keys())
         
         percentages = []
@@ -36,12 +48,22 @@ def create_quantity_chart(results: dict):
         
         for model in models:
             details = model_data[model]
+            # Contar requerimientos únicos (no duplicados) relacionados con el docente
+            seen_teacher_reqs = set()
+            unique_related = 0
+            
+            for d in details:
+                if d.get("related_to_teacher"):
+                    teacher_req_num = d.get("related_teacher_req_number")
+                    if teacher_req_num is not None and teacher_req_num not in seen_teacher_reqs:
+                        unique_related += 1
+                        seen_teacher_reqs.add(teacher_req_num)
+            
             total = len(details)
-            rel_count = sum(1 for d in details if d.get("related_to_teacher"))
-            pct = (rel_count / total * 100) if total > 0 else 0
+            pct = (unique_related / total * 100) if total > 0 else 0
             percentages.append(pct)
             totals.append(total)
-            relateds.append(rel_count)
+            relateds.append(unique_related)
         
         fig, ax = plt.subplots(figsize=(12, 8))
         
@@ -51,7 +73,7 @@ def create_quantity_chart(results: dict):
         
         ax.set_xlabel('Modelo', fontsize=14, fontweight='bold')
         ax.set_ylabel('Porcentaje de requerimientos relacionados (%)', fontsize=14, fontweight='bold')
-        ax.set_title(f'Precisión: Requerimientos Relacionados con Docente - {dataset_name}', fontsize=16, fontweight='bold', pad=20)
+        ax.set_title(f'Precisión: Requerimientos Relacionados con Docente - {display_name}', fontsize=16, fontweight='bold', pad=20)
         ax.set_xticks(x)
         ax.set_xticklabels(models, rotation=0, fontsize=12)
         ax.set_ylim(0, 105)
@@ -66,10 +88,10 @@ def create_quantity_chart(results: dict):
                        ha='center', va='center', fontsize=12, fontweight='bold', color='white')
         
         plt.tight_layout()
-        safe_name = dataset_name.replace('/', '_')
+        safe_name = display_name.replace('/', '_')
         output_path = PLOTS_DIR / f"precision_{safe_name}.png"
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
-        print(f"Precision chart for {dataset_name} saved to: {output_path}")
+        print(f"Precision chart for {display_name} saved to: {output_path}")
         plt.close()
 
 
@@ -83,6 +105,8 @@ def create_diversity_chart(results: dict):
         datasets[dataset][detail["model"]].append(detail)
     
     for dataset_name, model_data in sorted(datasets.items()):
+        # Remove "ej1-" prefix from display name
+        display_name = dataset_name.replace('ej1-', '')
         # Cargar criterios del docente
         teacher_reqs_path = OUTPUT_BASE / dataset_name / "teacher_requirements.txt"
         max_criteria = 0
@@ -108,7 +132,7 @@ def create_diversity_chart(results: dict):
         
         ax.set_xlabel('Modelo', fontsize=14, fontweight='bold')
         ax.set_ylabel('Cantidad de criterios', fontsize=14, fontweight='bold')
-        ax.set_title(f'Diversidad: Criterios Únicos Cubiertos - {dataset_name}', fontsize=16, fontweight='bold', pad=20)
+        ax.set_title(f'Diversidad: Criterios Únicos Cubiertos - {display_name}', fontsize=16, fontweight='bold', pad=20)
         ax.set_xticks(x)
         ax.set_xticklabels(models, rotation=0, fontsize=12)
         ax.grid(axis='y', alpha=0.3, linestyle='--')
@@ -123,10 +147,10 @@ def create_diversity_chart(results: dict):
                        ha='center', va='top', fontsize=11, fontweight='bold', color='white')
         
         plt.tight_layout()
-        safe_name = dataset_name.replace('/', '_')
+        safe_name = display_name.replace('/', '_')
         output_path = PLOTS_DIR / f"diversidad_{safe_name}.png"
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
-        print(f"Diversity chart for {dataset_name} saved to: {output_path}")
+        print(f"Diversity chart for {display_name} saved to: {output_path}")
         plt.close()
 
 
@@ -140,6 +164,8 @@ def create_stacked_bar_chart(results: dict):
         datasets[dataset][detail["model"]].append(detail)
     
     for dataset_name, model_data in sorted(datasets.items()):
+        # Remove "ej1-" prefix from display name
+        display_name = dataset_name.replace('ej1-', '')
         models = list(model_data.keys())
         not_related_counts = []
         duplicated_counts = []
@@ -190,7 +216,7 @@ def create_stacked_bar_chart(results: dict):
         
         ax.set_xlabel('Modelo', fontsize=14, fontweight='bold')
         ax.set_ylabel('Cantidad de requerimientos', fontsize=14, fontweight='bold')
-        ax.set_title(f'Desglose de Requerimientos - {dataset_name}', fontsize=16, fontweight='bold', pad=20)
+        ax.set_title(f'Desglose de Requerimientos - {display_name}', fontsize=16, fontweight='bold', pad=20)
         ax.set_xticks(x)
         ax.set_xticklabels(models, rotation=0, fontsize=12)
         ax.legend(fontsize=12, loc='upper left')
@@ -206,10 +232,10 @@ def create_stacked_bar_chart(results: dict):
                 ax.text(i, n + d + u/2, str(int(u)), ha='center', va='center', fontweight='bold', fontsize=10)
         
         plt.tight_layout()
-        safe_name = dataset_name.replace('/', '_')
+        safe_name = display_name.replace('/', '_')
         output_path = PLOTS_DIR / f"requirements_quality_stacked_{safe_name}.png"
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
-        print(f"Stacked chart for {dataset_name} saved to: {output_path}")
+        print(f"Stacked chart for {display_name} saved to: {output_path}")
         plt.close()
 
 

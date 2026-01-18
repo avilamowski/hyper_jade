@@ -39,16 +39,36 @@ def parse_requirements_file(filepath: Path) -> List[Dict[str, str]]:
     requirements = []
     
     # Split by "Requirement N:"
-    pattern = r'Requirement \d+:\s*\n\s*Type:\s*(\w+)\s*\n\s*Function:\s*([^\n]+)\s*\n\s*Description:\s*([^\n]+(?:\n(?!\s*Requirement|\s*$)[^\n]+)*)'
-    matches = re.findall(pattern, content, re.MULTILINE)
+    req_blocks = re.split(r'(?=Requirement \d+:)', content)
     
-    for i, match in enumerate(matches, 1):
-        req_type, function, description = match
+    for block in req_blocks:
+        block = block.strip()
+        if not block or not block.startswith('Requirement'):
+            continue
+        
+        # Extract requirement number
+        req_num_match = re.search(r'Requirement (\d+):', block)
+        if not req_num_match:
+            continue
+        req_id = int(req_num_match.group(1))
+        
+        # Extract type
+        type_match = re.search(r'Type:\s*(\w+)', block)
+        req_type = type_match.group(1).strip() if type_match else "unknown"
+        
+        # Extract function (optional)
+        function_match = re.search(r'Function:\s*([^\n]+)', block)
+        function = function_match.group(1).strip() if function_match else ""
+        
+        # Extract description
+        desc_match = re.search(r'Description:\s*(.+?)(?=\n\s*\n|$)', block, re.DOTALL)
+        description = desc_match.group(1).strip() if desc_match else ""
+        
         requirements.append({
-            "id": i,
-            "type": req_type.strip(),
-            "function": function.strip(),
-            "description": description.strip()
+            "id": req_id,
+            "type": req_type,
+            "function": function,
+            "description": description
         })
     
     return requirements
