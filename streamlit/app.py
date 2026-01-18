@@ -413,7 +413,22 @@ def _render_corrections_content(run_data: dict, run_key: str, sync_mode: bool):
 
 def _render_metrics_content(run_data: dict, run_key: str, sync_mode: bool):
     """Render metrics tab content."""
-    aux_metrics = run_data.get("auxiliary_metrics")
+    # Display Run-level metrics first (Costs/Tokens)
+    agg_metrics = run_data.get('aggregate_metrics')
+    if agg_metrics and 'token_usage' in agg_metrics:
+        token_usage = agg_metrics['token_usage']
+        total_tokens = token_usage.get('total_tokens', 0)
+        cost = token_usage.get('estimated_cost_usd', 0.0)
+        
+        st.markdown("##### 💸 Run Totals (All Submissions)")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Tokens", f"{total_tokens:,}")
+        with col2:
+            st.metric("Total Cost", f"${cost:.4f}")
+        st.divider()
+
+    aux_metrics = run_data.get('auxiliary_metrics')
     if aux_metrics:
         metrics = aux_metrics.get("auxiliary_metrics", aux_metrics)
         if isinstance(metrics, dict):

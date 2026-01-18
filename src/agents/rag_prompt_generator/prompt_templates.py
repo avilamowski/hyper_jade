@@ -19,7 +19,10 @@ class PromptTemplates:
     def __init__(self):
         # Get the directory where this module is located
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        templates_dir = os.path.join(current_dir, "templates")
+        # Go up 3 levels to getting to the project root (src/agents/rag_prompt_generator -> src/agents -> src -> hyper_jade)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        # Point to the root templates directory
+        templates_dir = os.path.join(project_root, "templates")
         
         # Initialize Jinja2 environment
         # NOTE: lstrip_blocks is NOT used to preserve code indentation in templates
@@ -33,16 +36,29 @@ class PromptTemplates:
         self._template_cache = {}
     
     def _get_template(self, language: Language, template_name: str) -> Template:
-        """Get a Jinja2 template for a specific language and template name."""
+        """Get a Jinja2 template. Tries:
+        1. rag/{language}/{template_name}.j2 (RAG specific)
+        2. {template_name}.jinja (Shared standard)
+        """
         cache_key = f"{language.value}_{template_name}"
         
         if cache_key not in self._template_cache:
-            template_path = f"{language.value}/{template_name}.j2"
+            # Try RAG specific path first
+            rag_path = f"rag/{language.value}/{template_name}.j2"
+            # Try shared path second
+            shared_path = f"{template_name}.jinja"
+            
             try:
-                template = self.jinja_env.get_template(template_path)
+                # Try loading RAG template first
+                try:
+                    template = self.jinja_env.get_template(rag_path)
+                except Exception:
+                    # Fallback to shared template
+                    template = self.jinja_env.get_template(shared_path)
+                    
                 self._template_cache[cache_key] = template
             except Exception as e:
-                raise ValueError(f"Template '{template_path}' not found: {e}")
+                raise ValueError(f"Template '{template_name}' not found at {rag_path} or {shared_path}: {e}")
         
         return self._template_cache[cache_key]
     

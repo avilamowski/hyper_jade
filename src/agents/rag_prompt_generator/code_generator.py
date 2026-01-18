@@ -47,19 +47,54 @@ class CodeGenerator:
         self.llm = self.llm_factory.create_llm(temperature=RAG_TEMPERATURE_EXAMPLE_GENERATION)
     
     @traceable(name="generate_initial_examples")
-    async def generate_examples(self, requirement: str, num_examples: int = 3, language: Language = Language.PYTHON) -> List[Dict[str, Any]]:
-        """Generate code examples for a given requirement."""
+    @traceable(name="generate_initial_examples")
+    async def generate_examples(self, requirement: Dict[str, Any] | str, num_examples: int = 3, language: Language = Language.PYTHON, theory_summary: str = "", assignment_description: str = "") -> List[Dict[str, Any]]:
+        """Generate code examples for a given requirement.
+        
+        Args:
+            requirement: Requirement object (dict) or requirement text (str)
+            num_examples: Number of examples to generate (used as default for correct/erroneous)
+            language: Programming language
+            theory_summary: Optional theory summary text
+            assignment_description: Optional assignment description
+        """
         try:
-            # Get language-specific prompt
+            # Handle requirement input types
+            if isinstance(requirement, str):
+                requirement_text = requirement
+                requirement_type_str = None
+            else:
+                requirement_text = requirement.get("requirement", "")
+                requirement_type = requirement.get("type")
+                if hasattr(requirement_type, 'value'):
+                    requirement_type_str = requirement_type.value
+                else:
+                    requirement_type_str = str(requirement_type) if requirement_type else None
+
+            # Select template based on requirement type (same logic as PromptGeneratorAgent)
+            # e.g., if type is 'error_presence', looks for 'examples_error_presence'
+            template_name = f"examples_{requirement_type_str}" if requirement_type_str else "examples"
+            
+            # Format arguments for the shared examples.jinja template
             prompt = self.prompt_templates.format_template(
                 language, 
-                "code_generation", 
-                requirement=requirement, 
-                num_examples=num_examples
+                template_name, 
+                requirement=requirement_text,
+                correct_example_quantity=num_examples,
+                erroneous_example_quantity=num_examples,
+                example_quantity=num_examples, # Backward compatibility
+                assignment_description=assignment_description,
+                theory_summary=theory_summary
             )
             
             # Get language-specific system message
-            system_message = self.prompt_templates.get_system_message(language, "code_generation")
+            # Get language-specific system message
+            # For shared templates, we can use a generic system message or try to load one
+            try:
+                system_message = self.prompt_templates.get_system_message(language, template_name)
+            except ValueError:
+                # Fallback if no system message exists for the shared template
+                system_message = "You are a helpful programming instructor. Always respond using the requested XML format."
             
             messages = [
                 SystemMessage(content=system_message),
@@ -398,14 +433,17 @@ class CodeExampleGenerator:
                                        max_theory_results: int = 5, 
                                        max_class_number: Optional[int] = None,
                                        dataset: str = "python",
-                                       assignment_description: str = "") -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+                                       assignment_description: str = "",
+                                       theory_summary: str = "") -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Generate code examples enhanced with course theory.
         Returns tuple of (correct_examples, erroneous_examples) where only correct examples are RAG-enhanced."""
         try:
             logger.info(f"Generating enhanced examples for: {requirement[:50]}...")
+            if theory_summary:
+                logger.info(f"Using theory summary for example generation ({len(theory_summary)} chars)")
             
             # Step 1: Generate initial examples (both correct and erroneous)
-            all_examples = await self.code_generator.generate_examples(requirement, num_examples)
+            all_examples = await self.code_generator.generate_examples(requirement, num_examples, theory_summary=theory_summary, assignment_description=assignment_description)
             
             if not all_examples:
                 logger.warning("No examples generated, returning empty lists")

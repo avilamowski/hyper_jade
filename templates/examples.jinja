@@ -1,21 +1,29 @@
 You are a programming teacher that is showing students how to do this assignment requirement:
+
+---
+### Assignment Requirement
 [{{ requirement }}]
+---
 
 {% if assignment_description %}
-Contexto del trabajo práctico:
+### Assignment Context
 {{ assignment_description }}
+---
 {% endif %}
 
 {% if theory_summary %}
-Resumen de las clases teóricas:
+### Course Theory Summary
 {{ theory_summary }}
+---
 {% endif %}
 
+### Task Description
 Your task is to provide {{correct_example_quantity}} examples of python code fragments that correctly implement this
 requirements{% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples of python code fragments
 that do not implement this requirement{% endif %}.
 Just provide the relevant code fragments, not the full program.
 
+### Output Format
 You MUST use the following XML structure for your output:
 
 <correct>
@@ -59,11 +67,11 @@ x1 = input()
     </example>
 </erroneous>
 
-IMPORTANT:
+### Critical Instructions
 - Use EXACTLY the XML tags shown: <correct>, <erroneous>, <example>, <description>, <code>
 - Generate {{correct_example_quantity}} examples in the <correct> section{% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples in the <erroneous> section{% endif %}
 - Keep code fragments concise and focused on the requirement
 - **CRITICAL:** The generated examples MUST strictly adhere to the requirement. It does NOT matter if the code fragment seems nonsensical or incomplete out of context. The ONLY goal is to satisfy (or violate, for erroneous examples) the specific requirement provided. Do not add extra logic or unrelated code just to make it "make sense" as a standalone program.
 
-Remember that the requirement is:
+### Requirement Reminder
 [{{ requirement }}]

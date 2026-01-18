@@ -196,6 +196,17 @@ def get_run_data(
     if eval_path.exists():
         with open(eval_path, 'r', encoding='utf-8') as f:
             result['evaluation_results'] = json.load(f)
+            
+    # Load aggregate metrics (tokens/cost) from parent timestamp directory
+    # run_path is .../timestamp/submission/
+    aggregate_path = run_path.parent / "aggregate_metrics.json"
+    if aggregate_path.exists():
+        try:
+            with open(aggregate_path, 'r', encoding='utf-8') as f:
+                agg_data = json.load(f)
+                result['aggregate_metrics'] = agg_data
+        except Exception:
+            pass
     
     return result
 

@@ -141,7 +141,7 @@ def format_rag_examples_simple(examples: str) -> str:
 
 # --- LangGraph Node: RAG-Enhanced Example Generation ---
 @traceable(name="rag_generate_examples")
-async def rag_example_generation_node(requirement: Requirement, agent_config: dict, llm, rag_system, code_generator, assignment_description: str = "") -> str:
+async def rag_example_generation_node(requirement: Requirement, agent_config: dict, llm, rag_system, code_generator, assignment_description: str = "", theory_summary: str = "") -> str:
     """
     Node for generating examples using RAG system and course theory.
     Generates both correct examples (RAG-enhanced) and erroneous examples (original).
@@ -154,7 +154,8 @@ async def rag_example_generation_node(requirement: Requirement, agent_config: di
             num_examples=3,
             max_theory_results=5,
             dataset="python",  # Default to python for now
-            assignment_description=assignment_description
+            assignment_description=assignment_description,
+            theory_summary=theory_summary
         )
         
         if not correct_examples and not erroneous_examples:
@@ -166,32 +167,9 @@ async def rag_example_generation_node(requirement: Requirement, agent_config: di
         logger.info(f"Formatting {len(correct_examples)} CORRECT examples for prompt generation")
         for i, example in enumerate(correct_examples, 1):
             code = example.get("code", "")
-            description = example.get("description", f"Example {i}")
-            improvements = example.get("improvements", [])
-            theory_alignment = example.get("theory_alignment", "")
-            class_name = example.get("class_name", "Unknown")
             
-            formatted_example = f"Correct example {i}: {description}\n"
-            formatted_example += f"**{class_name}**\n"  # Add class name
+            formatted_example = f"Correct example {i}:\n"
             formatted_example += f"```python\n{code}\n```\n"
-            
-            if improvements:
-                # Handle both list and string formats
-                if isinstance(improvements, list):
-                    improvements_str = '; '.join(str(imp) for imp in improvements if imp)
-                else:
-                    improvements_str = str(improvements)
-                if improvements_str:
-                    formatted_example += f"Improvements: {improvements_str}\n"
-            
-            if theory_alignment:
-                # Handle both list and string formats (sometimes it gets parsed as list)
-                if isinstance(theory_alignment, list):
-                    theory_alignment_str = ' '.join(str(ta) for ta in theory_alignment if ta)
-                else:
-                    theory_alignment_str = str(theory_alignment).strip()
-                if theory_alignment_str:
-                    formatted_example += f"Theory alignment: {theory_alignment_str}\n"
             
             formatted_correct_examples.append(formatted_example)
         
@@ -377,6 +355,21 @@ class RAGPromptGeneratorAgent:
         self.rag_system = None
         self.code_generator = None
         self.graph = None
+        
+        # Check if code_corrector has theory_summary enabled (for generated templates)
+        code_corrector_config = get_agent_config(config, "code_corrector")
+        theory_config_corrector = code_corrector_config.get('theory_summary', {})
+        self.theory_summary_for_templates_enabled = theory_config_corrector.get('enabled', False)
+        
+        # Check if prompt_generator has theory_summary enabled (for example generation)
+        theory_config_examples = self.agent_config.get('theory_summary', {})
+        self.theory_summary_for_examples_enabled = theory_config_examples.get('enabled', False)
+        self.theory_summary_path = theory_config_examples.get('path', 'data/clases_summary.txt')
+        
+        # Load theory summary content if enabled for example generation
+        self.theory_summary_content = ""
+        if self.theory_summary_for_examples_enabled:
+            self.theory_summary_content = self._load_theory_summary(self.theory_summary_path)
 
     def _setup_llm(self):
         provider = str(self.agent_config.get("provider", "openai")).lower().strip()
@@ -405,6 +398,57 @@ class RAGPromptGeneratorAgent:
             temperature=temperature,
         )
 
+    def _load_theory_summary(self, path: str) -> str:
+        """Load theory summary from file if it exists."""
+        try:
+            summary_path = Path(path)
+            if summary_path.exists():
+                content = summary_path.read_text(encoding='utf-8')
+                logger.info(f"Loaded theory summary from {path} ({len(content)} chars)")
+                return content
+            else:
+                logger.warning(f"Theory summary file not found at {path}")
+                return ""
+        except Exception as e:
+            logger.error(f"Error loading theory summary: {e}")
+            return ""
+
+    def _append_theory_summary_section(self, jinja_template: str) -> str:
+        """
+        Append conditional theory_summary section to the generated template.
+        This section will be rendered by the code_corrector when theory_summary is enabled.
+        """
+        if not self.theory_summary_for_templates_enabled:
+            return jinja_template
+        
+        # Find where {{ code }} is and insert theory_summary section before it
+        theory_section = (
+            "\n{% if theory_summary %}\n"
+            "---\n"
+            "Course Theory Reference:\n"
+            "{{ theory_summary }}\n"
+            "---\n"
+            "{% endif %}\n\n"
+        )
+        
+        # Insert before {{ code }} (with or without "Code to analyze:" label)
+        if "Code to analyze:\n{{ code }}" in jinja_template:
+            jinja_template = jinja_template.replace(
+                "Code to analyze:\n{{ code }}",
+                f"{theory_section}Code to analyze:\n{{{{ code }}}}"
+            )
+        elif "{{ code }}" in jinja_template:
+            jinja_template = jinja_template.replace(
+                "{{ code }}",
+                f"{theory_section}{{{{ code }}}}"
+            )
+        else:
+            # Fallback: append at the end
+            jinja_template += "\n" + theory_section
+        
+        logger.info("✓ Added theory_summary section to RAG-generated template")
+        return jinja_template
+
     async def initialize(self):
         """Initialize RAG system and code generator."""
         try:
@@ -423,6 +467,8 @@ class RAGPromptGeneratorAgent:
             logger.info("✅ RAG Prompt Generator initialized successfully")
             logger.info("🔧 RAG Mode: ENABLED")
             logger.info("📚 Course theory integration: ACTIVE")
+            logger.info(f"📚 Theory Summary for Example Generation: {'ENABLED' if self.theory_summary_for_examples_enabled else 'DISABLED'}")
+            logger.info(f"📚 Theory Summary for Code Correction: {'ENABLED' if self.theory_summary_for_templates_enabled else 'DISABLED'}")
             logger.info("=" * 50)
         except Exception as e:
             logger.error(f"Failed to initialize RAG Prompt Generator: {e}")
@@ -442,7 +488,7 @@ class RAGPromptGeneratorAgent:
             try:
                 # Generate RAG-enhanced examples
                 examples = await rag_example_generation_node(
-                    requirement, self.agent_config, self.llm, self.rag_system, self.code_generator, assignment_description
+                    requirement, self.agent_config, self.llm, self.rag_system, self.code_generator, assignment_description, self.theory_summary_content
                 )
                 
                 # Convert type string to PromptType if needed
@@ -462,6 +508,9 @@ class RAGPromptGeneratorAgent:
                     self.agent_config,
                     self.llm,
                 )
+                
+                # Post-process: Add theory_summary section if enabled
+                jinja_template = self._append_theory_summary_section(jinja_template)
                 
                 # Create result
                 generated_prompt = {

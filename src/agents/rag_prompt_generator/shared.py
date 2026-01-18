@@ -130,12 +130,41 @@ class XMLParser:
             
             # Try to find XML-like structure
             # Look for patterns like <example>, <code>, <approach>, etc.
+            
+            # Support both <correct><example>...</example></correct> and linear <example> list
+            correct_pattern = r'<correct[^>]*>(.*?)</correct>'
+            erroneous_pattern = r'<erroneous[^>]*>(.*?)</erroneous>'
+            incorrect_pattern = r'<incorrect[^>]*>(.*?)</incorrect>'  # For backward compatibility
+            
             example_pattern = r'<example[^>]*>(.*?)</example>'
             code_pattern = r'<code[^>]*>(.*?)</code>'
             approach_pattern = r'<approach[^>]*>(.*?)</approach>'
             description_pattern = r'<description[^>]*>(.*?)</description>'
             improvements_pattern = r'<improvements[^>]*>(.*?)</improvements>'
             theory_alignment_pattern = r'<theory_alignment[^>]*>(.*?)</theory_alignment>'
+            
+            # Extract content from sections if they exist
+            correct_content = ""
+            erroneous_content = ""
+            
+            # Check for <correct> section
+            correct_match = re.search(correct_pattern, cleaned_text, re.DOTALL | re.IGNORECASE)
+            if correct_match:
+                correct_content = correct_match.group(1)
+            
+            # Check for <erroneous> or <incorrect> section
+            erroneous_match = re.search(erroneous_pattern, cleaned_text, re.DOTALL | re.IGNORECASE)
+            if not erroneous_match:
+                erroneous_match = re.search(incorrect_pattern, cleaned_text, re.DOTALL | re.IGNORECASE)
+            
+            if erroneous_match:
+                erroneous_content = erroneous_match.group(1)
+                
+            # If we found sections, parse examples from each section
+            # For now, simplistic approach: just search for all examples in the raw text
+            # RAG pipeline mainly cares about "examples" in general, but ideally we should distinguish.
+            # However, the current signature returns List[Dict], so it flattens them.
+            # We'll just extract all <example> blocks.
             
             # Find all example blocks
             example_matches = re.findall(example_pattern, cleaned_text, re.DOTALL | re.IGNORECASE)
@@ -146,13 +175,18 @@ class XMLParser:
                     code_match = re.search(code_pattern, example_content, re.DOTALL | re.IGNORECASE)
                     code = code_match.group(1).strip() if code_match else "# No code found"
                     
-                    # Extract approach
-                    approach_match = re.search(approach_pattern, example_content, re.DOTALL | re.IGNORECASE)
-                    approach = approach_match.group(1).strip() if approach_match else "No approach provided"
-                    
                     # Extract description
                     desc_match = re.search(description_pattern, example_content, re.DOTALL | re.IGNORECASE)
                     description = desc_match.group(1).strip() if desc_match else f"Example {i+1}"
+
+                    # Extract approach - if missing, try to use description
+                    approach_match = re.search(approach_pattern, example_content, re.DOTALL | re.IGNORECASE)
+                    if approach_match:
+                        approach = approach_match.group(1).strip()
+                    else:
+                        # Fallback: use description as approach if approach/explanation is not explicitly tagged
+                        # but we have a description.
+                        approach = description if desc_match else "No approach provided"
                     
                     # Extract improvements (for improved examples)
                     improvements_match = re.search(improvements_pattern, example_content, re.DOTALL | re.IGNORECASE)

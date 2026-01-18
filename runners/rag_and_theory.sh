@@ -15,10 +15,10 @@ echo "============================================================"
 
 ./runners/multi_run.sh $ITERATIONS \
     rag \
+    plain \
+    ex_theory \
+    co_theory \
+    ex_theory_co_theory \
     rag_ex_theory \
     rag_co_theory \
     rag_ex_theory_co_theory
-    # plain \
-    # ex_theory \
-    # co_theory \
-    # ex_theory_co_theory
