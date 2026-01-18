@@ -54,7 +54,9 @@ def load_all_metrics(base_dir: Path, config: str):
                     'completeness': data['metric_averages']['completeness'],
                     'content_similarity': data['metric_averages']['content_similarity'],
                     'restraint': data['metric_averages']['restraint'],
-                    'average_overall_score': data['average_overall_score']
+                    'average_overall_score': data['average_overall_score'],
+                    'total_tokens': data.get('token_usage', {}).get('total_tokens', 0),
+                    'total_cost': data.get('token_usage', {}).get('estimated_cost_usd', 0.0)
                 })
         except Exception as e:
             print(f"⚠️  Error reading {file_path}: {e}")
@@ -65,7 +67,7 @@ def load_all_metrics(base_dir: Path, config: str):
 
 def calculate_statistics(all_data, configs):
     """Calculate mean and standard deviation for each metric across all configurations."""
-    metrics = ['completeness', 'content_similarity', 'restraint', 'average_overall_score']
+    metrics = ['completeness', 'content_similarity', 'restraint', 'average_overall_score', 'total_tokens', 'total_cost']
     stats = {}
     
     for config, runs in all_data.items():
@@ -155,11 +157,13 @@ def plot_comparison(base_dir, configs, plot_title=None, output_filename='compari
         'completeness': 'Completeness',
         'content_similarity': 'Content Similarity',
         'restraint': 'Restraint',
-        'average_overall_score': 'Average Overall Score'
+        'average_overall_score': 'Average Overall Score',
+        'total_tokens': 'Total Tokens',
+        'total_cost': 'Total Cost ($)'
     }
     
-    # Create figure with 2x2 subplots
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    # Create figure with 3x2 subplots
+    fig, axes = plt.subplots(3, 2, figsize=(14, 15))
     fig.suptitle(f'{plot_title} (Mean ± Std Dev)', fontsize=16, fontweight='bold')
     
     # Flatten axes for easier iteration
@@ -168,36 +172,62 @@ def plot_comparison(base_dir, configs, plot_title=None, output_filename='compari
     # Color palette - extend if more configs are needed
     base_colors = ['#9b59b6', '#3498db', '#e74c3c', '#2ecc71', '#f39c12', 
                    '#1abc9c', '#34495e', '#e67e22', '#95a5a6', '#d35400']
-    colors = base_colors[:len(configs)]
+    
+    # Create consistent color mapping
+    import itertools
+    color_cycle = itertools.cycle(base_colors)
+    config_color_map = {config: next(color_cycle) for config in configs}
     
     # Create bar plots with error bars
     for idx, metric in enumerate(metrics):
         ax = axes[idx]
         
-        # Extract mean and std for this metric
-        means = [stats[config][metric]['mean'] for config in configs if config in stats]
-        stds = [stats[config][metric]['std'] for config in configs if config in stats]
-        labels = [config_labels[config] for config in configs if config in stats]
-        n_runs = [stats[config][metric]['n'] for config in configs if config in stats]
+        # Extract data for this metric
+        plot_data = []
+        for config in configs:
+            if config in stats:
+                plot_data.append({
+                    'mean': stats[config][metric]['mean'],
+                    'std': stats[config][metric]['std'],
+                    'label': config_labels[config],
+                    'n': stats[config][metric]['n'],
+                    'color': config_color_map[config]
+                })
+        
+        means = [d['mean'] for d in plot_data]
+        stds = [d['std'] for d in plot_data]
+        labels = [d['label'] for d in plot_data]
+        n_runs = [d['n'] for d in plot_data]
+        bar_colors = [d['color'] for d in plot_data]
         
         # Create bars with error bars
         x_pos = np.arange(len(labels))
-        bars = ax.bar(x_pos, means, color=colors[:len(means)], alpha=0.8, edgecolor='black', linewidth=1.5,
+        bars = ax.bar(x_pos, means, color=bar_colors, alpha=0.8, edgecolor='black', linewidth=1.5,
                        yerr=stds, capsize=8, error_kw={'linewidth': 2, 'elinewidth': 2})
         
         # Add value labels on top of bars (mean ± std)
         for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.02,
-                    f'{mean:.3f}\n±{std:.3f}',
+            ax.text(bar.get_x() + bar.get_width()/2., height + std,
+                    f'{mean:.3f}\n±{std:.3f}' if metric != 'total_tokens' else f'{mean:.0f}\n±{std:.0f}',
                     ha='center', va='bottom', fontweight='bold', fontsize=9)
         
         # Styling
         ax.set_title(metric_titles[metric], fontsize=14, fontweight='bold', pad=10)
-        ax.set_ylabel('Score', fontsize=11)
-        ax.set_ylim(0, 1.1)  # Increased to accommodate error bars
+        ax.set_ylabel('Score' if metric not in ['total_tokens', 'total_cost'] else 'Value', fontsize=11)
+        
+        # Dynamic Y-limit
+        if metric in ['total_tokens', 'total_cost']:
+            # Auto scale with 10% padding
+            ax.autoscale(axis='y')
+            # Ensure 0 is at bottom
+            ylim = ax.get_ylim()
+            ax.set_ylim(0, ylim[1] * 1.15)
+        else:
+            ax.set_ylim(0, 1.1)  # Fixed scale for score metrics
+            
         ax.set_xticks(x_pos)
-        ax.set_xticklabels(labels)
+        ax.set_xticklabels(labels, rotation=45, ha='right', rotation_mode='anchor')
         ax.grid(axis='y', alpha=0.3, linestyle='--')
         ax.set_axisbelow(True)
         
