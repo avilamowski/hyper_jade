@@ -134,6 +134,14 @@ class CodeCorrectorAgent:
             logger.info("Error locator agent initialized")
 
         self.graph = self._build_graph()
+        
+        # Initialize theory summary if enabled
+        theory_config = self.agent_config.get('theory_summary', {})
+        self.theory_summary_enabled = theory_config.get('enabled', False)
+        self.theory_summary = ""
+        if self.theory_summary_enabled:
+            theory_path = theory_config.get('path', 'data/clases_summary.txt')
+            self.theory_summary = self._load_theory_summary(theory_path)
 
     def _setup_llm(self):
         provider = str(self.agent_config.get("provider", "openai")).lower().strip()
@@ -169,6 +177,22 @@ class CodeCorrectorAgent:
     @staticmethod
     def _strip_code_fences(text: str) -> str:
         return re.sub(r"```[a-zA-Z]*\n|```", "", text).strip()
+
+    def _load_theory_summary(self, path: str) -> str:
+        """Load theory summary from file if it exists."""
+        try:
+            from pathlib import Path
+            summary_path = Path(path)
+            if summary_path.exists():
+                content = summary_path.read_text(encoding='utf-8')
+                logger.info(f"Loaded theory summary from {path} ({len(content)} chars)")
+                return content
+            else:
+                logger.warning(f"Theory summary file not found at {path}")
+                return ""
+        except Exception as e:
+            logger.error(f"Error loading theory summary: {e}")
+            return ""
 
     def _call_llm(self, rendered_prompt: str) -> str:
         def _extract_text(raw):
@@ -291,6 +315,7 @@ class CodeCorrectorAgent:
                         code=student_code,
                         correct_examples=correct_examples,
                         erroneous_examples=erroneous_examples,
+                        theory_summary=self.theory_summary,
                     )
                 else:
                     # No examples available, render with empty examples
@@ -298,11 +323,13 @@ class CodeCorrectorAgent:
                         code=student_code,
                         correct_examples="",
                         erroneous_examples="",
+                        theory_summary=self.theory_summary,
                     )
             else:
                 # Template already has examples injected, only need to inject student code
                 rendered_prompt = Template(template_str).render(
                     code=student_code,
+                    theory_summary=self.theory_summary,
                 )
 
             # Call LLM for analysis

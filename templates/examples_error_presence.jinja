@@ -7,12 +7,14 @@ Assignment context:
 {{ assignment_description }}
 {% endif %}
 
-{% if classes_summary %}
+{% if theory_summary %}
 Class summary:
-{{ classes_summary }}
+{{ theory_summary }}
 {% endif %}
 
-Your task is to provide {{correct_example_quantity}} examples of python code fragments that do NOT have this error (correct code){% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples of python code fragments that DO have this error (incorrect code){% endif %}.
+Your task is to provide {{correct_example_quantity}} examples of python code fragments that do NOT have this error
+(correct code){% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples of python code
+fragments that DO have this error (incorrect code){% endif %}.
 Just provide the relevant code fragments, not the full program.
 
 You MUST use the following XML structure for your output:
@@ -28,7 +30,7 @@ def read_positive_number():
     return value
         </code>
     </example>
-    
+
     <example>
         <description>Brief description of why this code is correct (does NOT have the error)</description>
         <code>
@@ -51,7 +53,7 @@ def read_positive_number():
     return value
         </code>
     </example>
-    
+
     <example>
         <description>Brief description of what error this code has</description>
         <code>
@@ -61,7 +63,7 @@ def read_positive_number():
     </example>
 </erroneous>
 
-IMPORTANT: 
+IMPORTANT:
 - Use EXACTLY the XML tags shown: <correct>, <erroneous>, <example>, <description>, <code>
 - Generate {{correct_example_quantity}} examples in the <correct> section (code WITHOUT the error){% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples in the <erroneous> section (code WITH the error){% endif %}
 - Keep code fragments concise and focused on the error being checked

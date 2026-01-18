@@ -1,0 +1,32 @@
+title: "RAG and Theory Impact Comparison"
+output_path: "outputs/evaluation/theory_rag_experiment/rag_and_theory_comparison_plots_v2"
+base_dir: "outputs/evaluation/theory_rag_experiment"
+
+sorting:
+  by: "score" # default, alphabetic, score, overall_score
+  order: "desc" # asc, desc
+
+experiments:
+  - config: "plain"
+    label: "Plain"
+
+  - config: "rag"
+    label: "RAG"
+
+  - config: "ex_theory"
+    label: "Example Theory"
+
+  - config: "co_theory"
+    label: "Corrector Theory"
+
+  - config: "rag_ex_theory"
+    label: "RAG + Ex Theory"
+
+  - config: "rag_co_theory"
+    label: "RAG + Corr Theory"
+
+  - config: "rag_ex_theory_co_theory"
+    label: "RAG + Both Theory"
+
+  - config: "ex_theory_co_theory"
+    label: "Both Theory"

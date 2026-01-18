@@ -40,6 +40,10 @@ agents:
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
       error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
       stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
+    # Theory summary injection for example generation
+    theory_summary:
+      enabled: true
+      path: "data/clases_summary.txt"
 
   code_corrector:
     enabled: true
@@ -51,6 +55,12 @@ agents:
     # model_name: "gpt-4-turbo"  # Different model for code correction
     # provider: "openai"         # Different provider for code correction
     # temperature: 0.05          # Different temperature for code correction
+
+    # Theory summary injection for experiments
+    # When enabled, injects course theory into prompts via {{ theory_summary }}
+    theory_summary:
+      enabled: false
+      path: "data/clases_summary.txt" # Path to the summary file
 
   group_functions:
     enabled: false # DISABLED: Do NOT use AST-based function grouping

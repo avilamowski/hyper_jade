@@ -1,13 +1,14 @@
-# Configuration for Examples Quantity Experiment: 2 Correct, 3 Incorrect
-# WITHOUT RAG, WITHOUT FUNCTION ANALYZER
+# Configuration for Theory/RAG Experiment: ex_theory
+# Variables: RAG=false, Example Theory=true, Corrector Theory=false
 
 # Global LLM Configuration
 model_name: "gemini-2.0-flash"
 provider: "gemini"
 temperature: 0.1
 
-# Disable RAG
+# RAG Configuration
 enable_rag: false
+rag_knowledge_base: null
 
 # Agent Configuration
 agents:
@@ -18,15 +19,16 @@ agents:
 
   prompt_generator:
     enabled: true
-    # Experiment-specific: 2 correct examples, 3 incorrect examples
-    correct_example_quantity: 2
-    erroneous_example_quantity: 3
+    provider: "gemini"
+    model_name: "gemini-2.0-flash"
+    temperature: 0.15
+    example_quantity: 3
     templates:
       examples: "examples.jinja"
       examples_error_presence: "examples_error_presence.jinja"
-      default: "prompt_generators/requirement_presence.jinja"
+      default: "prompt_generators/requirement_explain/requirement_explain.jinja"
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
-      error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
+      error_presence: "prompt_generators/error_explain/error_explain.en2en.jinja"
       stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
     # Theory summary injection for example generation
     theory_summary:
@@ -38,15 +40,16 @@ agents:
     detailed_feedback: true
     include_suggestions: true
     include_learning_resources: true
-
-    # Theory summary injection for experiments
-    # When enabled, injects course theory into prompts via {{ theory_summary }}
+    provider: "gemini"
+    model_name: "gemini-2.0-flash"
+    temperature: 0.1
+    # Theory summary injection for code correction
     theory_summary:
       enabled: false
-      path: "data/clases_summary.txt" # Path to the summary file
+      path: "data/clases_summary.txt"
 
   group_functions:
-    enabled: false # DISABLED: Do NOT use AST-based function grouping
+    enabled: true
 
   agent_evaluator:
     enabled: false

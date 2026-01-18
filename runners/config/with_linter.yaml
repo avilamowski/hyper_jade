@@ -42,6 +42,10 @@ agents:
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
       error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
       stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
+    # Theory summary injection for example generation
+    theory_summary:
+      enabled: true
+      path: "data/clases_summary.txt"
 
   code_corrector:
     enabled: true
@@ -51,33 +55,39 @@ agents:
     # Agent-specific model configuration (optional)
     # Uncomment and modify these lines to use a different model for this agent
     # model_name: "gpt-4-turbo"  # Different model for code correction
-    
+
     # Linter configuration - ENABLED for experiments
     linter:
-      enabled: true  # <-- LINTER ENABLED
+      enabled: true # <-- LINTER ENABLED
       provider: "gemini"
       model_name: "gemini-2.0-flash"
       include_categories:
-        - "E"  # Errors
-        - "F"  # Fatal/pyflakes
-        - "W"  # Warnings
+        - "E" # Errors
+        - "F" # Fatal/pyflakes
+        - "W" # Warnings
       exclude_codes:
-        - "E501"  # Line too long
-        - "W291"  # Trailing whitespace
-        - "W292"  # No newline at end of file
-        - "W293"  # Blank line contains whitespace
-        - "E302"  # Expected 2 blank lines
-        - "E303"  # Too many blank lines
-        - "E305"  # Expected 2 blank lines after class or function
-        - "E711"  # Comparison to None should be 'if cond is None:'
-        - "E712"  # Comparison to True/False should be 'if cond:' or 'if not cond:'
-        - "E713"  # Test for membership should be 'not in'
-        - "E714"  # Test for object identity should be 'is not'
-        - "E721"  # Do not compare types, use 'isinstance()'
-        - "E722"  # Do not use bare 'except'
-        - "W503"  # Line break before binary operator
-        - "W504"  # Line break after binary operator
+        - "E501" # Line too long
+        - "W291" # Trailing whitespace
+        - "W292" # No newline at end of file
+        - "W293" # Blank line contains whitespace
+        - "E302" # Expected 2 blank lines
+        - "E303" # Too many blank lines
+        - "E305" # Expected 2 blank lines after class or function
+        - "E711" # Comparison to None should be 'if cond is None:'
+        - "E712" # Comparison to True/False should be 'if cond:' or 'if not cond:'
+        - "E713" # Test for membership should be 'not in'
+        - "E714" # Test for object identity should be 'is not'
+        - "E721" # Do not compare types, use 'isinstance()'
+        - "E722" # Do not use bare 'except'
+        - "W503" # Line break before binary operator
+        - "W504" # Line break after binary operator
       template: "linter/linter_relevance.jinja"
+
+    # Theory summary injection for experiments
+    # When enabled, injects course theory into prompts via {{ theory_summary }}
+    theory_summary:
+      enabled: false
+      path: "data/clases_summary.txt" # Path to the summary file
 
   group_functions:
     enabled: true

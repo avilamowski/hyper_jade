@@ -39,6 +39,10 @@ agents:
     provider: "openai"
     model_name: "gpt-4o-mini"
     temperature: 0.1
+    # Theory summary injection for example generation
+    theory_summary:
+      enabled: true
+      path: "data/clases_summary.txt"
 
   code_corrector:
     enabled: true
@@ -50,8 +54,13 @@ agents:
     model_name: "gemini-2.0-flash"
     temperature: 0.1
 
+    # Theory summary injection for code correction
+    theory_summary:
+      enabled: false
+      path: "data/clases_summary.txt"
+
   group_functions:
-    enabled: false  # DISABLED: Do NOT use AST-based function grouping
+    enabled: false # DISABLED: Do NOT use AST-based function grouping
 
   agent_evaluator:
     enabled: false

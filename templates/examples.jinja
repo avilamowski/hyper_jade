@@ -6,12 +6,14 @@ Contexto del trabajo práctico:
 {{ assignment_description }}
 {% endif %}
 
-{% if classes_summary %}
+{% if theory_summary %}
 Resumen de las clases teóricas:
-{{ classes_summary }}
+{{ theory_summary }}
 {% endif %}
 
-Your task is to provide {{correct_example_quantity}} examples of python code fragments that correctly implement this requirements{% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples of python code fragments that do not implement this requirement{% endif %}.
+Your task is to provide {{correct_example_quantity}} examples of python code fragments that correctly implement this
+requirements{% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples of python code fragments
+that do not implement this requirement{% endif %}.
 Just provide the relevant code fragments, not the full program.
 
 You MUST use the following XML structure for your output:
@@ -27,7 +29,7 @@ except ValueError:
     print("Invalid input")
         </code>
     </example>
-    
+
     <example>
         <description>Brief description of what makes this correct</description>
         <code>
@@ -48,7 +50,7 @@ raw_input = input("Enter x1: ")
 x1 = float(raw_input)
         </code>
     </example>
-    
+
     <example>
         <description>Brief description of what's wrong</description>
         <code>
@@ -57,7 +59,7 @@ x1 = input()
     </example>
 </erroneous>
 
-IMPORTANT: 
+IMPORTANT:
 - Use EXACTLY the XML tags shown: <correct>, <erroneous>, <example>, <description>, <code>
 - Generate {{correct_example_quantity}} examples in the <correct> section{% if erroneous_example_quantity > 0 %} and {{erroneous_example_quantity}} examples in the <erroneous> section{% endif %}
 - Keep code fragments concise and focused on the requirement

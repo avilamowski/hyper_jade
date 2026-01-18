@@ -167,7 +167,7 @@ def _split_examples_legacy(examples: str) -> tuple[str, str]:
 
 # --- LangGraph Node: Example Generation ---
 @traceable(name="example_generation")
-def example_generation_node(requirement: Requirement, assignment_description: str, classes_summary: str, agent_config: dict, llm) -> str:
+def example_generation_node(requirement: Requirement, assignment_description: str, theory_summary: str, agent_config: dict, llm) -> str:
     """
     Node for generating examples from a requirement.
     Returns the generated examples as a string.
@@ -205,7 +205,7 @@ def example_generation_node(requirement: Requirement, assignment_description: st
         correct_example_quantity=correct_example_quantity,
         erroneous_example_quantity=erroneous_example_quantity,
         assignment_description=assignment_description,
-        classes_summary=classes_summary
+        theory_summary=theory_summary
     )
 
     logger.info("[Node] Invoking LLM for examples...")
@@ -358,7 +358,7 @@ def prompt_generation_node(
 class PromptGeneratorState(TypedDict):
     # All fields are Annotated to allow concurrent writes
     assignment_description: Annotated[str, keep_last]
-    classes_summary: Annotated[str, keep_last]
+    theory_summary: Annotated[str, keep_last]
     requirements: Annotated[List[Requirement], keep_last]  # List of requirement strings
     
     # Output - use Annotated to allow multiple concurrent writes
@@ -382,11 +382,27 @@ class PromptGeneratorAgent:
         self.llm = self._setup_llm()
         self.graph = self._build_graph()
         
+        # Check if code_corrector has theory_summary enabled (for generated templates)
+        code_corrector_config = get_agent_config(config, "code_corrector")
+        theory_config_corrector = code_corrector_config.get('theory_summary', {})
+        self.theory_summary_for_templates_enabled = theory_config_corrector.get('enabled', False)
+        
+        # Check if prompt_generator has theory_summary enabled (for example generation)
+        theory_config_examples = self.agent_config.get('theory_summary', {})
+        self.theory_summary_for_examples_enabled = theory_config_examples.get('enabled', False)
+        self.theory_summary_path = theory_config_examples.get('path', 'data/clases_summary.txt')
+        
+        # Load theory summary content if enabled for example generation
+        self.theory_summary_content = ""
+        if self.theory_summary_for_examples_enabled:
+            self.theory_summary_content = self._load_theory_summary(self.theory_summary_path)
+        
         # Log that we're using standard (non-RAG) mode
         logger.info("📝 Initializing Standard Prompt Generator")
         logger.info("=" * 50)
         logger.info("🔧 RAG Mode: DISABLED")
-        logger.info("📚 Course theory integration: INACTIVE")
+        logger.info(f"📚 Theory Summary for Example Generation: {'ENABLED' if self.theory_summary_for_examples_enabled else 'DISABLED'}")
+        logger.info(f"📚 Theory Summary for Code Correction: {'ENABLED' if self.theory_summary_for_templates_enabled else 'DISABLED'}")
         logger.info("=" * 50)
 
     def _setup_llm(self):
@@ -413,6 +429,57 @@ class PromptGeneratorAgent:
                 temperature=temperature,
             )
 
+    def _load_theory_summary(self, path: str) -> str:
+        """Load theory summary from file if it exists."""
+        try:
+            summary_path = Path(path)
+            if summary_path.exists():
+                content = summary_path.read_text(encoding='utf-8')
+                logger.info(f"Loaded theory summary from {path} ({len(content)} chars)")
+                return content
+            else:
+                logger.warning(f"Theory summary file not found at {path}")
+                return ""
+        except Exception as e:
+            logger.error(f"Error loading theory summary: {e}")
+            return ""
+
+    def _append_theory_summary_section(self, jinja_template: str) -> str:
+        """
+        Append conditional theory_summary section to the generated template.
+        This section will be rendered by the code_corrector when theory_summary is enabled.
+        """
+        if not self.theory_summary_for_templates_enabled:
+            return jinja_template
+        
+        # Find where {{ code }} is and insert theory_summary section before it
+        theory_section = (
+            "\n{% if theory_summary %}\n"
+            "---\n"
+            "Course Theory Reference:\n"
+            "{{ theory_summary }}\n"
+            "---\n"
+            "{% endif %}\n\n"
+        )
+        
+        # Insert before {{ code }} (with or without "Code to analyze:" label)
+        if "Code to analyze:\n{{ code }}" in jinja_template:
+            jinja_template = jinja_template.replace(
+                "Code to analyze:\n{{ code }}",
+                f"{theory_section}Code to analyze:\n{{{{ code }}}}"
+            )
+        elif "{{ code }}" in jinja_template:
+            jinja_template = jinja_template.replace(
+                "{{ code }}",
+                f"{theory_section}{{{{ code }}}}"
+            )
+        else:
+            # Fallback: append at the end
+            jinja_template += "\n" + theory_section
+        
+        logger.info("✓ Added theory_summary section to generated template")
+        return jinja_template
+
     # -------------------------- LangGraph Nodes ------------------------------ #
 
     def _create_requirement_processor(self, requirement: Requirement, index: int):
@@ -423,12 +490,12 @@ class PromptGeneratorAgent:
         ) -> PromptGeneratorState:
             """Process a single requirement - generate examples and prompt template"""
             assignment_description = state["assignment_description"]
-            classes_summary = state.get("classes_summary", "")
+            theory_summary = state.get("theory_summary", "")
 
             logger.info(f"Processing requirement {index + 1}: {requirement['requirement'][:50]}...")
 
             # Generate examples
-            examples = example_generation_node(requirement, assignment_description, classes_summary, self.agent_config, self.llm)
+            examples = example_generation_node(requirement, assignment_description, theory_summary, self.agent_config, self.llm)
 
             # Generate Jinja2 template
             jinja_template = prompt_generation_node(
@@ -438,6 +505,9 @@ class PromptGeneratorAgent:
                 self.agent_config,
                 self.llm,
             )
+            
+            # Post-process: Add theory_summary section if enabled
+            jinja_template = self._append_theory_summary_section(jinja_template)
 
             # Store result with full requirement data
             result: GeneratedPrompt = {
@@ -530,17 +600,12 @@ class PromptGeneratorAgent:
             f"Generating {len(requirements)} prompts in parallel using dynamic graph"
         )
         
-        # Load classes summary if available
-        classes_summary = ""
-        summary_path = Path("data/clases_summary.txt")
-        if summary_path.exists():
-            try:
-                classes_summary = summary_path.read_text(encoding="utf-8")
-                logger.info(f"Loaded classes summary from {summary_path} ({len(classes_summary)} chars)")
-            except Exception as e:
-                logger.warning(f"Could not read classes summary: {e}")
+        # Use pre-loaded theory summary content (empty string if disabled)
+        theory_summary = self.theory_summary_content
+        if theory_summary:
+            logger.info(f"Using theory summary for example generation ({len(theory_summary)} chars)")
         else:
-            logger.info(f"Classes summary file not found at {summary_path}")
+            logger.info("Theory summary for example generation is disabled or not available")
 
         # Create dynamic graph for this batch
         self._create_dynamic_graph(requirements)
@@ -548,7 +613,7 @@ class PromptGeneratorAgent:
         # Create state for batch processing
         state: PromptGeneratorState = {
             "assignment_description": assignment_description,
-            "classes_summary": classes_summary,
+            "theory_summary": theory_summary,
             "requirements": requirements,
             "generated_prompts": [],
             "extra": {},

@@ -31,6 +31,10 @@ agents:
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
       error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
       stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
+    # Theory summary injection for example generation
+    theory_summary:
+      enabled: true
+      path: "data/clases_summary.txt"
 
   code_corrector:
     enabled: true
@@ -68,6 +72,11 @@ agents:
         - "W503"  # Line break before binary operator
         - "W504"  # Line break after binary operator
       template: "linter/linter_relevance.jinja"
+
+    # Theory summary injection for code correction
+    theory_summary:
+      enabled: false
+      path: "data/clases_summary.txt"
 
   group_functions:
     enabled: true

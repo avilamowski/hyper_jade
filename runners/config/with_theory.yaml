@@ -35,7 +35,6 @@ agents:
     example_quantity: 3
     templates:
       examples: "examples.jinja"
-      examples_error_presence: "examples_error_presence.jinja"
       default: "prompt_generators/requirement_explain/requirement_explain.jinja"
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
       error_presence: "prompt_generators/error_explain/error_explain.en2en.jinja"
@@ -43,8 +42,8 @@ agents:
     # Theory summary injection for example generation
     # When enabled, injects course theory into example generation prompts via {{ theory_summary }}
     theory_summary:
-      enabled: true # Set to true to inject theory into example generation
-      path: "data/clases_summary.txt" # Path to the theory summary file
+      enabled: true # Theory injection ENABLED for example generation
+      path: "data/clases_summary.txt"
 
   code_corrector:
     enabled: true
@@ -89,7 +88,7 @@ agents:
     # Theory summary injection for experiments
     # When enabled, injects course theory into prompts via {{ theory_summary }}
     theory_summary:
-      enabled: false
+      enabled: true # Theory injection ENABLED for this experiment config
       path: "data/clases_summary.txt" # Path to the summary file
 
   group_functions:
@@ -101,13 +100,6 @@ agents:
     # temperature: 0.1     # Different temperature for function grouping
     # provider: "openai"         # Different provider for code correction
     # temperature: 0.05          # Different temperature for code correction
-
-  error_locator:
-    enabled: true  # Enable to locate specific code fragments for errors
-    provider: "google"
-    model_name: "gemini-2.0-flash"
-    temperature: 0.1
-
 
   # Agent Evaluator Configuration
   agent_evaluator:
