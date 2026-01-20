@@ -1,16 +1,15 @@
-# Configuration for Model Comparison Experiment: gemini-2.5-pro
-# 3 Correct, 3 Incorrect examples
-# WITHOUT RAG, WITHOUT FUNCTION ANALYZER
-# requirement_generator & prompt_generator: gemini-2.5-pro
-# code_corrector: gemini-2.0-flash (fixed)
+# Configuration for Prompt Generator Model Comparison Experiment
+# Prompt generator using: gemini-3-flash-preview
+# All other agents using: gemini-2.0-flash
 
-# Global LLM Configuration (fallback)
+# Global LLM Configuration
 model_name: "gemini-2.0-flash"
 provider: "gemini"
 temperature: 0.1
 
-# Disable RAG
+# RAG Configuration
 enable_rag: false
+rag_knowledge_base: null
 
 # Agent Configuration
 agents:
@@ -18,16 +17,13 @@ agents:
     enabled: true
     template: "requirement_generator_tags.jinja"
     max_requirements: 10
-    # VARIES BY EXPERIMENT: gemini-2.5-pro
-    provider: "gemini"
-    model_name: "gemini-2.5-pro"
-    temperature: 0.1
 
   prompt_generator:
     enabled: true
-    # Standard: 3 correct examples, 3 incorrect examples
-    correct_example_quantity: 3
-    erroneous_example_quantity: 3
+    provider: "gemini"
+    model_name: "gemini-3-flash-preview"
+    temperature: 0.15
+    example_quantity: 3
     templates:
       examples: "examples.jinja"
       examples_error_presence: "examples_error_presence.jinja"
@@ -35,10 +31,6 @@ agents:
       requirement_presence: "prompt_generators/requirement_explain/requirement_explain.jinja"
       error_presence: "prompt_generators/error_explain/error_explain.es2es.jinja"
       stylistic: "prompt_generators/stylistic_explain/stylistic_explain.jinja"
-    # VARIES BY EXPERIMENT: gemini-2.5-pro
-    provider: "gemini"
-    model_name: "gemini-2.5-pro"
-    temperature: 0.1
     # Theory summary injection for example generation
     theory_summary:
       enabled: true
@@ -53,6 +45,33 @@ agents:
     provider: "gemini"
     model_name: "gemini-2.0-flash"
     temperature: 0.1
+    
+    # Linter configuration
+    linter:
+      enabled: true
+      provider: "gemini"
+      model_name: "gemini-2.0-flash"
+      include_categories:
+        - "E"  # Errors
+        - "F"  # Fatal/pyflakes
+        - "W"  # Warnings
+      exclude_codes:
+        - "E501"  # Line too long
+        - "W291"  # Trailing whitespace
+        - "W292"  # No newline at end of file
+        - "W293"  # Blank line contains whitespace
+        - "E302"  # Expected 2 blank lines
+        - "E303"  # Too many blank lines
+        - "E305"  # Expected 2 blank lines after class or function
+        - "E711"  # Comparison to None should be 'if cond is None:'
+        - "E712"  # Comparison to True/False should be 'if cond:' or 'if not cond:'
+        - "E713"  # Test for membership should be 'not in'
+        - "E714"  # Test for object identity should be 'is not'
+        - "E721"  # Do not compare types, use 'isinstance()'
+        - "E722"  # Do not use bare 'except'
+        - "W503"  # Line break before binary operator
+        - "W504"  # Line break after binary operator
+      template: "linter/linter_relevance.jinja"
 
     # Theory summary injection for code correction
     theory_summary:
@@ -60,7 +79,7 @@ agents:
       path: "data/clases_summary.txt"
 
   group_functions:
-    enabled: false # DISABLED: Do NOT use AST-based function grouping
+    enabled: true
 
   agent_evaluator:
     enabled: false

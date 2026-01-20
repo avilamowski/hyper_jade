@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # =============================================================================
-# Code Corrector Model Comparison Experiment
+# Prompt Generator Model Comparison Experiment
 # =============================================================================
 # This script runs multiple iterations of the evaluation pipeline with different
-# models for the code_corrector agent, then generates comparison plots.
+# models for the prompt_generator agent, then generates comparison plots.
 #
-# Models tested for code_corrector:
+# Models tested for prompt_generator:
 #   - gpt-4o-mini
 #   - gemini-2.0-flash
 #   - gemini-2.5-pro
@@ -15,14 +15,14 @@
 # All other agents use gemini-2.0-flash consistently across all runs.
 #
 # Usage:
-#   ./runners/run_model_comparison_experiment.sh [NUM_RUNS] [NUM_SUBMISSIONS]
+#   ./runners/run_prompt_generator_comparison.sh [NUM_RUNS] [NUM_SUBMISSIONS]
 #
 # Arguments:
 #   NUM_RUNS        - Number of runs for each model (default: 5)
 #   NUM_SUBMISSIONS - Number of submissions to evaluate per run (default: 10)
 #
 # Example:
-#   ./runners/run_model_comparison_experiment.sh 5 10
+#   ./runners/run_prompt_generator_comparison.sh 5 10
 # =============================================================================
 
 set -e  # Exit on error
@@ -30,7 +30,7 @@ set -e  # Exit on error
 # Configuration
 NUM_RUNS=${1:-5}
 NUM_SUBMISSIONS=${2:-10}
-EXPERIMENT_NAME="model_comparison_${NUM_SUBMISSIONS}subs"
+EXPERIMENT_NAME="prompt_generator_comparison"
 
 # Validate NUM_SUBMISSIONS (max 10 available)
 if [ "$NUM_SUBMISSIONS" -gt 10 ]; then
@@ -55,10 +55,10 @@ REQUIREMENTS="ejemplos/3p/requirements_es/*.json"
 EVALUATOR_CONFIG="runners/config/eval_config.yaml"
 
 # Output directory for this experiment
-BASE_OUTPUT_DIR="outputs/evaluation/${EXPERIMENT_NAME}"
+BASE_OUTPUT_DIR="outputs/prompt_generator_model_comparison"
 
 echo "============================================================"
-echo "🧪 CODE CORRECTOR MODEL COMPARISON EXPERIMENT"
+echo "🧪 PROMPT GENERATOR MODEL COMPARISON EXPERIMENT"
 echo "============================================================"
 echo "Configuration:"
 echo "  - Runs per model: $NUM_RUNS"
@@ -108,7 +108,7 @@ echo "============================================================"
 echo "🔍 PHASE 1/4: Running with gpt-4o-mini ($NUM_RUNS runs)"
 echo "============================================================"
 for run in $(seq 1 $NUM_RUNS); do
-    run_evaluation "gpt4o_mini" "runners/config/model_comparison/corrector_gpt4o_mini.yaml" $run
+    run_evaluation "gpt4o_mini" "runners/config/prompt_generator_comparison/prompt_gpt4o_mini.yaml" $run
 done
 
 # Run experiments for gemini-2.0-flash
@@ -116,7 +116,7 @@ echo "============================================================"
 echo "🔍 PHASE 2/4: Running with gemini-2.0-flash ($NUM_RUNS runs)"
 echo "============================================================"
 for run in $(seq 1 $NUM_RUNS); do
-    run_evaluation "gemini_2_0_flash" "runners/config/model_comparison/corrector_gemini_2_0_flash.yaml" $run
+    run_evaluation "gemini_2_0_flash" "runners/config/prompt_generator_comparison/prompt_gemini_2_0_flash.yaml" $run
 done
 
 # Run experiments for gemini-2.5-pro
@@ -124,7 +124,7 @@ echo "============================================================"
 echo "🔍 PHASE 3/4: Running with gemini-2.5-pro ($NUM_RUNS runs)"
 echo "============================================================"
 for run in $(seq 1 $NUM_RUNS); do
-    run_evaluation "gemini_2_5_pro" "runners/config/model_comparison/corrector_gemini_2_5_pro.yaml" $run
+    run_evaluation "gemini_2_5_pro" "runners/config/prompt_generator_comparison/prompt_gemini_2_5_pro.yaml" $run
 done
 
 # Run experiments for gemini-3-flash-preview
@@ -132,7 +132,7 @@ echo "============================================================"
 echo "🔍 PHASE 4/4: Running with gemini-3-flash-preview ($NUM_RUNS runs)"
 echo "============================================================"
 for run in $(seq 1 $NUM_RUNS); do
-    run_evaluation "gemini_3_flash_preview" "runners/config/model_comparison/corrector_gemini_3_flash_preview.yaml" $run
+    run_evaluation "gemini_3_flash" "runners/config/prompt_generator_comparison/prompt_gemini_3_flash.yaml" $run
 done
 
 # Calculate elapsed time
@@ -148,9 +148,9 @@ echo "============================================================"
 # Generate plots
 uv run python plots/plot_experiments.py \
     "$BASE_OUTPUT_DIR" \
-    gpt4o_mini gemini_2_0_flash gemini_2_5_pro gemini_3_flash_preview \
-    --title "Code Corrector Model Comparison (${NUM_SUBMISSIONS} submissions, ${NUM_RUNS} runs)" \
-    --output model_comparison
+    gpt4o_mini gemini_2_0_flash gemini_2_5_pro gemini_3_flash \
+    --title "Prompt Generator Model Comparison (${NUM_SUBMISSIONS} submissions, ${NUM_RUNS} runs)" \
+    --output prompt_generator_comparison
 
 echo ""
 echo "============================================================"
@@ -160,5 +160,5 @@ echo "Summary:"
 echo "  - Total runs: $((NUM_RUNS * 4))"
 echo "  - Time elapsed: ${ELAPSED_MIN}m ${ELAPSED_SEC}s"
 echo "  - Results: ${BASE_OUTPUT_DIR}/"
-echo "  - Plots: ${BASE_OUTPUT_DIR}/model_comparison.png"
+echo "  - Plots: ${BASE_OUTPUT_DIR}/prompt_generator_comparison.png"
 echo "============================================================"
