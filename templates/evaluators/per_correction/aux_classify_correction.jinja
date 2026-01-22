@@ -2,7 +2,11 @@ You are an expert evaluator for educational feedback systems. Your task is to cl
 
 # TASK
 
-Determine if any AI correction matches (semantically) this human correction.
+Determine if this human correction is MISSING from the AI output.
+Only classify as MATCH if you find a clear, strong correspondence with an AI correction.
+
+> WARNING: Do NOT force a match. It is completely acceptable and expected
+> that many human corrections will be MISSING from the AI output.
 
 ---HUMAN---
 
@@ -35,17 +39,25 @@ Determine if ANY of the AI corrections above match the human correction semantic
 
 ## IMPORTANT: What is a MATCH?
 
-Two corrections are a **MATCH** if they refer to the **same underlying problem/error**, even if:
+Two corrections are a **MATCH** if they refer to the **same specific problem/error**, even if:
 - They use different words or technical terminology
 - One describes the symptom, the other describes the root cause
 - One uses linting error codes (like F405, E501), the other describes the runtime behavior
 - One is more technical, the other is more descriptive
+
+A MATCH requires:
+- The **same type of issue** is identified (e.g., both about missing validation, both about incorrect return value)
 
 ## IMPORTANT: What is NOT a MATCH?
 
 - An AI correction that says "NO ERROR" or finds no problem CANNOT match a human correction that reports an error
 - Different issues are NOT a match (e.g., human reports validation error, AI reports formatting issue)
 - If no AI corrections are provided, the result is MISSING
+
+## WHEN IN DOUBT: MISSING
+
+If you are uncertain whether a match exists, classify as **MISSING**.
+A weak or tangential connection is NOT a match.
 
 ## Examples of MATCHES:
 
@@ -71,28 +83,39 @@ AI: "NO ERROR - The code correctly updates stock"
 
 # OUTPUT FORMAT
 
-Respond with XML inside <RESULT> tags:
+Respond with XML inside <RESULT> tags.
+
+  ## If MISSING (no AI correction matches):
 
   <RESULT>
-    <CLASSIFICATION>MATCH or MISSING</CLASSIFICATION>
-    <MATCHED_AI_INDEX>index of matching AI correction (0-based), or -1 if MISSING</MATCHED_AI_INDEX>
-    <MATCH_QUALITY>FULL or HIGH or PARTIAL</MATCH_QUALITY>
-    <IMPACT_SEVERITY>HIGH or MEDIUM or LOW (only relevant if MISSING)</IMPACT_SEVERITY>
-    <EXPLANATION>Brief explanation of your decision</EXPLANATION>
+    <CLASSIFICATION>MISSING</CLASSIFICATION>
+    <IMPACT_SEVERITY>HIGH or MEDIUM or LOW</IMPACT_SEVERITY>
+    <EXPLANATION>Brief explanation of why no AI correction matches</EXPLANATION>
   </RESULT>
 
-  ## Field Descriptions:
-
-  - **CLASSIFICATION**: "MATCH" if an AI correction matches, "MISSING" if none match
-  - **MATCHED_AI_INDEX**: 0-based index of the AI correction that matches (-1 if MISSING)
-  - **MATCH_QUALITY**:
-  - FULL: AI captured exact same issue
-  - HIGH: Same core issue, minor differences
-  - PARTIAL: AI mentioned it but missed details
-  - **IMPACT_SEVERITY** (only for MISSING):
+  - **IMPACT_SEVERITY**:
   - HIGH: Critical functional issue
   - MEDIUM: Important issue affecting quality
   - LOW: Minor issue
+
+  ## If MATCH (an AI correction matches):
+
+  <RESULT>
+    <CLASSIFICATION>MATCH</CLASSIFICATION>
+    <HUMAN_CORRECTION>Copy the human correction being classified here</HUMAN_CORRECTION>
+    <MATCHED_AI_CORRECTION>Copy the full text of the matching AI correction here</MATCHED_AI_CORRECTION>
+    <MATCHED_AI_INDEX>index of matching AI correction (1-based)</MATCHED_AI_INDEX>
+    <MATCH_QUALITY>FULL or HIGH</MATCH_QUALITY>
+    <EXPLANATION>Brief explanation of the match</EXPLANATION>
+  </RESULT>
+
+  - **HUMAN_CORRECTION**: The human correction being classified (copy from above)
+  - **MATCHED_AI_CORRECTION**: The full text of the AI correction that matches (copy from above)
+  - **MATCHED_AI_INDEX**: 1-based index of the AI correction that matches (e.g., 1 for [AI Correction 1])
+  - **MATCH_QUALITY**:
+  - FULL: AI captured exact same issue
+  - GENERAL: Same core issue, but Human provided more specific details
+  - SPECIFIC: Same core issue, but AI provided more specific details
 
   ---
 

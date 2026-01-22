@@ -403,8 +403,8 @@ class PerCorrectionStrategy(AuxMetricsStrategy):
             if index_match:
                 try:
                     idx = int(index_match.group(1).strip())
-                    if idx >= 0:  # -1 means no match
-                        result["matched_ai_index"] = idx
+                    if idx >= 1:  # -1 means no match, 1-based indexing from LLM
+                        result["matched_ai_index"] = idx - 1  # Convert to 0-based for internal use
                 except ValueError:
                     pass
             

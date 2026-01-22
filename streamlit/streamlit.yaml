@@ -6,4 +6,4 @@ assignment_path: "ejemplos/3p"
 
 # Path to evaluation outputs directory
 # Structure: outputs_path/{experiment_name}/{timestamp}/{submission}/
-outputs_path: "outputs/evaluation/theory_rag_experiment"
+outputs_path: "outputs/evaluation/theory_rag_experiment_1"
