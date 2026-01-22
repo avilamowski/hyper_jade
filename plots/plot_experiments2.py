@@ -55,8 +55,19 @@ def load_metrics(base_dir: Path, config: str):
             
     return metrics_list
 
+class NumpyEncoder(json.JSONEncoder):
+    """Special json encoder for numpy types"""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
 def calculate_stats(experiments, base_dir):
-    """Calculate statistics for all experiments."""
+    """Calculate statistics for all experiments and save to JSON."""
     stats = {}
     
     for exp in experiments:
@@ -74,6 +85,18 @@ def calculate_stats(experiments, base_dir):
                 'std': np.std(values, ddof=1) if len(values) > 1 else 0,
                 'n': len(values)
             }
+        
+        # Save distribution metrics for this experiment
+        exp_dir = base_dir / config_name
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        with open(exp_dir / "distribution_metrics.json", "w") as f:
+            json.dump(stats[config_name], f, indent=4, cls=NumpyEncoder)
+            print(f"Saved metrics to {exp_dir / 'distribution_metrics.json'}")
+    
+    # Save combined metric table
+    with open(base_dir / "metric_table.json", "w") as f:
+        json.dump(stats, f, indent=4, cls=NumpyEncoder)
+        print(f"Saved metric table to {base_dir / 'metric_table.json'}")
     
     return stats
 
@@ -126,19 +149,12 @@ def get_sorted_experiments(experiments, stats, metric, sorting_config):
 
     return [(e['config'], e['label']) for e in sorted_exps]
 
-def plot_all(config_data):
-    """Generate plots based on YAML configuration."""
+def plot_group(config_data, stats, group_name, metrics, output_suffix, figsize):
+    """Helper to plot a group of metrics"""
     base_dir = Path(config_data['base_dir'])
     experiments = config_data['experiments']
     sorting = config_data.get('sorting', {'by': 'default', 'order': 'asc'})
     
-    print(f"Loading metrics from {base_dir}...")
-    stats = calculate_stats(experiments, base_dir)
-    
-    if not stats:
-        print("❌ No data found for any experiment!")
-        sys.exit(1)
-
     metric_titles = {
         'completeness': 'Completeness',
         'content_similarity': 'Content Similarity',
@@ -148,43 +164,66 @@ def plot_all(config_data):
         'total_cost': 'Total Cost ($)'
     }
     
-    metrics = ['completeness', 'content_similarity', 'restraint', 'average_overall_score', 'total_tokens', 'total_cost']
+    # Calculate grid dimensions
+    n_metrics = len(metrics)
+    cols = 2
+    rows = (n_metrics + 1) // 2
     
-    # Plotting setup
-    # 3x2 grid to accommodate 6 plots
-    fig, axes = plt.subplots(3, 2, figsize=(14, 15))
-    fig.suptitle(f"{config_data.get('title', 'Experiment Comparison')}\n(Mean ± Std Dev)", fontsize=16, fontweight='bold')
-    axes = axes.flatten()
+    fig, axes = plt.subplots(rows, cols, figsize=figsize)
+    fig.suptitle(f"{config_data.get('title', 'Experiment Comparison')} - {group_name}\n(Mean ± Std Dev)", fontsize=16, fontweight='bold')
     
+    # Normalize axes to a flat list even if 1x2 or 2x2
+    if n_metrics == 1:
+        axes = [axes]
+    else:
+        axes = axes.flatten()
+
     base_colors = ['#9b59b6', '#3498db', '#e74c3c', '#2ecc71', '#f39c12', 
                    '#1abc9c', '#34495e', '#e67e22', '#95a5a6', '#d35400']
     
-    # Assign consistent colors to each experiment config
     all_configs = [exp['config'] for exp in experiments]
     import itertools
     config_color_map = {config: color for config, color in zip(all_configs, itertools.cycle(base_colors))}
     
+    def get_smart_ylim(max_val):
+        """
+        Returns the smallest value from {..., 0.1, 0.2, 0.5, 1, 2, 5, 10, ...} 
+        that is strictly greater than max_val * 1.05 (5% padding).
+        """
+        if max_val <= 0:
+            return 1.0
+            
+        target = max_val * 1.05 # Add padding
+        
+        # Find order of magnitude
+        magnitude = 10 ** np.floor(np.log10(target))
+        
+        # Check candidates: 1x, 2x, 5x, 10x of magnitude
+        candidates = [1 * magnitude, 2 * magnitude, 5 * magnitude, 10 * magnitude]
+        
+        for cand in candidates:
+            if cand >= target:
+                return cand
+                
+        return 10 * magnitude # Should strictly be covered by loop, but fallback
+
+
     for idx, metric in enumerate(metrics):
         ax = axes[idx]
         
-        # Get sorted data for this subplot
         sorted_items = get_sorted_experiments(experiments, stats, metric, sorting)
-        
         configs = [item[0] for item in sorted_items]
         labels = [item[1] for item in sorted_items]
         
         means = [stats[c][metric]['mean'] for c in configs]
         stds = [stats[c][metric]['std'] for c in configs]
-        n_runs = [stats[c][metric]['n'] for c in configs]
         
-        # Plot bars
         x_pos = np.arange(len(configs))
         bar_colors = [config_color_map[c] for c in configs]
         
         bars = ax.bar(x_pos, means, color=bar_colors, alpha=0.8, edgecolor='black', linewidth=1.5,
                       yerr=stds, capsize=8, error_kw={'linewidth': 2, 'elinewidth': 2})
         
-        # Add labels
         for bar, mean, std in zip(bars, means, stds):
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height + std,
@@ -193,30 +232,66 @@ def plot_all(config_data):
             
         ax.set_title(metric_titles[metric], fontsize=14, fontweight='bold')
         
-        # Dynamic Y-limit
-        if metric in ['total_tokens', 'total_cost']:
-            # Auto scale with 10% padding
-            ax.autoscale(axis='y')
-            # Ensure 0 is at bottom
-            ylim = ax.get_ylim()
-            ax.set_ylim(0, ylim[1] * 1.15)
-        else:
-            ax.set_ylim(0, 1.1)
+        # Smart Y-limit
+        # Calculate max value including error bars
+        max_val = 0
+        for m, s in zip(means, stds):
+            max_val = max(max_val, m + s)
+            
+        ylim = get_smart_ylim(max_val)
+        ax.set_ylim(0, ylim)
             
         ax.set_xticks(x_pos)
         ax.set_xticklabels(labels, rotation=45, ha='right', rotation_mode='anchor')
         ax.grid(axis='y', alpha=0.3, linestyle='--')
         
+    # Hide empty subplots
+    for i in range(len(metrics), len(axes)):
+        axes[i].axis('off')
+
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     
-    # Save output
     output_base = config_data.get('output_path', 'comparison_plot')
     output_dir = Path(output_base).parent
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    plt.savefig(f"{output_base}.png", dpi=300, bbox_inches='tight')
-    plt.savefig(f"{output_base}.pdf", bbox_inches='tight')
-    print(f"\n✅ Plots saved to {output_base}.png and .pdf")
+    final_path = f"{output_base}_{output_suffix}"
+    plt.savefig(f"{final_path}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{final_path}.pdf", bbox_inches='tight')
+    print(f"✅ Saved {group_name} plots to {final_path}.png and .pdf")
+    plt.close(fig)
+
+def plot_all(config_data):
+    """Generate plots based on YAML configuration."""
+    base_dir = Path(config_data['base_dir'])
+    experiments = config_data['experiments']
+    
+    print(f"Loading metrics from {base_dir}...")
+    stats = calculate_stats(experiments, base_dir)
+    
+    if not stats:
+        print("❌ No data found for any experiment!")
+        sys.exit(1)
+
+    # 1. Quality Metrics Group
+    plot_group(
+        config_data, 
+        stats, 
+        "Quality Metrics", 
+        ['completeness', 'content_similarity', 'restraint', 'average_overall_score'], 
+        "metrics", 
+        figsize=(14, 10)
+    )
+    
+    # 2. Cost Metrics Group
+    plot_group(
+        config_data, 
+        stats, 
+        "Cost & Tokens", 
+        ['total_tokens', 'total_cost'], 
+        "costs", 
+        figsize=(14, 6)
+    )
 
 def main():
     parser = argparse.ArgumentParser(description='YAML-configured plotting script')

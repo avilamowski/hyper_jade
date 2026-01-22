@@ -1,6 +1,6 @@
-title: "RAG and Theory Impact Comparison"
-output_path: "outputs/evaluation/theory_rag_experiment/rag_and_theory_comparison_plots_v2"
-base_dir: "outputs/evaluation/theory_rag_experiment"
+title: "Theory/RAG Experiment (P2 Ej1)"
+output_path: "outputs/evaluation/p2_ej1_theory_rag_experiment/plots"
+base_dir: "outputs/evaluation/p2_ej1_theory_rag_experiment"
 
 sorting:
   by: "score" # default, alphabetic, score, overall_score
