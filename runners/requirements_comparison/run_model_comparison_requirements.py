@@ -1,6 +1,6 @@
 """
 Script para comparar diferentes modelos en la generación de requerimientos.
-Genera requerimientos UNA VEZ por ejercicio (no por alumno) con múltiples modelos para análisis manual.
+Genera requerimientos múltiples veces por ejercicio (no por alumno) con múltiples modelos para análisis estadístico.
 """
 import sys
 import os
@@ -12,6 +12,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from src.agents.requirement_generator.requirement_generator import RequirementGeneratorAgent
 from src.config import load_config, load_langsmith_config
 
+
+# Número de corridas independientes para cada modelo
+NUM_RUNS = 5
 
 # Modelos a comparar (configuración: provider, model_name)
 # Solo modelos estables y con cuotas suficientes
@@ -66,18 +69,19 @@ def generate_requirements_with_model(model_config: dict, consigna: str, base_con
         return None
 
 
-def save_results(output_dir: Path, dataset_name: str, model_name: str, requirements: str):
-    """Guarda los requerimientos generados (una vez por ejercicio, no por alumno)."""
+def save_results(output_dir: Path, dataset_name: str, model_name: str, requirements: str, run_number: int):
+    """Guarda los requerimientos generados (una vez por ejercicio por corrida)."""
     # Crear directorio por dataset
     dataset_dir = output_dir / dataset_name
     dataset_dir.mkdir(parents=True, exist_ok=True)
     
-    # Guardar requirements por modelo directamente en el directorio del dataset
+    # Guardar requirements por modelo y run directamente en el directorio del dataset
     model_filename = model_name.replace("/", "_").replace(" ", "_")
-    output_file = dataset_dir / f"requirements_{model_filename}.txt"
+    output_file = dataset_dir / f"requirements_{model_filename}_run{run_number}.txt"
     
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(f"Model: {model_name}\n")
+        f.write(f"Run: {run_number}\n")
         f.write("="*80 + "\n\n")
         f.write(requirements)
     
@@ -123,11 +127,12 @@ def main():
     print("="*80)
     print("COMPARACIÓN DE MODELOS PARA GENERACIÓN DE REQUERIMIENTOS")
     print("="*80)
+    print(f"\nNúmero de corridas independientes: {NUM_RUNS}")
     print(f"\nModelos a comparar:")
     for model in MODELS:
         print(f"  - {model['name']} ({model['provider']}: {model['model_name']})")
     print(f"\nDatasets: {DATASETS}")
-    print("\nNOTA: Los requerimientos se generan UNA VEZ por ejercicio (no por alumno)")
+    print("\nNOTA: Los requerimientos se generan múltiples veces por ejercicio para análisis estadístico")
     
     # Procesar cada dataset
     for dataset_name in DATASETS:
@@ -143,16 +148,22 @@ def main():
         # Cargar consigna
         consigna = load_consigna(dataset_path)
         
-        # Generar con cada modelo
+        # Generar con cada modelo (múltiples corridas)
         for model_config in MODELS:
-            requirements = generate_requirements_with_model(
-                model_config=model_config,
-                consigna=consigna,
-                base_config=base_config
-            )
-            
-            if requirements:
-                save_results(output_dir, dataset_name, model_config["name"], requirements)
+            print(f"\n  Modelo: {model_config['name']}")
+            for run in range(1, NUM_RUNS + 1):
+                print(f"    Corrida {run}/{NUM_RUNS}...", end=" ")
+                requirements = generate_requirements_with_model(
+                    model_config=model_config,
+                    consigna=consigna,
+                    base_config=base_config
+                )
+                
+                if requirements:
+                    save_results(output_dir, dataset_name, model_config["name"], requirements, run)
+                    print("✓")
+                else:
+                    print("✗")
     
     print(f"\n{'='*80}")
     print("PROCESO COMPLETADO")
@@ -162,15 +173,17 @@ def main():
     print("  outputs/model_requirements_comparison/")
     print("    ├── ej1-2025-s2-p2-ej1/")
     print("    │   ├── teacher_requirements.txt")
-    print("    │   ├── requirements_gpt-4o-mini.txt")
-    print("    │   ├── requirements_gemini-2.0-flash.txt")
-    print("    │   └── requirements_gemini-3-pro.txt")
+    print(f"    │   ├── requirements_gpt-4o-mini_run1.txt ... run{NUM_RUNS}.txt")
+    print(f"    │   ├── requirements_gemini-2.0-flash_run1.txt ... run{NUM_RUNS}.txt")
+    print(f"    │   └── requirements_gemini-3-pro_run1.txt ... run{NUM_RUNS}.txt")
     print("    └── ej1-2025-s2-p2-ej2/")
     print("        ├── teacher_requirements.txt")
-    print("        ├── requirements_gpt-4o-mini.txt")
-    print("        ├── requirements_gemini-2.0-flash.txt")
-    print("        └── requirements_gemini-3-pro.txt")
+    print(f"        ├── requirements_gpt-4o-mini_run1.txt ... run{NUM_RUNS}.txt")
+    print(f"        ├── requirements_gemini-2.0-flash_run1.txt ... run{NUM_RUNS}.txt")
+    print(f"        └── requirements_gemini-3-pro_run1.txt ... run{NUM_RUNS}.txt")
+    print(f"\nTotal de archivos generados: {len(MODELS) * len(DATASETS) * NUM_RUNS} + {len(DATASETS)} teacher requirements")
     print("\nAhora puedes revisar manualmente los requerimientos y compararlos con los del docente.")
+    print("Para análisis estadístico, procesa todos los archivos run1...runN de cada modelo.")
 
 
 if __name__ == "__main__":

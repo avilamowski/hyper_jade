@@ -3,11 +3,14 @@ Script para evaluar la calidad de los requerimientos generados por cada modelo.
 Usa Gemini 2.0 Flash como evaluador "humano" para determinar:
 1. Si cada requerimiento tiene sentido
 2. Si está relacionado con los criterios del docente
+
+Puede evaluar una corrida específica con --run=N
 """
 import sys
 import os
 import json
 import re
+import argparse
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -32,9 +35,57 @@ DATASETS = ["ej1-2025-s2-p2-ej1", "ej1-2025-s2-p2-ej2"]
 # Output path
 OUTPUT_BASE = Path(__file__).parent.parent / "outputs" / "model_requirements_comparison"
 
+# Run number (global variable set by command line)
+RUN_NUMBER = None
 
-def parse_requirements_file(filepath: Path) -> List[Dict[str, str]]:
+
+def parse_requirements_file(filepath: Path, run_number: int) -> List[Dict[str, str]]:
     """Parsea un archivo de requerimientos y extrae cada uno."""
+    # Construct filename with run number
+    filename = filepath.stem + f"_run{run_number}" + filepath.suffix
+    filepath_with_run = filepath.parent / filename
+    
+    content = filepath_with_run.read_text()
+    requirements = []
+    
+    # Split by "Requirement N:"
+    req_blocks = re.split(r'(?=Requirement \d+:)', content)
+    
+    for block in req_blocks:
+        block = block.strip()
+        if not block or not block.startswith('Requirement'):
+            continue
+        
+        # Extract requirement number
+        req_num_match = re.search(r'Requirement (\d+):', block)
+        if not req_num_match:
+            continue
+        req_id = int(req_num_match.group(1))
+        
+        # Extract type
+        type_match = re.search(r'Type:\s*(\w+)', block)
+        req_type = type_match.group(1).strip() if type_match else "unknown"
+        
+        # Extract function (optional)
+        function_match = re.search(r'Function:\s*([^\n]+)', block)
+        function = function_match.group(1).strip() if function_match else ""
+        
+        # Extract description
+        desc_match = re.search(r'Description:\s*(.+?)(?=\n\s*\n|$)', block, re.DOTALL)
+        description = desc_match.group(1).strip() if desc_match else ""
+        
+        requirements.append({
+            "id": req_id,
+            "type": req_type,
+            "function": function,
+            "description": description
+        })
+    
+    return requirements
+
+
+def parse_requirements_file_direct(filepath: Path) -> List[Dict[str, str]]:
+    """Parsea un archivo de requerimientos directamente (ya tiene el nombre completo)."""
     content = filepath.read_text()
     requirements = []
     
@@ -183,6 +234,8 @@ Respond ONLY with the JSON, no other text."""
 
 def evaluate_all_requirements():
     """Evalúa todos los requerimientos generados por todos los modelos."""
+    global RUN_NUMBER
+    
     all_results = {
         "by_model": {},
         "by_dataset": {},
@@ -212,13 +265,14 @@ def evaluate_all_requirements():
         
         # Procesar cada modelo para este dataset
         for model in MODELS:
-            req_file = dataset_path / f"requirements_{model}.txt"
+            # Construct filename with run number
+            req_file = dataset_path / f"requirements_{model}_run{RUN_NUMBER}.txt"
             
             if not req_file.exists():
-                print(f"  {model}: File not found")
+                print(f"  {model}: File not found at {req_file}")
                 continue
             
-            requirements = parse_requirements_file(req_file)
+            requirements = parse_requirements_file_direct(req_file)
             print(f"\n  {model}: {len(requirements)} requirements")
             
             for req in requirements:
@@ -267,7 +321,7 @@ def evaluate_all_requirements():
     return all_results
 
 
-def save_results(results: Dict[str, Any]):
+def save_results(results: Dict[str, Any], run_number: int):
     """Guarda los resultados en un archivo JSON."""
     # Convert sets to counts and calculate uniqueness ratio
     for model in results["by_model"]:
@@ -285,7 +339,7 @@ def save_results(results: Dict[str, Any]):
         else:
             results["by_model"][model]["redundancy_ratio"] = 0
     
-    output_file = OUTPUT_BASE / "requirements_quality_evaluation.json"
+    output_file = OUTPUT_BASE / f"requirements_quality_evaluation_run{run_number}.json"
     with open(output_file, 'w') as f:
         json.dump(results, f, indent=2)
     print(f"\nResults saved to: {output_file}")
@@ -315,9 +369,16 @@ def print_summary(results: Dict[str, Any]):
 
 
 if __name__ == "__main__":
-    print("Evaluating requirements quality with Gemini 2.0 Flash...")
+    parser = argparse.ArgumentParser(description="Evaluate requirements quality with Gemini 2.0 Flash")
+    parser.add_argument("--run", type=int, required=True, help="Run number (1-5)")
+    args = parser.parse_args()
+    
+    RUN_NUMBER = args.run
+    
+    print(f"Evaluating requirements quality for RUN {RUN_NUMBER} with Gemini 2.0 Flash...")
     print("This may take a while as each requirement is evaluated individually.\n")
     
     results = evaluate_all_requirements()
-    save_results(results)
+    save_results(results, RUN_NUMBER)
     print_summary(results)
+
