@@ -21,7 +21,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
-load_dotenv(Path(__file__).parent.parent / ".env")
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 # Configurar Gemini
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -33,7 +33,7 @@ MODELS = ["gpt-4o-mini", "gemini-2.0-flash", "gemini-3-pro"]
 DATASETS = ["ej1-2025-s2-p2-ej1", "ej1-2025-s2-p2-ej2"]
 
 # Output path
-OUTPUT_BASE = Path(__file__).parent.parent / "outputs" / "model_requirements_comparison"
+OUTPUT_BASE = Path(__file__).parent.parent.parent / "outputs" / "model_requirements_comparison"
 
 # Run number (global variable set by command line)
 RUN_NUMBER = None
@@ -232,6 +232,43 @@ Respond ONLY with the JSON, no other text."""
         }
 
 
+def normalize_requirement_text(text: str) -> str:
+    """Normaliza el texto de un requerimiento para comparación."""
+    # Convertir a minúsculas y eliminar espacios extras
+    text = text.lower().strip()
+    # Eliminar puntuación al final
+    text = text.rstrip('.,;:!?')
+    return text
+
+
+def are_requirements_similar(req1_desc: str, req2_desc: str, threshold: float = 0.85) -> bool:
+    """
+    Determina si dos requerimientos son similares usando similitud de texto simple.
+    Retorna True si son esencialmente el mismo requerimiento.
+    """
+    norm1 = normalize_requirement_text(req1_desc)
+    norm2 = normalize_requirement_text(req2_desc)
+    
+    # Si son exactamente iguales después de normalizar
+    if norm1 == norm2:
+        return True
+    
+    # Calcular similitud simple basada en palabras en común
+    words1 = set(norm1.split())
+    words2 = set(norm2.split())
+    
+    if not words1 or not words2:
+        return False
+    
+    # Jaccard similarity
+    intersection = len(words1.intersection(words2))
+    union = len(words1.union(words2))
+    
+    similarity = intersection / union if union > 0 else 0
+    
+    return similarity >= threshold
+
+
 def evaluate_all_requirements():
     """Evalúa todos los requerimientos generados por todos los modelos."""
     global RUN_NUMBER
@@ -247,7 +284,9 @@ def evaluate_all_requirements():
             "total": 0,
             "related_to_teacher": 0,
             "unique_teacher_requirements": set(),  # Para trackear criterios únicos del docente
-            "teacher_req_counts": {}  # Para contar cuántas veces se usa cada req del docente
+            "teacher_req_counts": {},  # Para contar cuántas veces se usa cada req del docente
+            "unique_requirements": [],  # Lista de descripciones únicas de requerimientos
+            "unique_count": 0  # Contador de requerimientos únicos
         }
     
     for dataset in DATASETS:
@@ -275,6 +314,9 @@ def evaluate_all_requirements():
             requirements = parse_requirements_file_direct(req_file)
             print(f"\n  {model}: {len(requirements)} requirements")
             
+            # Lista de requerimientos únicos PARA ESTE DATASET
+            dataset_unique_reqs = []
+            
             for req in requirements:
                 print(f"    Evaluating requirement {req['id']}...", end=" ", flush=True)
                 
@@ -282,6 +324,19 @@ def evaluate_all_requirements():
                 
                 # Update counters
                 all_results["by_model"][model]["total"] += 1
+                
+                # Determinar si este requerimiento es único DENTRO DE ESTE DATASET
+                req_desc = req["description"]
+                is_unique = True
+                
+                for unique_desc in dataset_unique_reqs:
+                    if are_requirements_similar(req_desc, unique_desc):
+                        is_unique = False
+                        break
+                
+                if is_unique:
+                    dataset_unique_reqs.append(req_desc)
+                    all_results["by_model"][model]["unique_count"] += 1
                 
                 is_duplicated = False
                 if eval_result["related_to_teacher"]:
@@ -310,6 +365,7 @@ def evaluate_all_requirements():
                     "requirement_description": req["description"],
                     "related_to_teacher": eval_result["related_to_teacher"],
                     "is_duplicated": is_duplicated,
+                    "is_unique": is_unique,  # Nueva métrica
                     "related_teacher_req_number": eval_result["related_teacher_req_number"],
                     "related_teacher_req_text": eval_result["related_teacher_req_text"],
                     "reasoning": eval_result["reasoning"]
@@ -323,21 +379,34 @@ def evaluate_all_requirements():
 
 def save_results(results: Dict[str, Any], run_number: int):
     """Guarda los resultados en un archivo JSON."""
-    # Convert sets to counts and calculate uniqueness ratio
+    # Convert sets to counts and calculate metrics
     for model in results["by_model"]:
-        unique_count = len(results["by_model"][model]["unique_teacher_requirements"])
-        results["by_model"][model]["unique_teacher_requirements"] = unique_count
+        unique_teacher_count = len(results["by_model"][model]["unique_teacher_requirements"])
+        results["by_model"][model]["unique_teacher_requirements"] = unique_teacher_count
         
-        # Remove teacher_req_counts (not JSON serializable with tuple keys)
+        # Get unique requirements count
+        unique_req_count = results["by_model"][model]["unique_count"]
+        
+        # Remove non-serializable fields
         if "teacher_req_counts" in results["by_model"][model]:
             del results["by_model"][model]["teacher_req_counts"]
+        if "unique_requirements" in results["by_model"][model]:
+            del results["by_model"][model]["unique_requirements"]
         
-        # Calculate uniqueness ratio: related requirements / unique teacher criteria
+        # Calculate redundancy ratio: related requirements / unique teacher criteria
         related = results["by_model"][model]["related_to_teacher"]
-        if unique_count > 0:
-            results["by_model"][model]["redundancy_ratio"] = related / unique_count
+        if unique_teacher_count > 0:
+            results["by_model"][model]["redundancy_ratio"] = related / unique_teacher_count
         else:
             results["by_model"][model]["redundancy_ratio"] = 0
+        
+        # Calculate NEW diversity ratio: unique requirements / total requirements
+        # Esta es la métrica que mide: de los requerimientos generados, cuántos son únicos
+        total = results["by_model"][model]["total"]
+        if total > 0:
+            results["by_model"][model]["diversity_ratio"] = unique_req_count / total
+        else:
+            results["by_model"][model]["diversity_ratio"] = 0
     
     output_file = OUTPUT_BASE / f"requirements_quality_evaluation_run{run_number}.json"
     with open(output_file, 'w') as f:
@@ -358,14 +427,18 @@ def print_summary(results: Dict[str, Any]):
             continue
             
         related_pct = (stats["related_to_teacher"] / total) * 100
-        unique = stats["unique_teacher_requirements"]
+        unique_teacher = stats["unique_teacher_requirements"]
+        unique_reqs = stats["unique_count"]
         redundancy = stats["redundancy_ratio"]
+        diversity = stats.get("diversity_ratio", 0)
         
         print(f"\n{model}:")
         print(f"  Total requirements: {total}")
         print(f"  Related to teacher: {stats['related_to_teacher']}/{total} ({related_pct:.1f}%)")
-        print(f"  Unique teacher criteria covered: {unique}")
+        print(f"  Unique teacher criteria covered: {unique_teacher}")
         print(f"  Redundancy ratio: {redundancy:.2f} (avg requirements per criterion)")
+        print(f"  Unique requirements: {unique_reqs}/{total}")
+        print(f"  Diversity ratio: {diversity:.2%} (unique requirements / total)")
 
 
 if __name__ == "__main__":

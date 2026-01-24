@@ -154,7 +154,10 @@ def create_quantity_chart(all_runs: list):
 
 
 def create_diversity_chart(all_runs: list):
-    """Crea gráfico de DIVERSIDAD con promedios - SEPARADOS POR EJERCICIO."""
+    """Crea gráfico de DIVERSIDAD con promedios - SEPARADOS POR EJERCICIO.
+    Diversidad = Requerimientos únicos (basados en similitud de descripciones) / Total requerimientos generados
+    Mide qué porcentaje de los requerimientos generados son verdaderamente únicos.
+    """
     # Organizar datos por dataset y modelo
     stats_by_dataset = defaultdict(lambda: defaultdict(list))
     
@@ -169,37 +172,58 @@ def create_diversity_chart(all_runs: list):
         # Calcular diversidad para cada dataset y modelo en esta corrida
         for dataset_name, model_data in datasets.items():
             for model, details in model_data.items():
-                unique_criteria = len(set(d.get("related_teacher_req_number") for d in details 
-                                         if d.get("related_to_teacher")))
-                stats_by_dataset[dataset_name][model].append(unique_criteria)
+                # Contar requerimientos únicos basados en similitud de descripciones
+                total_reqs = len(details)
+                unique_count = 0
+                duplicated_count = 0
+                
+                for d in details:
+                    # Usar la nueva métrica is_unique que compara descripciones
+                    if d.get("is_unique", False):
+                        unique_count += 1
+                    else:
+                        duplicated_count += 1
+                
+                pct = (unique_count / total_reqs * 100) if total_reqs > 0 else 0
+                
+                stats_by_dataset[dataset_name][model].append({
+                    'unique': unique_count,
+                    'duplicated': duplicated_count,
+                    'total': total_reqs,
+                    'pct': pct
+                })
     
     # Crear gráficos para cada dataset
     for dataset_name in sorted(stats_by_dataset.keys()):
         display_name = dataset_name.replace('ej1-', '')
         
-        # Cargar criterios del docente
-        teacher_reqs_path = OUTPUT_BASE / dataset_name / "teacher_requirements.txt"
-        max_criteria = 0
-        if teacher_reqs_path.exists():
-            with open(teacher_reqs_path, 'r') as f:
-                for line in f:
-                    if line.strip().startswith('- Requirement'):
-                        max_criteria += 1
-        
-        print(f"Dataset: {dataset_name}, max_criteria (teacher): {max_criteria}")
+        print(f"\n=== DIVERSITY - Dataset: {dataset_name} ===")
         
         models = sorted(stats_by_dataset[dataset_name].keys())
         
         avg_unique = []
-        std_unique = []
+        avg_total = []
+        avg_pct = []
+        std_pct = []
         
         for model in models:
             runs = stats_by_dataset[dataset_name][model]
-            avg = np.mean(runs)
-            avg_unique.append(avg)
-            std_unique.append(np.std(runs))
-            print(f"  {model}: runs={runs}, avg={avg:.2f}")
-
+            avg_uniq = np.mean([r['unique'] for r in runs])
+            avg_dup = np.mean([r['duplicated'] for r in runs])
+            avg_tot = np.mean([r['total'] for r in runs])
+            avg_p = np.mean([r['pct'] for r in runs])
+            std_p = np.std([r['pct'] for r in runs])
+            
+            avg_unique.append(avg_uniq)
+            avg_total.append(avg_tot)
+            avg_pct.append(avg_p)
+            std_pct.append(std_p)
+            
+            print(f"  {model}:")
+            print(f"    unique: {[r['unique'] for r in runs]} → avg={avg_uniq:.1f}")
+            print(f"    duplicated: {[r['duplicated'] for r in runs]} → avg={avg_dup:.1f}")
+            print(f"    total: {[r['total'] for r in runs]} → avg={avg_tot:.0f}")
+            print(f"    diversity: {avg_p:.1f}%")
         
         fig, ax = plt.subplots(figsize=(14, 8))
         
@@ -207,26 +231,26 @@ def create_diversity_chart(all_runs: list):
         colors = [MODEL_COLORS[m] for m in models]
         edge_colors = [MODEL_EDGE_COLORS[m] for m in models]
         
-        bars = ax.bar(x, avg_unique, width=0.6, color=colors, linewidth=2,
-                     edgecolor=edge_colors, yerr=std_unique, capsize=5,
-                     error_kw={'linewidth': 2})
+        bars = ax.bar(x, avg_pct, width=0.6, color=colors, linewidth=2,
+                     edgecolor=edge_colors, yerr=std_pct, 
+                     capsize=5, error_kw={'linewidth': 2})
         
         ax.set_xlabel('Modelo', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Cantidad de criterios', fontsize=14, fontweight='bold')
-        ax.set_title(f'Diversidad: Criterios Únicos Cubiertos - {display_name}', 
+        ax.set_ylabel('Diversidad: Requerimientos únicos (%)', fontsize=14, fontweight='bold')
+        ax.set_title(f'Diversidad: Requerimientos Únicos por Similitud de Contenido - {display_name}', 
                     fontsize=16, fontweight='bold', pad=20)
         ax.set_xticks(x)
         ax.set_xticklabels(models, rotation=0, fontsize=12)
+        ax.set_ylim(0, 105)
         ax.grid(axis='y', alpha=0.3, linestyle='--')
         
         for i, bar in enumerate(bars):
             height = bar.get_height()
-            pct = (height / max_criteria * 100) if max_criteria > 0 else 0
-            ax.annotate(f'{height:.1f}/{max_criteria}\n({pct:.0f}%)',
-                       xy=(bar.get_x() + bar.get_width() / 2, height),
-                       xytext=(0, -100),
+            ax.annotate(f'{height:.1f}%',
+                       xy=(bar.get_x() + bar.get_width() / 2, height / 2),
+                       xytext=(0, 0),
                        textcoords="offset points",
-                       ha='center', va='top', fontsize=11, fontweight='bold', color='white')
+                       ha='center', va='center', fontsize=14, fontweight='bold', color='white')
         
         plt.tight_layout()
         safe_name = display_name.replace('/', '_')
